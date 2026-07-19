@@ -3876,6 +3876,13 @@ fn seed_builtins(doc: &LoroDoc) -> Result<bool, DocError> {
     // reference it as the string "inbox" and clients render its label
     // client-side. Touch the root containers so fresh docs keep the
     // same top-level shape; no ops are emitted for untouched roots.
+    //
+    // Starter content (e.g. a "Welcome" list) is deliberately NOT seeded
+    // here: genesis must stay a clean empty baseline so a second replica
+    // constructed the same way doesn't mint a duplicate. The
+    // account-creating *client* seeds via the public API right after
+    // create (see the web boot in App.tsx / the CLI init path); other
+    // devices receive it through sync.
     let _ = doc.get_map(ROOT_ITEMS);
     let _ = doc.get_movable_list(ROOT_LISTS);
     let _ = doc.get_map(ROOT_SETTINGS);
@@ -4432,7 +4439,8 @@ mod tests {
     #[test]
     fn new_doc_has_no_persisted_lists() {
         // Main is a reserved id with no ListMeta row, and there are no
-        // seeded user lists.
+        // seeded user lists — genesis stays a clean baseline; starter
+        // content is seeded client-side (see App.tsx / the CLI init path).
         let doc = Doc::new().unwrap();
         let lists = doc.all_lists();
         assert!(lists.is_empty());

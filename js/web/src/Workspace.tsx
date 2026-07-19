@@ -744,6 +744,30 @@ export function Workspace(props: {
   };
   onGlobalKey(onToggleDoneKey);
 
+  // f: toggle Focus on the current selection. Mirrors the row context
+  // menu's Add to focus / Remove from focus. Direction follows the group
+  // like toggle-done: any not-focused → add all (the core skips ids that
+  // are already focused or not Open), only remove when every selected item
+  // is already in the Focus lens.
+  const onToggleFocusKey = (e: KeyboardEvent) => {
+    if (e.key !== "f" && e.key !== "F") return;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const sel = actionSelection();
+    if (!sel) return;
+    const visibleSet = new Set(items().map((it) => it.id));
+    const ids = sel
+      .getSelectedKeys()
+      .map(String)
+      .filter((id) => visibleSet.has(id));
+    if (ids.length === 0) return;
+    e.preventDefault();
+    const focusedSet = new Set(app.state.focusOrder);
+    const allFocused = ids.every((id) => focusedSet.has(id));
+    if (allFocused) app.removeFromFocusMany(ids);
+    else app.addToFocusMany(ids);
+  };
+  onGlobalKey(onToggleFocusKey);
+
   // Duplicate live items as a contiguous block immediately after the
   // bottom-most source row — same shape as paste — rather than each
   // clone sitting under its own original. Shared by Cmd+D and the row
@@ -1044,21 +1068,27 @@ export function Workspace(props: {
   onGlobalKey(onBracketNavigate);
 
   // Drag items into a list nav button to move them to that list as the
-  // first items, or onto Bin to bin them. Discriminate from the
-  // nav's own list-reorder drag by checking detail.items[0] for an
-  // item-shaped record (`listId` is present on ItemView, absent on
-  // ListView). Bubbling + composed means a single document-level
-  // listener catches both Dnd instances.
+  // first items, onto Bin to bin them, or onto Focus to pin them into the
+  // Focus lens. Discriminate from the nav's own list-reorder drag by
+  // checking detail.items[0] for an item-shaped record (`listId` is
+  // present on ItemView, absent on ListView). Bubbling + composed means a
+  // single document-level listener catches both Dnd instances.
   type DropTarget =
     | { kind: "list"; el: HTMLElement; listId: string }
-    | { kind: "bin"; el: HTMLElement };
+    | { kind: "bin"; el: HTMLElement }
+    | { kind: "focus"; el: HTMLElement };
   const findDropTarget = (x: number, y: number): DropTarget | null => {
     const el = document
       .elementFromPoint(x, y)
-      ?.closest<HTMLElement>("[data-drop-list-id], [data-drop-bin]");
+      ?.closest<HTMLElement>(
+        "[data-drop-list-id], [data-drop-bin], [data-drop-focus]",
+      );
     if (!el) return null;
     if (el.dataset.dropListId !== undefined) {
       return { kind: "list", el, listId: el.dataset.dropListId };
+    }
+    if (el.dataset.dropFocus !== undefined) {
+      return { kind: "focus", el };
     }
     return { kind: "bin", el };
   };
@@ -1102,6 +1132,14 @@ export function Workspace(props: {
       });
       if (toBin.length === 0) return;
       app.setBinnedMany(toBin, true);
+      selection.clear();
+      return;
+    }
+    if (target.kind === "focus") {
+      // Same behaviour as the row context menu's "Add to focus": the core
+      // skips any id that is already focused or not Open, so a mixed drop
+      // resolves cleanly. Items keep their list — nothing moves.
+      app.addToFocusMany(idsInOrder);
       selection.clear();
       return;
     }

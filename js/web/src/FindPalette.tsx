@@ -16,6 +16,7 @@ import type { DocApp } from "./sync/store.ts";
 import type { SearchResult } from "./search.ts";
 import { useAppI18n } from "./i18n.tsx";
 import { isOverlayOpen, trackOverlay } from "./overlay.ts";
+import fileSvg from "./icons/file.svg?raw";
 
 export function FindPalette(props: {
   app: DocApp;
@@ -74,7 +75,13 @@ export function FindPalette(props: {
     const q = searchFilter();
     if (!q) return [];
     props.app.version();
-    return props.app.search.query(q, 50);
+    const results = props.app.search.query(q, 50);
+    // Float list results above items, preserving each group's relevance
+    // order (Array.sort is stable). The palette owns this presentation
+    // tweak — the engine's ranking is left untouched.
+    return results
+      .slice()
+      .sort((a, b) => (a.kind === "list" ? 0 : 1) - (b.kind === "list" ? 0 : 1));
   });
 
   // Reset selection whenever the result set changes.
@@ -169,6 +176,14 @@ export function FindPalette(props: {
     return props.app.state.listsById[listId]?.name ?? "";
   }
 
+  // Chosen icon for a list result (a literal emoji grapheme), or
+  // undefined when unset — the caller falls back to the default file
+  // glyph, mirroring the nav.
+  function listIcon(item: SearchResult): string | undefined {
+    if (item.kind !== "list") return undefined;
+    return props.app.state.listsById[item.id]?.icon;
+  }
+
   return (
     <Show when={props.open}>
       <Portal>
@@ -220,14 +235,42 @@ export function FindPalette(props: {
                   onMouseEnter={() => setSelectedIndex(i())}
                   onClick={() => selectItem(item)}
                 >
-                  {/* Slot is always rendered (even for lists) so titles
-                      stay aligned across mixed result kinds. */}
-                  <span
-                    class="palette__item-check"
-                    data-kind={item.kind}
-                    data-checked={item.lifecycle === "done" ? "" : undefined}
-                    aria-hidden="true"
-                  />
+                  {/* Slot is always rendered so titles stay aligned across
+                      mixed result kinds: a checkbox mirror for items, the
+                      list's icon for lists. */}
+                  <Show
+                    when={item.kind === "list"}
+                    fallback={
+                      <span
+                        class="palette__item-check"
+                        data-kind={item.kind}
+                        data-checked={
+                          item.lifecycle === "done" ? "" : undefined
+                        }
+                        aria-hidden="true"
+                      />
+                    }
+                  >
+                    <Show
+                      when={listIcon(item)}
+                      fallback={
+                        <span
+                          class="palette__item-icon"
+                          innerHTML={fileSvg}
+                          aria-hidden="true"
+                        />
+                      }
+                    >
+                      {(icon) => (
+                        <span
+                          class="palette__item-icon palette__item-icon-emoji"
+                          aria-hidden="true"
+                        >
+                          {icon()}
+                        </span>
+                      )}
+                    </Show>
+                  </Show>
                   <span class="palette__item-name">{item.title}</span>
                   <Show when={listLabel(item)}>
                     {(label) => (

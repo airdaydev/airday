@@ -64,8 +64,15 @@ describe("tokenize", () => {
     expect(tokenize("--- !!! ?? ")).toEqual([]);
   });
 
-  test("NFKC normalizes fullwidth digits / letters", () => {
+  test("NFKD normalizes fullwidth digits / letters", () => {
     expect(tokenize("Ｑ３")).toEqual(["q3"]);
+  });
+
+  test("folds accents so accent-free queries match accented text", () => {
+    expect(tokenize("artículo")).toEqual(["articulo"]);
+    expect(tokenize("Café Niño")).toEqual(["cafe", "nino"]);
+    // Both sides fold to the same token, so either direction matches.
+    expect(tokenize("articulo")).toEqual(tokenize("artículo"));
   });
 });
 

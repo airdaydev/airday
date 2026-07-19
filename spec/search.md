@@ -91,7 +91,10 @@ Notes:
 
 Normalization rules:
 
-- Unicode normalize (`NFKC` if available in the host)
+- Unicode normalize (`NFKD` if available in the host) and strip combining
+  marks, folding accents so an accent-free query matches accented text and
+  vice versa (`articulo` ↔ `artículo`). Applied to both indexed text and
+  queries via the shared tokenizer.
 - lowercase
 - trim surrounding whitespace
 - split on whitespace and punctuation

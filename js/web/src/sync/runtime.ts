@@ -11,11 +11,39 @@ import { Doc, SyncEngine } from "@airday/core/wasm";
 import { IdbStorage, putDevice } from "@airday/core";
 import { savePrefs, type Prefs, type ViewKey } from "../prefs.ts";
 import { type Session } from "../Login.tsx";
-import { createSyncedApp } from "./store.ts";
+import { createSyncedApp, type DocApp } from "./store.ts";
 import { createSyncBridge, SyncBridge } from "./sync.ts";
 
 const CLIENT_NAME = "airday-web";
 const CLIENT_VERSION = "0.1.0";
+
+// Onboarding items for a brand-new account's "Welcome" list — learn by
+// doing: the item text names the gesture, and completing it (ticking the
+// box) is itself the lesson. The first item's descriptive line lives in
+// its notes rather than as its own checkbox. Kept literal (user-list
+// content is user-authored plain text, not localized).
+const WELCOME_ITEMS = [
+  "Welcome to Airday",
+  "Press 'space' to create a new item",
+  "Tick the box (or press 'x') to complete an item",
+  "Press 'f' to add an item to Focus",
+  "Press '?' to see all keyboard shortcuts",
+] as const;
+const WELCOME_NOTE =
+  "Airday helps you capture and organise your ideas, tasks, and projects.";
+
+/** Seed a fresh account's starter list and onboarding items; returns the
+ *  new list's id so the caller can open it. The list is freshly created
+ *  (empty), so inserting the batch at index 0 keeps the authored order —
+ *  and sidesteps the wasm32 `usize` (32-bit) overflow a "very large append
+ *  index" would hit. */
+function seedWelcome(app: DocApp): string {
+  const welcomeId = app.addList("Welcome");
+  app.setListIcon(welcomeId, "👋");
+  const ids = app.addItemsAt(welcomeId, [...WELCOME_ITEMS], 0);
+  if (ids[0]) app.editItemNotes(ids[0], WELCOME_NOTE);
+  return welcomeId;
+}
 
 /** Everything `BootGate` rebuilds from the op log before the runtime can
  *  start: the doc, the durable cursors, and the opened store. */
@@ -265,11 +293,26 @@ export function createWorkspaceRuntime(props: {
     ),
   );
 
-  // Freshly-created doc (signup, or a brand-new anonymous doc): persist
-  // the seeded built-ins as the first op row so a reload before any user
-  // mutation still has something to replay. The op row is unacked, so
-  // for authed sessions it also pushes to the server via the outbox.
+  // Freshly-created doc (signup, or a brand-new anonymous doc): seed a
+  // friendly starter list so the workspace opens with more than an empty
+  // Inbox, then persist as the first op row so a reload before any user
+  // mutation still has something to replay. Seeding goes through the
+  // normal mutation path, so it commits and (for authed sessions) pushes
+  // to the server via the outbox; other devices receive it through sync.
+  // Genesis in the core stays a clean empty baseline (see App.tsx boot);
+  // the account-creating client is the single seeder, so no duplicate
+  // arises. Guard on emptiness so a re-entrant boot can't double-seed.
   if (props.boot.seeded) {
+    if (Object.keys(app.state.listsById).length === 0) {
+      const welcomeId = seedWelcome(app);
+      // Open the Welcome list on the very first launch so the onboarding
+      // items are what a new user sees (Inbox stays the pure capture
+      // surface). Only overrides the default Inbox landing — never a real
+      // saved view — and the deferred prefs-save persists it from here on.
+      if (!props.boot.prefs?.currentView) {
+        setView({ kind: "list", id: welcomeId });
+      }
+    }
     capture();
     scheduleDurable();
   }

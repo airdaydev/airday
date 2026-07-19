@@ -400,6 +400,7 @@ export function Nav(props: {
           type="button"
           class="nav-item"
           data-active={props.view.kind === "focus" ? "" : undefined}
+          data-drop-focus=""
           onClick={() => props.setView({ kind: "focus" })}
         >
           <span class="nav-item-icon" innerHTML={arrowRightSvg} />

@@ -547,6 +547,7 @@ export function Row(props: {
               onSelect={onToggleFocusSelection}
             >
               {focused() ? m().focus.remove : m().focus.add}
+              <kbd class="menu-shortcut">F</kbd>
             </ContextMenu.Item>
           </Show>
           <Show when={inFocusView()}>
@@ -555,6 +556,7 @@ export function Row(props: {
               onSelect={onRemoveFromFocusSelection}
             >
               {m().focus.remove}
+              <kbd class="menu-shortcut">F</kbd>
             </ContextMenu.Item>
           </Show>
           <Show when={!isBinned(props.item())}>

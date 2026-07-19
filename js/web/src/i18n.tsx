@@ -152,6 +152,7 @@ type Messages = {
     editItem: string;
     openItem: string;
     toggleDone: string;
+    toggleFocus: string;
     duplicate: string;
     copy: string;
     undo: string;
@@ -318,6 +319,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       editItem: "Editar elemento",
       openItem: "Abrir elemento",
       toggleDone: "Marcar como hecho",
+      toggleFocus: "Añadir o quitar de Enfoque",
       duplicate: "Duplicar",
       copy: "Copiar",
       undo: "Deshacer",
@@ -480,6 +482,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       editItem: "Edit item",
       openItem: "Open item",
       toggleDone: "Toggle done",
+      toggleFocus: "Toggle focus",
       duplicate: "Duplicate",
       copy: "Copy",
       undo: "Undo",

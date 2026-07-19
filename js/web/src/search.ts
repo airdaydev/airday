@@ -47,9 +47,21 @@ interface SearchDoc {
 // "roadmap"]). NFKC + lowercase first so width / case variants collapse.
 const TOKEN_SPLIT = /[^\p{L}\p{N}]+/u;
 
+// Combining marks left behind by decomposition. Stripping them folds
+// accents so an accent-free query matches accented text and vice versa
+// ("articulo" <-> "artículo"). Runs on both indexed text and queries via
+// the shared tokenizer, so both sides meet at the folded form. NFKD
+// (compatibility decomposition) also keeps the width/variant folding the
+// prior NFKC pass provided.
+const COMBINING_MARKS = /\p{M}/gu;
+
 export function tokenize(input: string): string[] {
   if (!input) return [];
-  const normalized = input.normalize("NFKC").toLowerCase().trim();
+  const normalized = input
+    .normalize("NFKD")
+    .replace(COMBINING_MARKS, "")
+    .toLowerCase()
+    .trim();
   if (!normalized) return [];
   const out: string[] = [];
   const seen = new Set<string>();

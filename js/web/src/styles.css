@@ -2455,6 +2455,30 @@ body {
   border-color: #ffffff30;
 }
 
+/* Leading glyph for a list result, occupying the same 14px slot as an
+   item's checkbox mirror so titles stay aligned. Default file glyph
+   inherits the muted currentColor; an emoji keeps its intrinsic color. */
+.palette__item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+}
+
+.palette__item-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.palette__item-icon-emoji {
+  font-size: 13px;
+  line-height: 1;
+  color: inherit;
+}
+
 .palette__item--binned .palette__item-name {
   text-decoration: line-through;
   color: var(--text-muted);

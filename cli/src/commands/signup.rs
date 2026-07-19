@@ -109,12 +109,36 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     let primary_doc_uuid = uuid::Uuid::parse_str(&resp.primary_doc_id)
         .map_err(|e| anyhow::anyhow!("server returned malformed primary_doc_id: {e}"))?;
     let doc_id = airday_core::DocId(primary_doc_uuid);
-    // Seed the local doc with built-in lists, written as the baseline
-    // snapshot. The seed travels to future devices as the first push on
-    // the op stream. Account identity goes in the same db; secrets.toml
-    // is written last — it's the "logged in" marker.
+    // Seed the local doc, written as the baseline snapshot. This device is
+    // the account's device-1 (genesis); the starter "Welcome" list is
+    // seeded here via the public API so a CLI-created account isn't an
+    // empty shell, and it travels to future devices through snapshot
+    // bootstrap. (The web client seeds the equivalent when it is the
+    // account creator; see js/web/src/sync/runtime.ts.) Account identity
+    // goes in the same db; secrets.toml is written last — the "logged in"
+    // marker.
     let storage = crate::storage::open_storage(&profile)?;
-    crate::storage::seed_snapshot(&storage, &dek, doc_id, &Doc::new()?)?;
+    let doc = Doc::new()?;
+    let welcome = doc.add_list("Welcome")?;
+    doc.set_list_icon(&welcome, "👋")?;
+    // Same onboarding content the web client seeds (see runtime.ts): a few
+    // learn-by-doing items, with the first item's descriptive line in its
+    // notes. The list is empty, so index 0 keeps the authored order.
+    let welcome_items = [
+        "Welcome to Airday",
+        "Press 'space' to create a new item",
+        "Tick the box (or press 'x') to complete an item",
+        "Press 'f' to add an item to Focus",
+        "Press '?' to see all keyboard shortcuts",
+    ];
+    let item_ids = doc.add_items_at(&welcome, &welcome_items, 0)?;
+    if let Some(first) = item_ids.first() {
+        doc.edit_item_notes(
+            first,
+            "Airday helps you capture and organise your ideas, tasks, and projects.",
+        )?;
+    }
+    crate::storage::seed_snapshot(&storage, &dek, doc_id, &doc)?;
     storage.write_account(&Account {
         account_id: resp.account_id.clone(),
         email: email.clone(),
