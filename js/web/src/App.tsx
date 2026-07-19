@@ -18,6 +18,7 @@ import { type Session } from "./Login.tsx";
 import { Workspace } from "./Workspace.tsx";
 import { createWorkspaceRuntime, type BootInfo } from "./sync/runtime.ts";
 import { SessionProvider, useSession } from "./SessionContext.tsx";
+import { clearAuthPromptDismissed } from "./nav.tsx";
 
 export function App() {
   const { m, locale, direction } = useAppI18n();
@@ -80,6 +81,9 @@ export function App() {
       }
     }
     await dekVault.clear();
+    // Signing out is a deliberate act — re-prompt the fresh anonymous
+    // session to sign back in, even if the prompt was dismissed before.
+    clearAuthPromptDismissed();
     setBoot(null);
     setBootError(null);
     setOnline(false);

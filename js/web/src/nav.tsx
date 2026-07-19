@@ -27,6 +27,36 @@ import { pasteAsPlainText } from "./plainTextPaste.ts";
 import type { ViewKey } from "./prefs.ts";
 import type { DocApp } from "./sync/store.ts";
 
+// Whether the anonymous-session sign-in prompt has been dismissed. Auto-
+// opening the auth dialog on every load is nagging once the user has
+// deliberately closed it, so we persist a single flag and skip the
+// auto-open while it's set. Purely local UI state — same localStorage
+// rationale as the board prefs in Workspace.tsx. Cleared on logout (see
+// App.tsx) so signing out re-prompts. The user can still reopen the
+// dialog any time via the cloud-off indicator.
+const AUTH_DISMISSED_KEY = "airday:auth-prompt-dismissed";
+export function loadAuthPromptDismissed(): boolean {
+  try {
+    return localStorage.getItem(AUTH_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+export function clearAuthPromptDismissed(): void {
+  try {
+    localStorage.removeItem(AUTH_DISMISSED_KEY);
+  } catch {
+    // Best-effort; a stuck flag only means the prompt stays dismissed.
+  }
+}
+function markAuthPromptDismissed(): void {
+  try {
+    localStorage.setItem(AUTH_DISMISSED_KEY, "1");
+  } catch {
+    // Best-effort; failing to persist just means we re-prompt next load.
+  }
+}
+
 function ConnectionStatusPopover(props: {
   app: DocApp;
   online: boolean;
@@ -183,11 +213,17 @@ export function StatusSlot(props: {
   onSession: (s: Session) => void;
 }) {
   const { m } = useAppI18n();
-  // Auto-prompt anonymous users on first mount; closing dismisses for the
-  // rest of the session. The whole workspace remounts on session swap
-  // (App's keyed <Show>), so a logout re-inits this to `true` and
-  // re-prompts.
-  const [authOpen, setAuthOpen] = createSignal(props.session.anonymous);
+  // Auto-prompt anonymous users on first mount unless they've dismissed the
+  // prompt before (persisted in localStorage). Closing sets that flag so
+  // reloads don't re-nag. The whole workspace remounts on session swap
+  // (App's keyed <Show>); logout clears the flag so it re-prompts.
+  const [authOpen, setAuthOpen] = createSignal(
+    props.session.anonymous && !loadAuthPromptDismissed(),
+  );
+  const onOpenChange = (open: boolean) => {
+    if (!open) markAuthPromptDismissed();
+    setAuthOpen(open);
+  };
   const handleSession = (s: Session) => {
     setAuthOpen(false);
     props.onSession(s);
@@ -209,7 +245,7 @@ export function StatusSlot(props: {
         </button>
         <AuthDialog
           open={authOpen()}
-          onOpenChange={setAuthOpen}
+          onOpenChange={onOpenChange}
           onSession={handleSession}
         />
       </Show>
