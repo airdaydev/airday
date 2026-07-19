@@ -71,3 +71,4 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 - Consider bounding sizes of client blobs (by KiB or op count)
 - Multi-tab single-engine sharing via SharedWorker to avoid duplication of resources, data - while this seems like a good idea, in practice it slows things down enough it is important to have client-side optimistic changes which is of course, slightly harder than it looks
 - Corruption detection - later
+- fuck, when i was dragging a kanban item, i couldn't see my drop target easily in the list on the left
