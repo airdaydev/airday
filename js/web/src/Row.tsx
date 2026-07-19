@@ -307,6 +307,33 @@ export function Row(props: {
   const onSetDate = () => {
     props.onSetDue?.(targetIds(), props.item().dueOn ?? null);
   };
+  // Move the target set to the top / bottom of the item's list Open order,
+  // preserving the targets' relative order. `moveItem`'s index is applied
+  // after the item is removed (splice semantics, see reorder.ts), so the
+  // bottom slot is `open.length - 1`. Targets are taken in list order (not
+  // selection-click order) so a multi-row move keeps their visual sequence.
+  const orderedTargets = (listId: string): string[] => {
+    const open = props.app.state.listOpen[listId] ?? [];
+    const set = new Set(targetIds());
+    return open.filter((id) => set.has(id));
+  };
+  const onMoveToTop = () => {
+    const listId = props.item().listId;
+    const ordered = orderedTargets(listId);
+    if (ordered.length === 0) return;
+    props.app.withActionBatch(() => {
+      ordered.forEach((id, i) => props.app.moveItem(id, listId, i));
+    });
+  };
+  const onMoveToBottom = () => {
+    const listId = props.item().listId;
+    const ordered = orderedTargets(listId);
+    if (ordered.length === 0) return;
+    const lastIndex = Math.max((props.app.state.listOpen[listId]?.length ?? 1) - 1, 0);
+    props.app.withActionBatch(() => {
+      for (const id of ordered) props.app.moveItem(id, listId, lastIndex);
+    });
+  };
   const onOpenChange = (open: boolean) => {
     // Register the menu in the shared overlay count so the workspace's
     // document-level shortcuts (Enter → open dialog, x → done, …) go inert
@@ -590,6 +617,32 @@ export function Row(props: {
                     onSelect={onDueTomorrow}
                   >
                     <span>{m().due.tomorrow}</span>
+                  </ContextMenu.Item>
+                </ContextMenu.SubContent>
+              </ContextMenu.Portal>
+            </ContextMenu.Sub>
+          </Show>
+          <Show when={canPinToFocus()}>
+            <ContextMenu.Sub gutter={4}>
+              <ContextMenu.SubTrigger class="context-menu-item">
+                <span>{m().order.label}</span>
+                <span class="menu-sub-arrow" aria-hidden="true">
+                  ›
+                </span>
+              </ContextMenu.SubTrigger>
+              <ContextMenu.Portal>
+                <ContextMenu.SubContent class="context-menu-content">
+                  <ContextMenu.Item
+                    class="context-menu-item"
+                    onSelect={onMoveToTop}
+                  >
+                    <span>{m().order.moveToTop}</span>
+                  </ContextMenu.Item>
+                  <ContextMenu.Item
+                    class="context-menu-item"
+                    onSelect={onMoveToBottom}
+                  >
+                    <span>{m().order.moveToBottom}</span>
                   </ContextMenu.Item>
                 </ContextMenu.SubContent>
               </ContextMenu.Portal>
