@@ -1310,19 +1310,6 @@ body {
   color: var(--text);
 }
 
-.signin-button {
-  display: block;
-  width: 100%;
-  padding: 6px 12px;
-  border: none;
-  background: var(--bg-elevated);
-  color: var(--text);
-  border-radius: 4px;
-  box-shadow: 0 3px var(--border);
-  cursor: pointer;
-  font: inherit;
-}
-
 .auth-form {
   display: flex;
   flex-direction: column;

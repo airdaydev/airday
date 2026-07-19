@@ -160,12 +160,17 @@ export function StatusSlot(props: {
   return (
     <>
       <Show when={props.session.anonymous}>
+        {/* Anonymous sessions show the same cloud-off indicator as an
+            offline authed session; clicking it opens the sign-in dialog
+            rather than a status popover. */}
         <button
           type="button"
-          class="signin-button"
+          class="connection-indicator"
+          aria-label={m().auth.signIn}
+          title={m().auth.signIn}
           onClick={() => setAuthOpen(true)}
         >
-          {m().auth.signIn}
+          <span innerHTML={cloudOffSvg} />
         </button>
         <AuthDialog
           open={authOpen()}
@@ -218,6 +223,19 @@ export function Nav(props: {
   const { m } = useAppI18n();
   const [adding, setAdding] = createSignal(false);
   const [emptyBinConfirmOpen, setEmptyBinConfirmOpen] = createSignal(false);
+  // Auth dialog opened from the overflow menu's Sign in / Sign up items
+  // (anonymous sessions only). Separate from StatusSlot's own auto-open
+  // dialog; `authMode` seeds the form's login/signup toggle.
+  const [authOpen, setAuthOpen] = createSignal(false);
+  const [authMode, setAuthMode] = createSignal<"login" | "signup">("login");
+  const openAuth = (mode: "login" | "signup") => {
+    setAuthMode(mode);
+    setAuthOpen(true);
+  };
+  const handleAuthSession = (s: Session) => {
+    setAuthOpen(false);
+    props.onSession(s);
+  };
   // When a non-empty list is about to be deleted we stage it here so the
   // ConfirmDialog can name it; null means no pending delete. Empty lists
   // (no live items) skip the dialog and delete immediately.
@@ -682,6 +700,21 @@ export function Nav(props: {
                 {m().nav.website}
                 <span innerHTML={externalLinkSvg} />
               </DropdownMenu.Item>
+              <Show when={props.session.anonymous}>
+                <DropdownMenu.Separator class="dropdown-menu-separator" />
+                <DropdownMenu.Item
+                  class="dropdown-menu-item"
+                  onSelect={() => openAuth("login")}
+                >
+                  {m().auth.signIn}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  class="dropdown-menu-item"
+                  onSelect={() => openAuth("signup")}
+                >
+                  {m().auth.signUp}
+                </DropdownMenu.Item>
+              </Show>
               <Show when={!props.session.anonymous}>
                 <DropdownMenu.Item
                   class="dropdown-menu-item"
@@ -705,6 +738,14 @@ export function Nav(props: {
           </div>
         </Show>
       </div>
+      <Show when={props.session.anonymous}>
+        <AuthDialog
+          open={authOpen()}
+          onOpenChange={setAuthOpen}
+          onSession={handleAuthSession}
+          initialMode={authMode()}
+        />
+      </Show>
       <ConfirmDialog
         open={emptyBinConfirmOpen()}
         onOpenChange={setEmptyBinConfirmOpen}
