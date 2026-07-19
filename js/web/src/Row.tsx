@@ -312,22 +312,40 @@ export function Row(props: {
   // after the item is removed (splice semantics, see reorder.ts), so the
   // bottom slot is `open.length - 1`. Targets are taken in list order (not
   // selection-click order) so a multi-row move keeps their visual sequence.
-  const orderedTargets = (listId: string): string[] => {
-    const open = props.app.state.listOpen[listId] ?? [];
+  // In the Focus lens the same operation reorders FocusRefs via `moveInFocus`
+  // over `focusOrder` (the curated visible order) instead of the list Open.
+  const orderedTargets = (order: string[]): string[] => {
     const set = new Set(targetIds());
-    return open.filter((id) => set.has(id));
+    return order.filter((id) => set.has(id));
   };
   const onMoveToTop = () => {
+    if (props.viewKind === "focus") {
+      const ordered = orderedTargets(props.app.state.focusOrder);
+      if (ordered.length === 0) return;
+      props.app.withActionBatch(() => {
+        ordered.forEach((id, i) => props.app.moveInFocus(id, i));
+      });
+      return;
+    }
     const listId = props.item().listId;
-    const ordered = orderedTargets(listId);
+    const ordered = orderedTargets(props.app.state.listOpen[listId] ?? []);
     if (ordered.length === 0) return;
     props.app.withActionBatch(() => {
       ordered.forEach((id, i) => props.app.moveItem(id, listId, i));
     });
   };
   const onMoveToBottom = () => {
+    if (props.viewKind === "focus") {
+      const ordered = orderedTargets(props.app.state.focusOrder);
+      if (ordered.length === 0) return;
+      const lastIndex = Math.max(props.app.state.focusOrder.length - 1, 0);
+      props.app.withActionBatch(() => {
+        for (const id of ordered) props.app.moveInFocus(id, lastIndex);
+      });
+      return;
+    }
     const listId = props.item().listId;
-    const ordered = orderedTargets(listId);
+    const ordered = orderedTargets(props.app.state.listOpen[listId] ?? []);
     if (ordered.length === 0) return;
     const lastIndex = Math.max((props.app.state.listOpen[listId]?.length ?? 1) - 1, 0);
     props.app.withActionBatch(() => {
@@ -622,7 +640,7 @@ export function Row(props: {
               </ContextMenu.Portal>
             </ContextMenu.Sub>
           </Show>
-          <Show when={canPinToFocus()}>
+          <Show when={canPinToFocus() || inFocusView()}>
             <ContextMenu.Sub gutter={4}>
               <ContextMenu.SubTrigger class="context-menu-item">
                 <span>{m().order.label}</span>
