@@ -8,7 +8,7 @@ pub mod sync;
 
 pub use crypto::*;
 pub use doc::{
-    Doc, DocError, ExportItem, ExportList, ExportSettings, INBOX_NAME, ImportSummary,
+    DefaultView, Doc, DocError, ExportItem, ExportList, ExportSettings, INBOX_NAME, ImportSummary,
     ItemLifecycle, ItemView, JsonExport, LIST_INBOX, ListView, SettingsView,
 };
 pub use events::AppEvent;

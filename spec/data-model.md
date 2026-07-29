@@ -273,6 +273,8 @@ sweep folded into each focus mutation.
 |---|---|---|
 | `id` | string | uuid v7 hex; stable, used in `Location.list_id` |
 | `name` | string | display name |
+| `icon` | string? | user-chosen display icon, stored as the literal emoji grapheme. Absent/empty ≡ no icon; clients render a built-in fallback glyph. |
+| `view` | string? | the list's **saved default view** — an encoded scalar (`"list"` / `"board"` / `"board:nodone"`) written as one register so a concurrent save can't tear the mode apart from the Done-lane flag. Absent (or unparseable, e.g. written by a newer client) ≡ no saved default: clients fall back to their own. Clients may override it locally. See `spec/board.md`. |
 | `created_at` | i64 | unix millis |
 
 Whether the nav shows an open-item count (Backlog + Live) beside each list is governed by a single doc-level flag — see `WorkspaceSettings.show_list_counts`. There is no per-list override; Inbox's count is always shown regardless.
@@ -303,6 +305,7 @@ Doc-level synced settings that are not owned by any specific `ListMeta`.
 |---|---|---|
 | `show_list_counts` | bool? | when true, clients render each non-Inbox list's open-item count (Backlog + Live) in the nav (subject to a `count > 0` gate). Inbox's count is always shown regardless. Absent ≡ false; the mutation deletes the key on the off path so an unset flag leaves no on-disk trace. |
 | `inbox_name` | string? | user-chosen display-name override for the reserved `inbox` (Inbox) list. Absent ≡ no override; clients fall back to the localized built-in label. The mutation deletes the key on empty/whitespace input so an unset override leaves no on-disk trace. (Stored settings key: `inbox_name`.) |
+| `inbox_view` | string? | the reserved `inbox` list's **saved default view**. Inbox has no `ListMeta` row, so its `view` register lives here — same encoding, same absent ≡ no-default reading. See `spec/board.md`. |
 
 ## Mutations (rust core API surface)
 
@@ -322,6 +325,7 @@ All mutations go through Loro APIs internally; the core exposes typed helpers:
 - `rename_list(list_id, name)`
 - `set_show_list_counts(show)` — toggles the doc-level "show counts on non-Inbox lists" flag. Inbox's count is always visible (subject to count > 0) and is not gated by this.
 - `set_inbox_name(name)` — sets or clears the reserved `inbox` (Inbox) list's display-name override in the doc-level `settings` map. Trims input; an empty trimmed string clears the override.
+- `set_default_view(list_id, view)` — saves (`Some`) or clears (`None`) a list's default view as one encoded register; accepts the reserved `inbox`, whose value lands in `settings.inbox_view` and reports via `SettingsChanged` rather than `ListDefaultViewChanged`. One commit; a no-op when unchanged. See `spec/board.md`.
 - `delete_list(list_id)` — refuses for `inbox`; see "Delete list" contract above.
 - `empty_bin()` — hard-deletes all `Binned` items.
 - `delete_binned(item_id)` — hard-deletes one `Binned` item.

@@ -138,6 +138,11 @@ type Messages = {
     board: string;
     /** Switch label (view-mode popover) toggling the Done lane on/off. */
     showDoneColumn: string;
+    /** Popover action saving the current view as this list's default on
+     *  every device (spec/board.md). */
+    saveAsDefault: string;
+    /** Disabled state of that action: this view already is the default. */
+    savedAsDefault: string;
   };
   due: {
     /** Section label / accessible name for the due-date control. */
@@ -329,6 +334,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       list: "Lista",
       board: "Tablero",
       showDoneColumn: "Carril Hecho",
+      saveAsDefault: "Guardar como predeterminada",
+      savedAsDefault: "Vista predeterminada",
     },
     due: {
       label: "Fecha de vencimiento",
@@ -503,6 +510,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       list: "List",
       board: "Board",
       showDoneColumn: "Done lane",
+      saveAsDefault: "Save as default",
+      savedAsDefault: "Default view",
     },
     due: {
       label: "Due date",

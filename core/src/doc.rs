@@ -99,6 +99,12 @@ const KEY_NAME: &str = "name";
 /// built-in fallback". A future SVG-icon set can share this key via a
 /// `"svg:<id>"` prefix convention without a schema change.
 const KEY_ICON: &str = "icon";
+/// Optional saved default view for a list — the lens a client renders
+/// before the user overrides it locally. One **encoded scalar string**
+/// (`DefaultView`, e.g. `"board:nodone"`), so the mode and the Done-lane
+/// flag can never be torn apart by concurrent saves. Absent ≡ no saved
+/// default; clients fall back to their own built-in default.
+const KEY_VIEW: &str = "view";
 const KEY_CREATED_AT: &str = "created_at";
 const KEY_DONE_AT: &str = "done_at";
 const KEY_BINNED_AT: &str = "binned_at";
@@ -112,6 +118,10 @@ const KEY_SHOW_LIST_COUNTS: &str = "show_list_counts";
 /// (Inbox) list. Absent ≡ no override; clients render the localized
 /// built-in label (`INBOX_NAME` / `i18n nav.home`) in that case.
 const KEY_INBOX_NAME: &str = "inbox_name";
+/// The reserved `inbox` (Inbox) list's saved default view. Inbox has no
+/// ListMeta row, so its `KEY_VIEW` equivalent lives on the doc-level
+/// settings map — same encoding, same absent ≡ no-default semantics.
+const KEY_INBOX_VIEW: &str = "inbox_view";
 /// Batch lifecycle mutations at/above this many ids stop emitting
 /// surgical per-item events and fall back to one whole-doc rebuild +
 /// diff. Matches the web store's coarse-projection threshold so both
@@ -222,6 +232,63 @@ impl ItemView {
     }
 }
 
+/// A list's saved default view (`spec/board.md`): which lens a client
+/// renders the list in when it has no local override of its own, and —
+/// for the board lens — whether the Done lane is shown.
+///
+/// Stored as a single encoded scalar string so a concurrent save on
+/// another device replaces the whole view atomically (same rationale as
+/// [`Location`]) rather than merging a mode from one device with a
+/// Done-lane flag from another:
+///
+/// ```text
+/// "list" | "board" | "board:nodone"
+/// ```
+///
+/// `show_done` is only meaningful for the board lens; the list lens
+/// always encodes as bare `"list"`. Unrecognized strings parse to `None`
+/// (treated as "no saved default"), so a future client writing a lens
+/// this build doesn't know about degrades to the local default instead
+/// of rendering something wrong.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DefaultView {
+    /// `true` ≡ the board lens, `false` ≡ the flat list view.
+    pub board: bool,
+    /// Board Done-lane visibility. Always `true` for the list lens.
+    pub show_done: bool,
+}
+
+impl DefaultView {
+    pub const LIST: DefaultView = DefaultView {
+        board: false,
+        show_done: true,
+    };
+    pub const BOARD: DefaultView = DefaultView {
+        board: true,
+        show_done: true,
+    };
+
+    pub fn encode(&self) -> &'static str {
+        match (self.board, self.show_done) {
+            (false, _) => "list",
+            (true, true) => "board",
+            (true, false) => "board:nodone",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<DefaultView> {
+        match s {
+            "list" => Some(DefaultView::LIST),
+            "board" => Some(DefaultView::BOARD),
+            "board:nodone" => Some(DefaultView {
+                board: true,
+                show_done: false,
+            }),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListView {
     pub id: String,
@@ -231,6 +298,10 @@ pub struct ListView {
     /// `None`. Reserved `inbox` (Inbox) has no ListMeta row, so it is
     /// always `None` here.
     pub icon: Option<String>,
+    /// The list's saved default view, or `None` when the user has never
+    /// saved one. Reserved `inbox` has no ListMeta row — its default
+    /// lives on [`SettingsView::inbox_view`].
+    pub default_view: Option<DefaultView>,
     pub created_at: i64,
 }
 
@@ -245,6 +316,10 @@ pub struct SettingsView {
     /// display name. `None` (or absent in storage) means clients render
     /// the localized built-in label.
     pub inbox_name: Option<String>,
+    /// The reserved `inbox` (Inbox) list's saved default view. Inbox has
+    /// no ListMeta row, so its default lives here rather than on
+    /// [`ListView::default_view`]. `None` ≡ no saved default.
+    pub inbox_view: Option<DefaultView>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -276,6 +351,11 @@ pub struct ExportSettings {
     /// default case.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub inbox_name: Option<String>,
+    /// Inbox's saved default view in its encoded form (`"list"`,
+    /// `"board"`, `"board:nodone"` — see [`DefaultView`]). Skipped when
+    /// unset so pre-default-view dumps stay byte-identical.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub inbox_view: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -288,6 +368,13 @@ pub struct ExportList {
     /// carries no icon.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub icon: Option<String>,
+    /// The list's saved default view in its encoded form (`"list"`,
+    /// `"board"`, `"board:nodone"` — see [`DefaultView`]). Skipped when
+    /// unset so pre-default-view dumps stay byte-identical. The reserved
+    /// Inbox entry carries none; its default rides on
+    /// [`ExportSettings::inbox_view`].
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub view: Option<String>,
     pub created_at: Option<i64>,
     pub builtin: bool,
 }
@@ -2151,6 +2238,7 @@ impl Doc {
         self.push_event(AppEvent::SettingsChanged {
             show_list_counts: post.show_list_counts,
             inbox_name: post.inbox_name,
+            inbox_view: post.inbox_view,
         });
         Ok(())
     }
@@ -2181,6 +2269,7 @@ impl Doc {
         self.push_event(AppEvent::SettingsChanged {
             show_list_counts: post.show_list_counts,
             inbox_name: post.inbox_name,
+            inbox_view: post.inbox_view,
         });
         Ok(())
     }
@@ -2231,6 +2320,59 @@ impl Doc {
         self.push_event(AppEvent::ListIconChanged {
             id: list_id.to_string(),
             icon: next,
+        });
+        Ok(())
+    }
+
+    /// Save (`Some`) or clear (`None`) a list's default view — the lens
+    /// a client renders it in when it has no local override of its own
+    /// (`spec/board.md`). The whole view is one encoded scalar register,
+    /// so a concurrent save on another device replaces it atomically.
+    ///
+    /// Works for the reserved `inbox` too: it has no ListMeta row, so its
+    /// default is written to the doc-level settings map instead and
+    /// surfaces as a `SettingsChanged` event rather than
+    /// `ListDefaultViewChanged`. No-op when the value is unchanged, so
+    /// re-saving the same view emits no phantom event or undo step.
+    pub fn set_default_view(
+        &self,
+        list_id: &str,
+        view: Option<DefaultView>,
+    ) -> Result<(), DocError> {
+        if list_id == LIST_INBOX {
+            let settings = self.settings_map();
+            if read_default_view(&settings, KEY_INBOX_VIEW) == view {
+                return Ok(());
+            }
+            match view {
+                Some(v) => settings.insert(KEY_INBOX_VIEW, v.encode())?,
+                None => {
+                    settings.delete(KEY_INBOX_VIEW)?;
+                }
+            }
+            self.inner.commit();
+            let post = settings_view(&settings);
+            self.push_event(AppEvent::SettingsChanged {
+                show_list_counts: post.show_list_counts,
+                inbox_name: post.inbox_name,
+                inbox_view: post.inbox_view,
+            });
+            return Ok(());
+        }
+        let (_, map) = self.find_list(list_id)?;
+        if read_default_view(&map, KEY_VIEW) == view {
+            return Ok(());
+        }
+        match view {
+            Some(v) => map.insert(KEY_VIEW, v.encode())?,
+            None => {
+                map.delete(KEY_VIEW)?;
+            }
+        }
+        self.inner.commit();
+        self.push_event(AppEvent::ListDefaultViewChanged {
+            id: list_id.to_string(),
+            view,
         });
         Ok(())
     }
@@ -2484,6 +2626,9 @@ impl Doc {
             id: LIST_INBOX.to_string(),
             name: INBOX_NAME.to_string(),
             icon: None,
+            // Inbox's default view rides on `settings.inbox_view`, not
+            // on its (nonexistent) ListMeta row.
+            view: None,
             created_at: None,
             builtin: true,
         });
@@ -2491,6 +2636,7 @@ impl Doc {
             id: list.id,
             name: list.name,
             icon: list.icon,
+            view: list.default_view.map(|v| v.encode().to_string()),
             created_at: Some(list.created_at),
             builtin: false,
         }));
@@ -2515,6 +2661,7 @@ impl Doc {
             settings: ExportSettings {
                 show_list_counts: s.show_list_counts,
                 inbox_name: s.inbox_name,
+                inbox_view: s.inbox_view.map(|v| v.encode().to_string()),
             },
             lists,
             items,
@@ -2579,8 +2726,19 @@ impl Doc {
             map.insert(KEY_CREATED_AT, created_at)?;
             // Carry the display icon through; a trimmed-empty value (or none)
             // leaves the key unset so clients fall back to the built-in glyph.
-            if let Some(icon) = src_list.icon.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            if let Some(icon) = src_list
+                .icon
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
                 map.insert(KEY_ICON, icon)?;
+            }
+            // Carry the saved default view through. An unrecognized value
+            // in a hand-edited export is dropped rather than stored, so
+            // the doc never holds a view string this build can't read.
+            if let Some(view) = src_list.view.as_deref().and_then(DefaultView::parse) {
+                map.insert(KEY_VIEW, view.encode())?;
             }
             id_map.insert(src_list.id.clone(), new_list_id);
             lists_added += 1;
@@ -3515,6 +3673,7 @@ impl Doc {
         out.push(AppEvent::SettingsChanged {
             show_list_counts: s.show_list_counts,
             inbox_name: s.inbox_name,
+            inbox_view: s.inbox_view,
         });
         let lists = self.all_lists();
         for (idx, list) in lists.iter().enumerate() {
@@ -3943,6 +4102,10 @@ fn settings_view(map: &LoroMap) -> SettingsView {
         // empty input, but a caller that bypassed it shouldn't surface
         // a confusing blank label.
         inbox_name: read_string(map, KEY_INBOX_NAME).filter(|s| !s.is_empty()),
+        // Inbox has no ListMeta row, so its saved default view lives
+        // here; same encoding and same absent ≡ no-default reading as a
+        // user list's `view` key.
+        inbox_view: read_default_view(map, KEY_INBOX_VIEW),
     }
 }
 
@@ -4029,8 +4192,18 @@ fn list_view(map: &LoroMap) -> Option<ListView> {
         id: read_string(map, KEY_ID)?,
         name: read_string(map, KEY_NAME)?,
         icon: read_string(map, KEY_ICON).filter(|s| !s.is_empty()),
+        default_view: read_default_view(map, KEY_VIEW),
         created_at: read_i64(map, KEY_CREATED_AT)?,
     })
+}
+
+/// Read an encoded [`DefaultView`] register. Absent, empty, or written
+/// by a future client in a form this build doesn't recognize all read as
+/// `None` — "no saved default", so the client falls back to its own.
+fn read_default_view(map: &LoroMap, key: &str) -> Option<DefaultView> {
+    read_string(map, key)
+        .as_deref()
+        .and_then(DefaultView::parse)
 }
 
 /// The item's stored lifecycle flag: `true` ≡ Live, absent/`false` ≡
@@ -4282,6 +4455,12 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
                         icon: post_l.icon.clone(),
                     });
                 }
+                if pre_l.default_view != post_l.default_view {
+                    out.push(AppEvent::ListDefaultViewChanged {
+                        id: post_l.id.clone(),
+                        view: post_l.default_view,
+                    });
+                }
                 if pre_idx != post_idx {
                     out.push(AppEvent::ListMoved {
                         id: post_l.id.clone(),
@@ -4294,10 +4473,11 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
 }
 
 fn diff_settings(pre: &SettingsView, post: &SettingsView, out: &mut Vec<AppEvent>) {
-    if pre.show_list_counts != post.show_list_counts || pre.inbox_name != post.inbox_name {
+    if pre != post {
         out.push(AppEvent::SettingsChanged {
             show_list_counts: post.show_list_counts,
             inbox_name: post.inbox_name.clone(),
+            inbox_view: post.inbox_view,
         });
     }
 }
@@ -4561,6 +4741,179 @@ mod tests {
             doc.set_list_icon(LIST_INBOX, "📥").unwrap_err(),
             DocError::CannotRenameBuiltin(_)
         ));
+    }
+
+    #[test]
+    fn set_default_view_round_trips_and_clears() {
+        let doc = Doc::new().unwrap();
+        let list = doc.add_list("Work").unwrap();
+        let _ = doc.drain_events();
+
+        let board_nodone = DefaultView {
+            board: true,
+            show_done: false,
+        };
+        doc.set_default_view(&list, Some(board_nodone)).unwrap();
+        assert_eq!(
+            doc.get_list_meta(&list).unwrap().default_view,
+            Some(board_nodone)
+        );
+        assert!(doc.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::ListDefaultViewChanged { id, view: Some(v) }
+                if id == &list && *v == board_nodone
+        )));
+
+        // No-op when unchanged (no phantom event / undo step).
+        doc.set_default_view(&list, Some(board_nodone)).unwrap();
+        assert!(doc.drain_events().is_empty());
+
+        // Clearing drops the key and reports "no saved default".
+        doc.set_default_view(&list, None).unwrap();
+        assert_eq!(doc.get_list_meta(&list).unwrap().default_view, None);
+        assert!(doc.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::ListDefaultViewChanged { id, view: None } if id == &list
+        )));
+    }
+
+    #[test]
+    fn set_default_view_on_inbox_lands_in_settings() {
+        let doc = Doc::new().unwrap();
+        let _ = doc.drain_events();
+
+        // Inbox has no ListMeta row, so its default rides on the
+        // doc-level settings map and its settings event.
+        doc.set_default_view(LIST_INBOX, Some(DefaultView::BOARD))
+            .unwrap();
+        assert_eq!(doc.get_settings().inbox_view, Some(DefaultView::BOARD));
+        assert!(doc.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::SettingsChanged {
+                inbox_view: Some(v),
+                ..
+            } if *v == DefaultView::BOARD
+        )));
+
+        doc.set_default_view(LIST_INBOX, Some(DefaultView::BOARD))
+            .unwrap();
+        assert!(doc.drain_events().is_empty());
+
+        doc.set_default_view(LIST_INBOX, None).unwrap();
+        assert_eq!(doc.get_settings().inbox_view, None);
+    }
+
+    #[test]
+    fn default_view_encoding_round_trips() {
+        for view in [
+            DefaultView::LIST,
+            DefaultView::BOARD,
+            DefaultView {
+                board: true,
+                show_done: false,
+            },
+        ] {
+            assert_eq!(DefaultView::parse(view.encode()), Some(view));
+        }
+        // The list lens carries no Done-lane state.
+        assert_eq!(
+            DefaultView {
+                board: false,
+                show_done: false,
+            }
+            .encode(),
+            "list"
+        );
+        // A value written by a future client reads as "no saved
+        // default" rather than something wrong.
+        assert_eq!(DefaultView::parse("calendar"), None);
+        assert_eq!(DefaultView::parse(""), None);
+    }
+
+    #[test]
+    fn remote_default_view_change_emits_event() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let list = a.add_list("Work").unwrap();
+        let seed = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        let mut b = Doc::empty();
+        b.apply_remote(&dek, &seed).unwrap();
+        let _ = b.drain_events();
+
+        a.set_default_view(&list, Some(DefaultView::BOARD)).unwrap();
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &blob).unwrap();
+        assert_eq!(
+            b.get_list_meta(&list).unwrap().default_view,
+            Some(DefaultView::BOARD)
+        );
+        assert!(b.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::ListDefaultViewChanged { id, view: Some(v) }
+                if id == &list && *v == DefaultView::BOARD
+        )));
+    }
+
+    #[test]
+    fn export_import_carries_default_view() {
+        let src = Doc::new().unwrap();
+        let list = src.add_list("Work").unwrap();
+        let nodone = DefaultView {
+            board: true,
+            show_done: false,
+        };
+        src.set_default_view(&list, Some(nodone)).unwrap();
+        src.set_default_view(LIST_INBOX, Some(DefaultView::BOARD))
+            .unwrap();
+        src.add_item(&list, "a").unwrap();
+
+        let export = src.export_json();
+        assert_eq!(export.settings.inbox_view.as_deref(), Some("board"));
+        let exported = export
+            .lists
+            .iter()
+            .find(|l| l.id == list)
+            .expect("user list exported");
+        assert_eq!(exported.view.as_deref(), Some("board:nodone"));
+
+        let dst = Doc::new().unwrap();
+        dst.import_json(&export).unwrap();
+        let imported = dst
+            .all_lists()
+            .into_iter()
+            .find(|l| l.name == "Work")
+            .expect("user list imported");
+        assert_eq!(imported.default_view, Some(nodone));
+    }
+
+    #[test]
+    fn import_drops_unknown_default_view() {
+        let export = JsonExport {
+            version: 1,
+            settings: ExportSettings {
+                show_list_counts: false,
+                inbox_name: None,
+                inbox_view: None,
+            },
+            lists: vec![ExportList {
+                id: "src-list".to_string(),
+                name: "Work".to_string(),
+                icon: None,
+                view: Some("hologram".to_string()),
+                created_at: Some(1),
+                builtin: false,
+            }],
+            items: vec![],
+        };
+        let dst = Doc::new().unwrap();
+        dst.import_json(&export).unwrap();
+        let imported = dst
+            .all_lists()
+            .into_iter()
+            .find(|l| l.name == "Work")
+            .expect("user list imported");
+        assert_eq!(imported.default_view, None);
     }
 
     #[test]
@@ -5075,6 +5428,7 @@ mod tests {
                 id: LIST_INBOX.to_string(),
                 name: INBOX_NAME.to_string(),
                 icon: None,
+                view: None,
                 created_at: None,
                 builtin: true,
             }
@@ -6634,11 +6988,13 @@ mod tests {
             settings: ExportSettings {
                 show_list_counts: false,
                 inbox_name: None,
+                inbox_view: None,
             },
             lists: vec![ExportList {
                 id: LIST_INBOX.to_string(),
                 name: INBOX_NAME.to_string(),
                 icon: None,
+                view: None,
                 created_at: None,
                 builtin: true,
             }],
@@ -6686,6 +7042,7 @@ mod tests {
             settings: ExportSettings {
                 show_list_counts: false,
                 inbox_name: None,
+                inbox_view: None,
             },
             lists: vec![],
             items: vec![],

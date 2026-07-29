@@ -78,6 +78,11 @@ export interface ListView {
   /** User-chosen display icon (a literal emoji grapheme), or absent when
    *  unset — consumers render a built-in fallback glyph. */
   icon?: string;
+  /** Saved default view in encoded form (`"list"` / `"board"` /
+   *  `"board:nodone"` — see `parseDefaultView`), or absent when the user
+   *  has never saved one. Synced doc state; a client with a local
+   *  override of its own ignores it. See `spec/board.md`. */
+  defaultView?: string;
   createdAt: number;
 }
 
@@ -125,6 +130,11 @@ export interface SettingsView {
    *  `null` when no override is set — clients fall back to the localized
    *  built-in label. Synced via the doc-level settings map. */
   inboxName: string | null;
+  /** The reserved `inbox` list's saved default view in encoded form, or
+   *  `null` when none is saved. Inbox has no ListMeta row, so its
+   *  default lives in the doc-level settings map rather than on
+   *  `ListView.defaultView`. */
+  inboxView: string | null;
 }
 
 export interface DocApp {
@@ -205,6 +215,11 @@ export interface DocApp {
   /** Set (`icon` = emoji grapheme) or clear (`icon` = "") a list's
    *  display icon. */
   setListIcon(id: string, icon: string): void;
+  /** Save (`view` = an encoded `DefaultView`) or clear (`view` = `null`)
+   *  a list's default view — the lens clients render it in when they
+   *  have no local override. Accepts the reserved `inbox`, whose default
+   *  lands in the doc-level settings map. See `spec/board.md`. */
+  setDefaultView(id: string, view: string | null): void;
   moveList(id: string, index: number): void;
   deleteList(id: string): void;
   /** Toggle the global "show counts on non-Queue lists" setting.
@@ -301,6 +316,7 @@ function materializeEngineSnapshot(engine: SyncEngine): WorkspaceState {
     settings: {
       showListCounts: payload.settings.showListCounts ?? true,
       inboxName: payload.settings.inboxName ?? null,
+      inboxView: payload.settings.inboxView ?? null,
     },
   };
 }
@@ -325,6 +341,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     settings: {
       showListCounts: true,
       inboxName: null,
+      inboxView: null,
     },
   });
   const [version, setVersion] = createSignal(0);
@@ -562,6 +579,14 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         }
         break;
       }
+      case "listDefaultViewChanged": {
+        if (state.listsById[ev.id]) {
+          // `ev.defaultView` is undefined when the default was cleared —
+          // mirror that so this client falls back to its own default.
+          setState("listsById", ev.id, "defaultView", ev.defaultView ?? undefined);
+        }
+        break;
+      }
       case "settingsChanged": {
         // Mirror the whole event payload — settings are tiny and the
         // wire format always sends the full known shape, so a single
@@ -569,6 +594,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         setState("settings", {
           showListCounts: ev.showListCounts ?? true,
           inboxName: ev.inboxName ?? null,
+          inboxView: ev.inboxView ?? null,
         });
         break;
       }
@@ -741,6 +767,9 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     setListIcon(id, icon) {
       mutate(() => engine.setListIcon(id, icon));
+    },
+    setDefaultView(id, view) {
+      mutate(() => engine.setDefaultView(id, view ?? ""));
     },
     importJson(json) {
       return mutate(() => {

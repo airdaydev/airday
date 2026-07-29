@@ -227,6 +227,16 @@ impl Doc {
         self.inner.set_list_icon(list_id, icon).map_err(js_err)
     }
 
+    /// Save (`view` = `"list"` / `"board"` / `"board:nodone"`) or clear
+    /// (`view` = "") a list's default view. Accepts the reserved `inbox`
+    /// too. See `airday_core::Doc::set_default_view`.
+    #[wasm_bindgen(js_name = setDefaultView)]
+    pub fn set_default_view(&self, list_id: &str, view: &str) -> Result<(), JsError> {
+        self.inner
+            .set_default_view(list_id, parse_default_view_arg(view)?)
+            .map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = moveList)]
     pub fn move_list(&self, list_id: &str, target_index: usize) -> Result<(), JsError> {
         self.inner.move_list(list_id, target_index).map_err(js_err)
@@ -1433,6 +1443,17 @@ impl SyncEngine {
             .map_err(js_err)
     }
 
+    /// Save (`view` = `"list"` / `"board"` / `"board:nodone"`) or clear
+    /// (`view` = "") a list's default view. Accepts the reserved `inbox`
+    /// too. See `airday_core::Doc::set_default_view`.
+    #[wasm_bindgen(js_name = setDefaultView)]
+    pub fn set_default_view(&self, list_id: &str, view: &str) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .set_default_view(list_id, parse_default_view_arg(view)?)
+            .map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = moveList)]
     pub fn move_list(&self, list_id: &str, target_index: usize) -> Result<(), JsError> {
         self.inner
@@ -1741,7 +1762,8 @@ impl From<CoreEvent> for EngineEvent {
 /// - `listMoved` — id, index
 /// - `listRenamed` — id, name
 /// - `listIconChanged` — id, icon? (undefined = icon removed)
-/// - `settingsChanged` — showListCounts, inboxName?
+/// - `listDefaultViewChanged` — id, defaultView? (undefined = cleared)
+/// - `settingsChanged` — showListCounts, inboxName?, inboxView?
 /// - `focusChanged` — no fields; re-derive the Focus projection
 #[wasm_bindgen]
 pub struct AppEventJs {
@@ -1754,6 +1776,10 @@ pub struct AppEventJs {
     /// List display icon (`listIconChanged`): `Some(grapheme)` when set,
     /// `None` when the icon was removed or on events that don't carry one.
     icon: Option<String>,
+    /// Saved default view in encoded form (`listDefaultViewChanged`):
+    /// `"list"` / `"board"` / `"board:nodone"`, or `None` when the
+    /// default was cleared or the event doesn't carry one.
+    default_view: Option<String>,
     /// Lifecycle flag (`itemAdded` / `itemLifecycleChanged`): `true` ≡
     /// Live, `false` ≡ Backlog underneath any done/binned mask. `None`
     /// on events that don't carry lifecycle.
@@ -1769,6 +1795,9 @@ pub struct AppEventJs {
     /// label; `None` (or absent on non-`settingsChanged` events) means
     /// fall back to the localized built-in label.
     inbox_name: Option<String>,
+    /// Settings (`settingsChanged`): Inbox's saved default view in
+    /// encoded form, or `None` when none is saved.
+    inbox_view: Option<String>,
     /// List-event ordering position (`listAdded` / `listMoved`). Item
     /// events no longer carry a doc-wide index in the v2 schema — use
     /// `open_index`.
@@ -1838,6 +1867,14 @@ impl AppEventJs {
     pub fn inbox_name(&self) -> Option<String> {
         self.inbox_name.clone()
     }
+    #[wasm_bindgen(getter, js_name = defaultView)]
+    pub fn default_view(&self) -> Option<String> {
+        self.default_view.clone()
+    }
+    #[wasm_bindgen(getter, js_name = inboxView)]
+    pub fn inbox_view(&self) -> Option<String> {
+        self.inbox_view.clone()
+    }
     #[wasm_bindgen(getter)]
     pub fn live(&self) -> Option<bool> {
         self.live
@@ -1858,6 +1895,7 @@ impl From<CoreAppEvent> for AppEventJs {
             notes: None,
             name: None,
             icon: None,
+            default_view: None,
             live: None,
             due_on: None,
             created_at: None,
@@ -1865,6 +1903,7 @@ impl From<CoreAppEvent> for AppEventJs {
             binned_at: None,
             show_list_counts: None,
             inbox_name: None,
+            inbox_view: None,
             index: None,
             open_index: None,
         };
@@ -1993,13 +2032,21 @@ impl From<CoreAppEvent> for AppEventJs {
                 icon,
                 ..blank
             },
+            CoreAppEvent::ListDefaultViewChanged { id, view } => AppEventJs {
+                kind: "listDefaultViewChanged",
+                id,
+                default_view: view.map(|v| v.encode().to_string()),
+                ..blank
+            },
             CoreAppEvent::SettingsChanged {
                 show_list_counts,
                 inbox_name,
+                inbox_view,
             } => AppEventJs {
                 kind: "settingsChanged",
                 show_list_counts: Some(show_list_counts),
                 inbox_name,
+                inbox_view: inbox_view.map(|v| v.encode().to_string()),
                 ..blank
             },
         }
@@ -2007,6 +2054,19 @@ impl From<CoreAppEvent> for AppEventJs {
 }
 
 // ---------- private helpers ----------
+
+/// Decode the JS-side `view` argument of `setDefaultView`: `""` clears
+/// the saved default, anything else must be a known encoded
+/// [`DefaultView`]. An unknown string is an error rather than a silent
+/// clear, so a caller typo surfaces instead of wiping the default.
+fn parse_default_view_arg(view: &str) -> Result<Option<airday_core::DefaultView>, JsError> {
+    if view.is_empty() {
+        return Ok(None);
+    }
+    airday_core::DefaultView::parse(view)
+        .map(Some)
+        .ok_or_else(|| JsError::new(&format!("unknown default view: {view}")))
+}
 
 fn list_to_json(l: &airday_core::ListView) -> String {
     let mut s = format!(
@@ -2018,6 +2078,10 @@ fn list_to_json(l: &airday_core::ListView) -> String {
         s.push_str(",\"icon\":");
         s.push_str(&json_string(icon));
     }
+    if let Some(v) = &l.default_view {
+        s.push_str(",\"defaultView\":");
+        s.push_str(&json_string(v.encode()));
+    }
     s.push_str(&format!(",\"createdAt\":{}}}", l.created_at));
     s
 }
@@ -2027,6 +2091,10 @@ fn settings_to_json(s: &airday_core::SettingsView) -> String {
     if let Some(n) = &s.inbox_name {
         out.push_str(",\"inboxName\":");
         out.push_str(&json_string(n));
+    }
+    if let Some(v) = &s.inbox_view {
+        out.push_str(",\"inboxView\":");
+        out.push_str(&json_string(v.encode()));
     }
     out.push('}');
     out

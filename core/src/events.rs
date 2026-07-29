@@ -13,6 +13,8 @@
 //! Initial attachment materializes current state explicitly. After that,
 //! consumers receive live deltas or an occasional `FullResync` request.
 
+use crate::doc::DefaultView;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppEvent {
     /// The doc changed by a bulk or opaque operation that is cheaper and
@@ -130,6 +132,17 @@ pub enum AppEvent {
         id: String,
         icon: Option<String>,
     },
+    /// A user-created list's saved default view was set or cleared
+    /// (`spec/board.md`). `view` is the value after the change; `None`
+    /// means no saved default, so clients fall back to their own. The
+    /// reserved `inbox` list has no ListMeta row — its default rides on
+    /// `SettingsChanged.inbox_view` instead. A client that has its own
+    /// local override for this list keeps it; the default only decides
+    /// what an un-overridden client renders.
+    ListDefaultViewChanged {
+        id: String,
+        view: Option<DefaultView>,
+    },
 
     // ---------- focus ----------
     /// The Focus lens (`spec/focus.md`) changed — a ref was added, removed,
@@ -152,5 +165,10 @@ pub enum AppEvent {
         /// `None` when the user hasn't overridden Inbox's display name;
         /// clients should fall back to the localized built-in label.
         inbox_name: Option<String>,
+        /// The reserved `inbox` list's saved default view (`spec/board.md`),
+        /// or `None` when none is saved. Inbox has no ListMeta row, so its
+        /// default travels on the settings event rather than
+        /// `ListDefaultViewChanged`.
+        inbox_view: Option<DefaultView>,
     },
 }

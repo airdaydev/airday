@@ -54,6 +54,13 @@ import {
   type ListView,
 } from "./sync/store.ts";
 import { createTheme, type ThemePreference } from "./theme.ts";
+import {
+  encodeView,
+  LIST_VIEW,
+  parseView,
+  viewsEqual,
+  type ViewSpec,
+} from "./view.ts";
 
 // Done items linger in their live list this long after being marked
 // done, so the user sees the strike-through before the row drops out.
@@ -65,28 +72,19 @@ const DONE_LINGER_MS = 3_000;
 // once for the lifetime of the page.
 const theme = createTheme();
 
-// Per-list board-mode toggle. A purely local view preference (the same
-// account may want a board on desktop and a flat list on a phone), so
-// it lives in localStorage rather than the synced doc or the IDB prefs
-// row — see spec/kanban.md "Client (web) contract".
-const BOARD_PREF_KEY = "airday:board-lists";
-function loadBoardPrefs(): Record<string, boolean> {
+// Per-list *local* view override: list ⇄ board plus the board's Done
+// lane, for the lists where this browser wants something other than the
+// list's saved default (the same account may want a board on desktop and
+// a flat list on a phone — see spec/board.md "Client (web) contract").
+// Absent ≡ follow the synced default; only genuinely divergent lists get
+// a key, so a client that never overrides anything tracks the account.
+// Values are encoded `ViewSpec` strings — the same grammar the doc
+// stores, so comparing local against default is a string compare.
+const VIEW_PREF_KEY = "airday:list-view";
+function loadViewPrefs(): Record<string, string> {
   try {
-    const raw = localStorage.getItem(BOARD_PREF_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
-  } catch {
-    return {};
-  }
-}
-
-// Per-list "hide the board's Done column" preference. Same local-only
-// storage rationale as BOARD_PREF_KEY. Stores only the lists where the
-// column is hidden — absent ≡ shown, so boards default to showing Done.
-const DONE_HIDE_PREF_KEY = "airday:board-done-hidden";
-function loadDoneHidePrefs(): Record<string, boolean> {
-  try {
-    const raw = localStorage.getItem(DONE_HIDE_PREF_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    const raw = localStorage.getItem(VIEW_PREF_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
   } catch {
     return {};
   }
@@ -195,39 +193,72 @@ export function Workspace(props: {
   // lands where the user pointed; null (→ caret at end) otherwise. Reset
   // whenever the dialog closes.
   const [openCaret, setOpenCaret] = createSignal<number | null>(null);
-  // Which lists render as a board. Persisted per browser (not synced).
-  const [boardLists, setBoardLists] = createSignal<Record<string, boolean>>(
-    loadBoardPrefs(),
+  // Lists this browser renders differently from their saved default.
+  // Persisted per browser (not synced); absent ≡ follow the default.
+  const [viewOverrides, setViewOverrides] = createSignal<Record<string, string>>(
+    loadViewPrefs(),
   );
+  // The list's saved default view, or null when none is saved. Inbox has
+  // no ListMeta row, so its default lives in the doc-level settings.
+  const savedView = (listId: string): ViewSpec | null =>
+    parseView(
+      listId === "inbox"
+        ? state.settings.inboxView
+        : state.listsById[listId]?.defaultView,
+    );
+  // What this client actually renders: local override, else the synced
+  // default, else the built-in flat list.
+  const listView = (listId: string): ViewSpec =>
+    parseView(viewOverrides()[listId]) ?? savedView(listId) ?? LIST_VIEW;
   const boardListId = createMemo((): string | null => {
     const v = view();
-    return v.kind === "list" && boardLists()[v.id] ? v.id : null;
+    return v.kind === "list" && listView(v.id).board ? v.id : null;
   });
-  const toggleBoard = (listId: string) => {
-    const next = { ...boardLists(), [listId]: !boardLists()[listId] };
-    if (!next[listId]) delete next[listId];
-    setBoardLists(next);
+  // The list currently on screen (board or flat), or null in Focus /
+  // Done / Bin — the view-mode popover's subject.
+  const currentListId = createMemo((): string | null => {
+    const v = view();
+    return v.kind === "list" ? v.id : null;
+  });
+  // Whether what this client renders is already the list's saved default
+  // (so "save as default" would be a no-op).
+  const isSavedDefault = (listId: string): boolean => {
+    const saved = savedView(listId);
+    return saved !== null && viewsEqual(listView(listId), saved);
+  };
+  const putViewOverrides = (map: Record<string, string>) => {
+    setViewOverrides(map);
     try {
-      localStorage.setItem(BOARD_PREF_KEY, JSON.stringify(next));
+      localStorage.setItem(VIEW_PREF_KEY, JSON.stringify(map));
     } catch {
       // Quota/private-mode failures just lose the preference.
     }
   };
-  // Which boards hide their Done column. Absent ≡ shown.
-  const [doneHidden, setDoneHidden] = createSignal<Record<string, boolean>>(
-    loadDoneHidePrefs(),
-  );
-  const showDoneColumn = (listId: string): boolean => !doneHidden()[listId];
+  // Record a local view choice. A choice that matches what this client
+  // would render anyway drops the override instead of pinning it, so the
+  // client keeps following the default if another device changes it.
+  const setLocalView = (listId: string, next: ViewSpec) => {
+    const map = { ...viewOverrides() };
+    if (viewsEqual(next, savedView(listId) ?? LIST_VIEW)) delete map[listId];
+    else map[listId] = encodeView(next);
+    putViewOverrides(map);
+  };
+  const toggleBoard = (listId: string) => {
+    const cur = listView(listId);
+    setLocalView(listId, { ...cur, board: !cur.board });
+  };
+  const showDoneColumn = (listId: string): boolean => listView(listId).showDone;
   const setShowDoneColumn = (listId: string, show: boolean) => {
-    const next = { ...doneHidden() };
-    if (show) delete next[listId];
-    else next[listId] = true;
-    setDoneHidden(next);
-    try {
-      localStorage.setItem(DONE_HIDE_PREF_KEY, JSON.stringify(next));
-    } catch {
-      // Quota/private-mode failures just lose the preference.
-    }
+    setLocalView(listId, { ...listView(listId), showDone: show });
+  };
+  // Save what this client is looking at as the list's default view for
+  // every device, and drop the local override so this client follows the
+  // default it just set.
+  const saveViewAsDefault = (listId: string) => {
+    app.setDefaultView(listId, encodeView(listView(listId)));
+    const map = { ...viewOverrides() };
+    delete map[listId];
+    putViewOverrides(map);
   };
   // Whether the global Done view badges each item with its origin list.
   const [doneShowList, setDoneShowListSignal] = createSignal<boolean>(
@@ -1212,7 +1243,7 @@ export function Workspace(props: {
     // If the destination list renders as a board, the list-view Dnd isn't
     // mounted — hand the id to the Board's reveal path (select + scroll in
     // the resolved column) instead of the list-view scroll below.
-    if (target.kind === "list" && boardLists()[target.id]) {
+    if (target.kind === "list" && listView(target.id).board) {
       setBoardRevealIds([r.id]);
       return;
     }
@@ -1544,6 +1575,23 @@ export function Workspace(props: {
                             <Switch.Thumb class="done-switch-thumb" />
                           </Switch.Control>
                         </Switch>
+                      )}
+                    </Show>
+                    {/* Publish this view as the list's default for every
+                        device. Disabled once it already is the default —
+                        the label then reads as a state, not an action. */}
+                    <Show when={currentListId()}>
+                      {(listId) => (
+                        <button
+                          type="button"
+                          class="view-default-button"
+                          disabled={isSavedDefault(listId())}
+                          onClick={() => saveViewAsDefault(listId())}
+                        >
+                          {isSavedDefault(listId())
+                            ? m().board.savedAsDefault
+                            : m().board.saveAsDefault}
+                        </button>
                       )}
                     </Show>
                   </Popover.Content>

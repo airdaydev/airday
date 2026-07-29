@@ -23,6 +23,28 @@ function memStorage(): EngineStorage {
   return new MemEngineStorage() as unknown as EngineStorage;
 }
 
+/** Drain the engine's AppEvent queue into plain objects — the wasm
+ *  getters are only readable while the event is alive. */
+function drainAppEvents(eng: SyncEngine): Array<{
+  kind: string;
+  id: string;
+  defaultView?: string;
+  inboxView?: string;
+}> {
+  const out = [];
+  while (true) {
+    const ev = eng.popAppEvent();
+    if (!ev) break;
+    out.push({
+      kind: ev.kind,
+      id: ev.id,
+      defaultView: ev.defaultView,
+      inboxView: ev.inboxView,
+    });
+  }
+  return out;
+}
+
 function newEngine(): SyncEngine {
   // Doc.create() builds a fresh doc with no commits (no seeded user
   // lists). Mutations through the engine are what put it in a
@@ -143,6 +165,61 @@ describe("doc passthrough", () => {
     eng.addItem(LIST_MAIN, "later");
     eng.flush();
     expect(eng.popOutbox()).toBeUndefined();
+  });
+
+  test("setDefaultView surfaces on the snapshot and as an event", () => {
+    const eng = newEngine();
+    const listId = eng.addList("Work");
+    drainAppEvents(eng);
+
+    eng.setDefaultView(listId, "board:nodone");
+    const events = drainAppEvents(eng);
+    const changed = events.find((e) => e.kind === "listDefaultViewChanged");
+    expect(changed?.id).toBe(listId);
+    expect(changed?.defaultView).toBe("board:nodone");
+
+    const snap = JSON.parse(eng.workspaceSnapshotJson()) as {
+      settings: { inboxView?: string };
+      lists: Array<{ id: string; defaultView?: string }>;
+    };
+    expect(snap.lists.find((l) => l.id === listId)?.defaultView).toBe(
+      "board:nodone",
+    );
+
+    // Clearing drops the key rather than persisting a "none" value.
+    eng.setDefaultView(listId, "");
+    expect(drainAppEvents(eng).at(-1)?.defaultView).toBeUndefined();
+    const cleared = JSON.parse(eng.workspaceSnapshotJson()) as {
+      lists: Array<{ id: string; defaultView?: string }>;
+    };
+    expect(cleared.lists.find((l) => l.id === listId)?.defaultView).toBeUndefined();
+  });
+
+  test("inbox's default view rides on settings, not a ListMeta row", () => {
+    const eng = newEngine();
+    drainAppEvents(eng);
+
+    // The reserved list has no ListMeta row, so its default lands in the
+    // doc-level settings map and reports via settingsChanged.
+    eng.setDefaultView(LIST_MAIN, "board");
+    const settingsEvent = drainAppEvents(eng).find(
+      (e) => e.kind === "settingsChanged",
+    );
+    expect(settingsEvent?.inboxView).toBe("board");
+
+    const snap = JSON.parse(eng.workspaceSnapshotJson()) as {
+      settings: { inboxView?: string };
+      lists: Array<{ id: string }>;
+    };
+    expect(snap.settings.inboxView).toBe("board");
+    expect(snap.lists.some((l) => l.id === LIST_MAIN)).toBe(false);
+  });
+
+  test("setDefaultView rejects a view it can't encode", () => {
+    const eng = newEngine();
+    const listId = eng.addList("Work");
+    // A typo must surface rather than silently clearing the default.
+    expect(() => eng.setDefaultView(listId, "hologram")).toThrow();
   });
 });
 

@@ -1192,6 +1192,34 @@ body {
   box-shadow: 0 0 0 2px var(--dnd-select-bg);
 }
 
+/* "Save as default" action at the foot of the view-mode popover. Reads
+   as a quiet link until hovered; disabled once this view already is the
+   list's saved default. */
+.view-default-button {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.view-default-button:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.view-default-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
