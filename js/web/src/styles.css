@@ -1873,7 +1873,6 @@ body {
 }
 
 .task-dialog-title[data-done] {
-  text-decoration: line-through;
   color: var(--text-muted);
 }
 
