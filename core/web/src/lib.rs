@@ -252,11 +252,6 @@ impl Doc {
         self.inner.set_show_list_counts(show).map_err(js_err)
     }
 
-    #[wasm_bindgen(js_name = setInboxName)]
-    pub fn set_inbox_name(&self, name: &str) -> Result<(), JsError> {
-        self.inner.set_inbox_name(name).map_err(js_err)
-    }
-
     // ---------- lifecycle (spec/board.md, spec/data-model.md) ----------
 
     /// Move one item to `lifecycle` in a single commit (the board's
@@ -1472,11 +1467,6 @@ impl SyncEngine {
         self.inner.doc().set_show_list_counts(show).map_err(js_err)
     }
 
-    #[wasm_bindgen(js_name = setInboxName)]
-    pub fn set_inbox_name(&self, name: &str) -> Result<(), JsError> {
-        self.inner.doc().set_inbox_name(name).map_err(js_err)
-    }
-
     // ---------- lifecycle (spec/board.md, spec/data-model.md) ----------
 
     /// Move one item to `lifecycle` in a single commit (the board's
@@ -1763,7 +1753,7 @@ impl From<CoreEvent> for EngineEvent {
 /// - `listRenamed` — id, name
 /// - `listIconChanged` — id, icon? (undefined = icon removed)
 /// - `listDefaultViewChanged` — id, defaultView? (undefined = cleared)
-/// - `settingsChanged` — showListCounts, inboxName?, inboxView?
+/// - `settingsChanged` — showListCounts, inboxView?
 /// - `focusChanged` — no fields; re-derive the Focus projection
 #[wasm_bindgen]
 pub struct AppEventJs {
@@ -1791,10 +1781,6 @@ pub struct AppEventJs {
     done_at: Option<i64>,
     binned_at: Option<i64>,
     show_list_counts: Option<bool>,
-    /// Settings: `Some(name)` when the user has overridden Inbox's
-    /// label; `None` (or absent on non-`settingsChanged` events) means
-    /// fall back to the localized built-in label.
-    inbox_name: Option<String>,
     /// Settings (`settingsChanged`): Inbox's saved default view in
     /// encoded form, or `None` when none is saved.
     inbox_view: Option<String>,
@@ -1863,10 +1849,6 @@ impl AppEventJs {
     pub fn show_list_counts(&self) -> Option<bool> {
         self.show_list_counts
     }
-    #[wasm_bindgen(getter, js_name = inboxName)]
-    pub fn inbox_name(&self) -> Option<String> {
-        self.inbox_name.clone()
-    }
     #[wasm_bindgen(getter, js_name = defaultView)]
     pub fn default_view(&self) -> Option<String> {
         self.default_view.clone()
@@ -1902,7 +1884,6 @@ impl From<CoreAppEvent> for AppEventJs {
             done_at: None,
             binned_at: None,
             show_list_counts: None,
-            inbox_name: None,
             inbox_view: None,
             index: None,
             open_index: None,
@@ -2040,12 +2021,10 @@ impl From<CoreAppEvent> for AppEventJs {
             },
             CoreAppEvent::SettingsChanged {
                 show_list_counts,
-                inbox_name,
                 inbox_view,
             } => AppEventJs {
                 kind: "settingsChanged",
                 show_list_counts: Some(show_list_counts),
-                inbox_name,
                 inbox_view: inbox_view.map(|v| v.encode().to_string()),
                 ..blank
             },
@@ -2088,10 +2067,6 @@ fn list_to_json(l: &airday_core::ListView) -> String {
 
 fn settings_to_json(s: &airday_core::SettingsView) -> String {
     let mut out = format!("{{\"showListCounts\":{}", s.show_list_counts);
-    if let Some(n) = &s.inbox_name {
-        out.push_str(",\"inboxName\":");
-        out.push_str(&json_string(n));
-    }
     if let Some(v) = &s.inbox_view {
         out.push_str(",\"inboxView\":");
         out.push_str(&json_string(v.encode()));

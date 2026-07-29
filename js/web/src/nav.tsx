@@ -271,9 +271,6 @@ export function Nav(props: {
    *  renders a badge (showing "-" when zero); non-Inbox rows render theirs
    *  only when `showListCounts` is true, again with "-" for zero. */
   openCountsByList: Record<string, number>;
-  /** Resolved Inbox label — user override from doc-level settings if
-   *  present, otherwise the localized built-in label. */
-  homeName: string;
   /** Doc-level settings flag; when true, render the live-item count
    *  badge beside each non-Inbox list in the nav (showing "-" when the
    *  list is empty). Inbox's badge is always shown regardless. */
@@ -466,10 +463,6 @@ export function Nav(props: {
       }
     }
   };
-  // Captured by the Home ContextMenu's Rename item — same trick as the
-  // user-list rows further down so the menu can drive rename mode the
-  // same way a double-click on the label does.
-  let startHomeRename: (() => void) | undefined;
   return (
     <nav class="nav" onKeyDown={onNavKeyDown}>
       <input
@@ -498,47 +491,28 @@ export function Nav(props: {
             <span class="nav-item-count">{props.focusCount}</span>
           </Show>
         </button>
-        <ContextMenu>
-          <ContextMenu.Trigger
-            as="button"
-            type="button"
-            class="nav-item"
-            data-active={
-              props.view.kind === "list" && props.view.id === "inbox"
-                ? ""
-                : undefined
-            }
-            data-drop-list-id="inbox"
-            onClick={() => props.setView({ kind: "list", id: "inbox" })}
-          >
-            <span class="nav-item-icon" innerHTML={archiveSvg} />
-            <EditableNavLabel
-              name={props.homeName}
-              onSave={(name) => props.app.setInboxName(name)}
-              registerStart={(fn) => (startHomeRename = fn)}
-            />
-            <span class="nav-item-count">
-              {(props.openCountsByList["inbox"] ?? 0) > 0
-                ? props.openCountsByList["inbox"]
-                : "-"}
-            </span>
-          </ContextMenu.Trigger>
-          <ContextMenu.Portal>
-            <ContextMenu.Content class="context-menu-content">
-              <ContextMenu.Item
-                class="context-menu-item"
-                onSelect={() => {
-                  // Defer past the menu close + focus-restore (Kobalte
-                  // returns focus to the trigger on dismiss), matching
-                  // the user-list Rename pathway.
-                  requestAnimationFrame(() => startHomeRename?.());
-                }}
-              >
-                {m().nav.renameList}
-              </ContextMenu.Item>
-            </ContextMenu.Content>
-          </ContextMenu.Portal>
-        </ContextMenu>
+        {/* Inbox is reserved: it has no `ListMeta` row and carries the
+            localized built-in label, so — like Focus / Done / Bin — it's a
+            static entry with no rename affordance and no context menu. */}
+        <button
+          type="button"
+          class="nav-item"
+          data-active={
+            props.view.kind === "list" && props.view.id === "inbox"
+              ? ""
+              : undefined
+          }
+          data-drop-list-id="inbox"
+          onClick={() => props.setView({ kind: "list", id: "inbox" })}
+        >
+          <span class="nav-item-icon" innerHTML={archiveSvg} />
+          {m().nav.inbox}
+          <span class="nav-item-count">
+            {(props.openCountsByList["inbox"] ?? 0) > 0
+              ? props.openCountsByList["inbox"]
+              : "-"}
+          </span>
+        </button>
         <button
           type="button"
           class="nav-item"

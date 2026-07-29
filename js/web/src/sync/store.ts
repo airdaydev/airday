@@ -126,10 +126,6 @@ export interface SettingsView {
    *  always shown regardless. Single global flag; default false. Synced
    *  via the doc-level settings map. */
   showListCounts: boolean;
-  /** User-chosen display-name override for the reserved `inbox` list.
-   *  `null` when no override is set — clients fall back to the localized
-   *  built-in label. Synced via the doc-level settings map. */
-  inboxName: string | null;
   /** The reserved `inbox` list's saved default view in encoded form, or
    *  `null` when none is saved. Inbox has no ListMeta row, so its
    *  default lives in the doc-level settings map rather than on
@@ -226,9 +222,6 @@ export interface DocApp {
    *  Queue's own count is always visible (subject to count > 0) and is
    *  not gated by this flag. */
   setShowListCounts(show: boolean): void;
-  /** Set or clear the user-chosen display name for the reserved `inbox`
-   *  list. Passing `""` clears the override. */
-  setInboxName(name: string): void;
   /** Pin an item into the Focus lens at `index` in the visible curated
    *  order (default: the top — new focus items are "what am I working on
    *  now"). No-op if the item already has a visible ref or isn't Open;
@@ -315,7 +308,6 @@ function materializeEngineSnapshot(engine: SyncEngine): WorkspaceState {
     listsById,
     settings: {
       showListCounts: payload.settings.showListCounts ?? true,
-      inboxName: payload.settings.inboxName ?? null,
       inboxView: payload.settings.inboxView ?? null,
     },
   };
@@ -340,7 +332,6 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     listsById: {},
     settings: {
       showListCounts: true,
-      inboxName: null,
       inboxView: null,
     },
   });
@@ -593,7 +584,6 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         // setState keeps the store in lockstep with the doc.
         setState("settings", {
           showListCounts: ev.showListCounts ?? true,
-          inboxName: ev.inboxName ?? null,
           inboxView: ev.inboxView ?? null,
         });
         break;
@@ -785,9 +775,6 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     setShowListCounts(show) {
       mutate(() => engine.setShowListCounts(show));
-    },
-    setInboxName(name) {
-      mutate(() => engine.setInboxName(name));
     },
     addToFocus(id, index) {
       // Default to the top: newly-focused items are "what am I working on
