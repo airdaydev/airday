@@ -27,6 +27,7 @@ import type { DndDragEventDetail } from "./dnd";
 import checkSvg from "./icons/check.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
+import { isOverlayOpen } from "./overlay.ts";
 import { Row } from "./Row.tsx";
 import { planReorderMoves } from "./reorder.ts";
 import {
@@ -490,6 +491,10 @@ export function Board(props: {
   const onBoardKeyDown = (e: KeyboardEvent): void => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    // Row context menus portal out of the board, but Solid routes delegated
+    // keydown back through the JSX tree — so lane hopping would fire while a
+    // menu is open (and left/right belongs to the menu's submenus).
+    if (isOverlayOpen()) return;
     const target = e.target as Element | null;
     if (target?.closest('input, textarea, [contenteditable="true"]')) return;
     e.preventDefault();
