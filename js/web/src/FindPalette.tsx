@@ -161,18 +161,14 @@ export function FindPalette(props: {
   }
 
   // Display name of the list an item lives in, for the right-hand
-  // column. The reserved `inbox` list isn't a `ListMeta` row — its label
-  // is the doc-level override or the localized built-in (mirrors
-  // Workspace's homeName). Lists themselves get no label. Returns "" when
-  // there's nothing to show.
+  // column. The reserved `inbox` list isn't a `ListMeta` row — it always
+  // renders the localized built-in label. Lists themselves get no label.
+  // Returns "" when there's nothing to show.
   function listLabel(item: SearchResult): string {
     if (item.kind !== "item") return "";
     const listId = item.listId;
     if (!listId) return "";
-    if (listId === "inbox") {
-      const override = props.app.state.settings.inboxName;
-      return override && override.length > 0 ? override : m().nav.inbox;
-    }
+    if (listId === "inbox") return m().nav.inbox;
     return props.app.state.listsById[listId]?.name ?? "";
   }
 

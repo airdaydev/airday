@@ -283,9 +283,9 @@ Airday has one reserved primary capture list:
 
 - `inbox` — rendered as "Inbox". This id is reserved and addressable by items,
   but it is not stored as a `ListMeta` row in the `lists` MovableList. Its
-  order container is `order/inbox`. Its label is currently client-defined and
-  it is non-renamable, non-movable, and non-deletable. Doc-level settings for
-  it live in `settings`. (Pre-rename docs stored this id as `main`; the JSON
+  order container is `order/inbox`. Its label is client-defined (the localized
+  built-in) and it is non-renamable, non-movable, and non-deletable — there is
+  no display-name override. Doc-level settings for it live in `settings`. (Pre-rename docs stored this id as `main`; the JSON
   importer aliases `main` ⇒ `inbox` for the reserved list — see "Schema
   versioning & compatibility".)
 
@@ -302,7 +302,6 @@ Doc-level synced settings that are not owned by any specific `ListMeta`.
 | Field | Type | Notes |
 |---|---|---|
 | `show_list_counts` | bool? | when true, clients render each non-Inbox list's open-item count (Backlog + Live) in the nav (subject to a `count > 0` gate). Inbox's count is always shown regardless. Absent ≡ false; the mutation deletes the key on the off path so an unset flag leaves no on-disk trace. |
-| `inbox_name` | string? | user-chosen display-name override for the reserved `inbox` (Inbox) list. Absent ≡ no override; clients fall back to the localized built-in label. The mutation deletes the key on empty/whitespace input so an unset override leaves no on-disk trace. (Stored settings key: `inbox_name`.) |
 
 ## Mutations (rust core API surface)
 
@@ -321,7 +320,6 @@ All mutations go through Loro APIs internally; the core exposes typed helpers:
 - `add_list(name) -> ListId`
 - `rename_list(list_id, name)`
 - `set_show_list_counts(show)` — toggles the doc-level "show counts on non-Inbox lists" flag. Inbox's count is always visible (subject to count > 0) and is not gated by this.
-- `set_inbox_name(name)` — sets or clears the reserved `inbox` (Inbox) list's display-name override in the doc-level `settings` map. Trims input; an empty trimmed string clears the override.
 - `delete_list(list_id)` — refuses for `inbox`; see "Delete list" contract above.
 - `empty_bin()` — hard-deletes all `Binned` items.
 - `delete_binned(item_id)` — hard-deletes one `Binned` item.

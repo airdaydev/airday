@@ -63,8 +63,6 @@ export function TaskDialog(props: {
     } | null,
   ) => void;
   app: DocApp;
-  /** Resolved display name for the reserved `main` list. */
-  homeName: () => string;
   lists: () => ListView[];
   /** Which field to focus on open (default title). */
   focusField?: () => "title" | "notes";
@@ -118,7 +116,7 @@ export function TaskDialog(props: {
 
   // Move-to-list options: Inbox followed by every user list.
   const listOptions = createMemo<ListOption[]>(() => [
-    { id: "inbox", name: props.homeName() },
+    { id: "inbox", name: m().nav.inbox },
     ...props.lists().map((l) => ({ id: l.id, name: l.name, icon: l.icon })),
   ]);
   const moveItemToList = (targetId: string, currentListId: string) => {

@@ -431,29 +431,20 @@ export function Workspace(props: {
     return `${v.kind}:${v.kind === "list" ? v.id : "-"}`;
   });
 
-  // Id of the currently-viewed list iff it can be renamed. Both `main`
-  // (Home, via the doc-level settings override) and any user-created
-  // list qualify; only the done/bin cross-cutting views opt out.
+  // Id of the currently-viewed list iff it can be renamed. Only
+  // user-created lists qualify: reserved `inbox` carries the localized
+  // built-in label, and the done/bin cross-cutting views aren't lists.
   const editableListId = createMemo(() => {
     const v = view();
-    return v.kind === "list" ? v.id : null;
+    return v.kind === "list" && v.id !== "inbox" ? v.id : null;
   });
 
-  // Resolved display label for the reserved `main` (Home) list:
-  // user override from doc-level settings if present, otherwise the
-  // localized built-in label. Centralised here so the nav row, the
-  // workspace header, and `viewTitle` agree.
-  const homeName = createMemo((): string => {
-    const override = state.settings.inboxName;
-    return override && override.length > 0 ? override : m().nav.inbox;
-  });
-
-  // Resolved display label for any list id, matching the header/nav rules:
-  // `inbox` uses the Inbox override/built-in, others use the stored name.
+  // Display label for any list id, matching the header/nav rules:
+  // `inbox` is the localized built-in label, others use the stored name.
   // Used by Done-view rows to badge each item with its origin list.
   const listLabel = (listId: string): string =>
     listId === "inbox"
-      ? homeName()
+      ? m().nav.inbox
       : (state.listsById[listId]?.name ?? listId);
 
   createEffect(() => {
@@ -1283,7 +1274,6 @@ export function Workspace(props: {
         binCount={state.binCount}
         focusCount={state.focusOrder.length}
         openCountsByList={openCountsByList()}
-        homeName={homeName()}
         showListCounts={state.settings.showListCounts}
         view={view()}
         setView={(v) => {
@@ -1358,7 +1348,6 @@ export function Workspace(props: {
         newItem={newItemTarget}
         setNewItem={setNewItemTarget}
         app={app}
-        homeName={homeName}
         lists={lists}
         focusField={openFocus}
         caret={openCaret}
@@ -1412,7 +1401,7 @@ export function Workspace(props: {
             {/* User-created lists carry a display icon (chosen emoji or
                 the default glyph). Reserved `inbox` has no `ListMeta` row,
                 so it can't store one — gated out. */}
-            <Show when={editableListId() !== null && editableListId() !== "inbox"}>
+            <Show when={editableListId() !== null}>
               <ListIconPicker
                 icon={state.listsById[editableListId() ?? ""]?.icon}
                 onPick={(icon) => app.setListIcon(editableListId() ?? "", icon)}
@@ -1429,24 +1418,13 @@ export function Workspace(props: {
             <Show
               keyed
               when={editableListId()}
-              fallback={viewTitle(view(), lists(), homeName(), m())}
+              fallback={viewTitle(view(), lists(), m())}
             >
               {(listId) => (
                 <EditableNavLabel
                   class="editable-title"
-                  name={
-                    listId === "inbox"
-                      ? homeName()
-                      : (lists().find((l) => l.id === listId)?.name ?? listId)
-                  }
-                  onSave={(name) => {
-                    // Inbox's name lives on the doc-level settings map,
-                    // not as a `ListMeta` row — route to the right
-                    // mutation so the override survives sync. Empty
-                    // input clears the override (falls back to default).
-                    if (listId === "inbox") app.setInboxName(name);
-                    else app.renameList(listId, name);
-                  }}
+                  name={lists().find((l) => l.id === listId)?.name ?? listId}
+                  onSave={(name) => app.renameList(listId, name)}
                 />
               )}
             </Show>
@@ -1799,13 +1777,12 @@ export function Workspace(props: {
 function viewTitle(
   v: ViewKey,
   lists: { id: string; name: string }[],
-  homeName: string,
   m: ReturnType<typeof useAppI18n>["m"] extends () => infer T ? T : never,
 ): string {
   if (v.kind === "list") {
-    // `homeName` already resolves the user override → localized default
-    // chain (see `App.homeName`); pass through verbatim.
-    if (v.id === "inbox") return homeName;
+    // Reserved `inbox` has no `ListMeta` row — it always renders the
+    // localized built-in label.
+    if (v.id === "inbox") return m.nav.inbox;
     return lists.find((l) => l.id === v.id)?.name ?? v.id;
   }
   if (v.kind === "focus") return m.nav.focus;

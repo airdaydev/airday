@@ -149,8 +149,5 @@ pub enum AppEvent {
         /// gate). Inbox always shows its count regardless. Single global flag —
         /// there is no per-list override.
         show_list_counts: bool,
-        /// `None` when the user hasn't overridden Inbox's display name;
-        /// clients should fall back to the localized built-in label.
-        inbox_name: Option<String>,
     },
 }

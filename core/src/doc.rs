@@ -108,10 +108,6 @@ const KEY_BINNED_AT: &str = "binned_at";
 /// (and removed when toggled back off) so docs that have never enabled
 /// it carry no key.
 const KEY_SHOW_LIST_COUNTS: &str = "show_list_counts";
-/// Optional user-chosen display name override for the reserved `inbox`
-/// (Inbox) list. Absent ≡ no override; clients render the localized
-/// built-in label (`INBOX_NAME` / `i18n nav.home`) in that case.
-const KEY_INBOX_NAME: &str = "inbox_name";
 /// Batch lifecycle mutations at/above this many ids stop emitting
 /// surgical per-item events and fall back to one whole-doc rebuild +
 /// diff. Matches the web store's coarse-projection threshold so both
@@ -241,10 +237,6 @@ pub struct SettingsView {
     /// Inbox's count is always shown regardless. Single global flag;
     /// default false.
     pub show_list_counts: bool,
-    /// User-chosen override for the reserved `inbox` (Inbox) list's
-    /// display name. `None` (or absent in storage) means clients render
-    /// the localized built-in label.
-    pub inbox_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -271,11 +263,6 @@ pub struct ImportSummary {
 #[serde(rename_all = "camelCase")]
 pub struct ExportSettings {
     pub show_list_counts: bool,
-    /// `None` when the user hasn't overridden Inbox's display name.
-    /// Skipped when serializing to keep the JSON dump minimal for the
-    /// default case.
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub inbox_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -2150,37 +2137,6 @@ impl Doc {
         let post = settings_view(&settings);
         self.push_event(AppEvent::SettingsChanged {
             show_list_counts: post.show_list_counts,
-            inbox_name: post.inbox_name,
-        });
-        Ok(())
-    }
-
-    /// Set or clear the reserved `inbox` (Inbox) list's display-name
-    /// override. Trims `name`; an empty trimmed string clears the
-    /// override (so clients fall back to the localized built-in label).
-    /// No-op when the resulting value matches the current value, so
-    /// repeat saves of the same name don't emit phantom events.
-    pub fn set_inbox_name(&self, name: &str) -> Result<(), DocError> {
-        let settings = self.settings_map();
-        let trimmed = name.trim();
-        let next: Option<String> = if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        };
-        let current = read_string(&settings, KEY_INBOX_NAME);
-        if current.as_deref() == next.as_deref() {
-            return Ok(());
-        }
-        match &next {
-            Some(s) => settings.insert(KEY_INBOX_NAME, s.as_str())?,
-            None => settings.delete(KEY_INBOX_NAME)?,
-        }
-        self.inner.commit();
-        let post = settings_view(&settings);
-        self.push_event(AppEvent::SettingsChanged {
-            show_list_counts: post.show_list_counts,
-            inbox_name: post.inbox_name,
         });
         Ok(())
     }
@@ -2514,7 +2470,6 @@ impl Doc {
             version: 1,
             settings: ExportSettings {
                 show_list_counts: s.show_list_counts,
-                inbox_name: s.inbox_name,
             },
             lists,
             items,
@@ -2579,7 +2534,12 @@ impl Doc {
             map.insert(KEY_CREATED_AT, created_at)?;
             // Carry the display icon through; a trimmed-empty value (or none)
             // leaves the key unset so clients fall back to the built-in glyph.
-            if let Some(icon) = src_list.icon.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            if let Some(icon) = src_list
+                .icon
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
                 map.insert(KEY_ICON, icon)?;
             }
             id_map.insert(src_list.id.clone(), new_list_id);
@@ -3514,7 +3474,6 @@ impl Doc {
         let s = self.get_settings();
         out.push(AppEvent::SettingsChanged {
             show_list_counts: s.show_list_counts,
-            inbox_name: s.inbox_name,
         });
         let lists = self.all_lists();
         for (idx, list) in lists.iter().enumerate() {
@@ -3613,16 +3572,6 @@ impl Doc {
         let settings = self.get_settings();
         hasher.update(b"S");
         hasher.update([settings.show_list_counts as u8]);
-        // `inbox_name` is `Option<String>`; hash a presence byte so an
-        // empty string and `None` (which the reader collapses anyway)
-        // can't collide with a non-empty value of the same bytes.
-        match &settings.inbox_name {
-            Some(n) => {
-                hasher.update([1u8]);
-                hash_str(&mut hasher, n);
-            }
-            None => hasher.update([0u8]),
-        }
         // Lists: walk by stored order because ordering is part of the
         // logical state surfaced to users.
         let lists = self.all_lists();
@@ -3938,11 +3887,6 @@ fn settings_view(map: &LoroMap) -> SettingsView {
         // persisted on the opt-out path (stored `false`); absence means
         // the default.
         show_list_counts: read_bool(map, KEY_SHOW_LIST_COUNTS).unwrap_or(true),
-        // Read-side defaults to `None` when absent. Any persisted empty
-        // string is treated the same — the mutation deletes the key on
-        // empty input, but a caller that bypassed it shouldn't surface
-        // a confusing blank label.
-        inbox_name: read_string(map, KEY_INBOX_NAME).filter(|s| !s.is_empty()),
     }
 }
 
@@ -4294,10 +4238,9 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
 }
 
 fn diff_settings(pre: &SettingsView, post: &SettingsView, out: &mut Vec<AppEvent>) {
-    if pre.show_list_counts != post.show_list_counts || pre.inbox_name != post.inbox_name {
+    if pre.show_list_counts != post.show_list_counts {
         out.push(AppEvent::SettingsChanged {
             show_list_counts: post.show_list_counts,
-            inbox_name: post.inbox_name.clone(),
         });
     }
 }
@@ -4799,49 +4742,6 @@ mod tests {
             doc.drain_events().is_empty(),
             "second toggle to same value must not re-emit"
         );
-    }
-
-    #[test]
-    fn main_name_round_trips() {
-        let doc = Doc::new().unwrap();
-        assert_eq!(doc.get_settings().inbox_name, None);
-        doc.set_inbox_name("Today").unwrap();
-        assert_eq!(doc.get_settings().inbox_name.as_deref(), Some("Today"));
-        // Save/load preserves the override across the on-disk envelope.
-        let bytes = doc.save().unwrap();
-        let restored = Doc::load(&bytes).unwrap();
-        assert_eq!(restored.get_settings().inbox_name.as_deref(), Some("Today"));
-        // Whitespace is trimmed; surrounding spaces collapse, internal
-        // spaces survive verbatim.
-        doc.set_inbox_name("  My Day  ").unwrap();
-        assert_eq!(doc.get_settings().inbox_name.as_deref(), Some("My Day"));
-        // Empty input clears the override entirely — clients fall back
-        // to the localized built-in label.
-        doc.set_inbox_name("").unwrap();
-        assert_eq!(doc.get_settings().inbox_name, None);
-        doc.set_inbox_name("  ").unwrap();
-        assert_eq!(doc.get_settings().inbox_name, None);
-    }
-
-    #[test]
-    fn main_name_idempotent() {
-        let doc = Doc::new().unwrap();
-        let _ = doc.drain_events();
-        // Setting empty when already empty is a no-op.
-        doc.set_inbox_name("").unwrap();
-        assert!(doc.drain_events().is_empty());
-        doc.set_inbox_name("Today").unwrap();
-        let evs = doc.drain_events();
-        assert!(matches!(
-            evs.as_slice(),
-            [AppEvent::SettingsChanged {
-                inbox_name: Some(_),
-                ..
-            }]
-        ));
-        // Setting the same value (after trim) is also a no-op.
-        doc.set_inbox_name("  Today  ").unwrap();
-        assert!(doc.drain_events().is_empty());
     }
 
     #[test]
@@ -6633,7 +6533,6 @@ mod tests {
             version: 1,
             settings: ExportSettings {
                 show_list_counts: false,
-                inbox_name: None,
             },
             lists: vec![ExportList {
                 id: LIST_INBOX.to_string(),
@@ -6685,7 +6584,6 @@ mod tests {
             version: 99,
             settings: ExportSettings {
                 show_list_counts: false,
-                inbox_name: None,
             },
             lists: vec![],
             items: vec![],
