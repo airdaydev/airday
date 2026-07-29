@@ -73,6 +73,18 @@ export function tokenize(input: string): string[] {
   return out;
 }
 
+/** Name-only filter predicate, for pickers that narrow a short list of
+ *  names rather than querying the index (the task dialog's move-to-list
+ *  popover). Every query token must prefix some token of `name`, in any
+ *  order; an empty query matches everything. Shares `tokenize`, so the
+ *  case / accent / punctuation folding in spec/search.md applies here too. */
+export function matchesName(name: string, query: string): boolean {
+  const wanted = tokenize(query);
+  if (wanted.length === 0) return true;
+  const have = tokenize(name);
+  return wanted.every((w) => have.some((t) => t.startsWith(w)));
+}
+
 function lifecycleOf(item: ItemView): SearchLifecycle {
   if (item.binnedAt != null) return "binned";
   if (item.doneAt != null) return "done";

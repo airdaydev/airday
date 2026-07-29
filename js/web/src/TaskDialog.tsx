@@ -8,10 +8,9 @@
 
 import { Dialog } from "@kobalte/core/dialog";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import { Select } from "@kobalte/core/select";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { DueField } from "./DueField.tsx";
-import caretSortSvg from "./icons/caret-sort.svg?raw";
+import { ListPicker, type ListOption } from "./ListPicker.tsx";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import {
   addDaysToStamp,
@@ -38,10 +37,6 @@ import {
   type ItemView,
   type ListView,
 } from "./sync/store.ts";
-
-// One entry in the header's move-to-list Select: the reserved `inbox` list
-// plus every user list, `{ id, name }`.
-type ListOption = { id: string; name: string };
 
 export function TaskDialog(props: {
   /** The open item's id, or null when closed. */
@@ -124,7 +119,7 @@ export function TaskDialog(props: {
   // Move-to-list options: Inbox followed by every user list.
   const listOptions = createMemo<ListOption[]>(() => [
     { id: "inbox", name: props.homeName() },
-    ...props.lists().map((l) => ({ id: l.id, name: l.name })),
+    ...props.lists().map((l) => ({ id: l.id, name: l.name, icon: l.icon })),
   ]);
   const moveItemToList = (targetId: string, currentListId: string) => {
     const id = props.itemId();
@@ -390,43 +385,11 @@ export function TaskDialog(props: {
             <Show when={isNew()}>
               <header class="task-dialog-header">
                 <div class="task-dialog-header-meta">
-                  <Select<ListOption>
-                    placement="bottom-start"
-                    gutter={4}
-                    options={listOptions()}
-                    optionValue="id"
-                    optionTextValue="name"
-                    value={newItemListOption()}
-                    onChange={(opt) => {
-                      if (opt) setNewItemList(opt.id);
-                    }}
-                    itemComponent={(iprops) => (
-                      <Select.Item item={iprops.item} class="select-item">
-                        <Select.ItemLabel>
-                          {iprops.item.rawValue.name}
-                        </Select.ItemLabel>
-                      </Select.Item>
-                    )}
-                  >
-                    <Select.Trigger
-                      class="task-dialog-list"
-                      aria-label={m().workspace.moveToList}
-                    >
-                      <Select.Value<ListOption> class="task-dialog-list-value">
-                        {(state) => state.selectedOption()?.name}
-                      </Select.Value>
-                      <span
-                        class="task-dialog-list-caret"
-                        aria-hidden="true"
-                        innerHTML={caretSortSvg}
-                      />
-                    </Select.Trigger>
-                    <Select.Portal>
-                      <Select.Content class="select-content task-dialog-menu-content">
-                        <Select.Listbox class="select-listbox" />
-                      </Select.Content>
-                    </Select.Portal>
-                  </Select>
+                  <ListPicker
+                    options={listOptions}
+                    value={() => newItemListOption()?.id ?? null}
+                    onChange={setNewItemList}
+                  />
                 </div>
                 <div class="task-dialog-header-actions">
                   <Dialog.CloseButton
@@ -500,46 +463,11 @@ export function TaskDialog(props: {
                 <>
                   <header class="task-dialog-header">
                     <div class="task-dialog-header-meta">
-                      <Select<ListOption>
-                        placement="bottom-start"
-                        gutter={4}
-                        options={listOptions()}
-                        optionValue="id"
-                        optionTextValue="name"
-                        value={
-                          listOptions().find((o) => o.id === it().listId) ??
-                          null
-                        }
-                        onChange={(opt) => {
-                          if (opt) moveItemToList(opt.id, it().listId);
-                        }}
-                        itemComponent={(iprops) => (
-                          <Select.Item item={iprops.item} class="select-item">
-                            <Select.ItemLabel>
-                              {iprops.item.rawValue.name}
-                            </Select.ItemLabel>
-                          </Select.Item>
-                        )}
-                      >
-                        <Select.Trigger
-                          class="task-dialog-list"
-                          aria-label={m().workspace.moveToList}
-                        >
-                          <Select.Value<ListOption> class="task-dialog-list-value">
-                            {(state) => state.selectedOption()?.name}
-                          </Select.Value>
-                          <span
-                            class="task-dialog-list-caret"
-                            aria-hidden="true"
-                            innerHTML={caretSortSvg}
-                          />
-                        </Select.Trigger>
-                        <Select.Portal>
-                          <Select.Content class="select-content task-dialog-menu-content">
-                            <Select.Listbox class="select-listbox" />
-                          </Select.Content>
-                        </Select.Portal>
-                      </Select>
+                      <ListPicker
+                        options={listOptions}
+                        value={() => it().listId}
+                        onChange={(id) => moveItemToList(id, it().listId)}
+                      />
                       <span class="task-dialog-created">
                         {formatRelative(it().createdAt, nowMs(), locale())}
                       </span>

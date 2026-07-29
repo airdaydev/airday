@@ -98,6 +98,14 @@ type Messages = {
     duplicate: string;
     moveToBin: string;
     moveToList: string;
+    /** Placeholder / accessible name for the filter box in the move-to-list
+     *  picker's popover. */
+    searchLists: string;
+    /** Empty state shown when the move-to-list filter excludes every list. */
+    noMatchingLists: string;
+    /** Tag marking the row for the list an item is already filed under, in
+     *  the move-to-list picker. */
+    currentList: string;
     /** Accessible name for the Done view's display-options popover trigger. */
     doneOptions: string;
     /** Switch label (Done options popover) toggling the origin-list badge. */
@@ -299,6 +307,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       duplicate: "Duplicar",
       moveToBin: "Mover a la papelera",
       moveToList: "Mover a la lista",
+      searchLists: "Buscar listas",
+      noMatchingLists: "No hay listas coincidentes",
+      currentList: "Actual",
       doneOptions: "Opciones de visualización",
       showDoneList: "Mostrar lista",
       log: "Registrar",
@@ -470,6 +481,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       duplicate: "Duplicate",
       moveToBin: "Move to bin",
       moveToList: "Move to list",
+      searchLists: "Search lists",
+      noMatchingLists: "No matching lists",
+      currentList: "Current",
       doneOptions: "Display options",
       showDoneList: "Show list",
       log: "Log",

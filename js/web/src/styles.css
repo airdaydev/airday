@@ -1743,53 +1743,6 @@ body {
   color: var(--text-faint);
 }
 
-.select-content {
-  min-width: 160px;
-  padding: 4px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  outline: none;
-  /* Above the dialog overlay/positioner (100/101) — this Select only ever
-     opens inside the task dialog. */
-  z-index: 110;
-}
-
-[data-theme="dark"] .select-content {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-}
-
-.select-listbox {
-  max-height: 260px;
-  overflow-y: auto;
-  outline: none;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.select-item {
-  display: flex;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-size: 13px;
-  color: var(--text);
-  cursor: pointer;
-  outline: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.select-item[data-highlighted] {
-  background: var(--bg-active);
-}
-
-.select-item[data-selected] {
-  font-weight: 600;
-}
-
 .task-dialog-close {
   appearance: none;
   -webkit-appearance: none;
@@ -2544,6 +2497,40 @@ body {
   text-align: center;
   font-size: 13px;
   color: var(--text-faint);
+}
+
+/* Move-to-list picker (ListPicker.tsx): the palette's anatomy at popover
+   scale. Anchored under its trigger instead of centered — the component
+   measures the trigger and writes top / left inline, so those are only
+   reset here — and typographically a notch smaller to suit a 248px panel
+   holding a handful of names. Sits above the task dialog's overlay and
+   positioner (z-index 100 / 101), which the centered palette never has
+   to clear. */
+.list-picker {
+  top: 0;
+  left: 0;
+  transform: none;
+  width: 248px;
+  z-index: 110;
+  /* The task dialog is modal, so Kobalte puts pointer-events: none on
+     <body> and re-enables it only for the layers it registered itself.
+     This panel is portaled outside that machinery, so it has to opt back
+     in — without this every click on a row lands nowhere. */
+  pointer-events: auto;
+}
+
+.list-picker .palette__search input {
+  padding: 9px 10px;
+  font-size: 14px;
+}
+
+.list-picker .palette__results {
+  max-height: 260px;
+}
+
+.list-picker .palette__item {
+  padding: 6px 10px;
+  font-size: 14px;
 }
 
 /* ---------- Kanban board (spec/kanban.md) ---------- */
