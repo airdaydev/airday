@@ -1212,36 +1212,59 @@ export function Workspace(props: {
     document.removeEventListener("primavera-dnd-dragend", onDndDragEnd);
   });
 
-  // Selecting a palette result: jump to the view that contains it and
-  // re-anchor the dnd selection on the row. Lists go straight to that
-  // list. Items pick the view based on their lifecycle — binned items live
-  // in the Bin, done-only items in Done, otherwise their list. The
+  // Jump to `target` and re-anchor the dnd selection on `id`. The
   // selection + scroll bounce is deferred past the view-change effect
   // (which clears selection) and past the keyed Dnd remount, so the
   // new controller's source has the row's index when scrollToKey lands.
-  const onFindSelect = (r: SearchResult) => {
-    if (r.kind === "list") {
-      setView({ kind: "list", id: r.id });
-      return;
-    }
-    const target: ViewKey =
-      r.lifecycle === "binned"
-        ? { kind: "bin" }
-        : r.lifecycle === "done"
-          ? { kind: "done" }
-          : { kind: "list", id: r.listId || "inbox" };
+  const revealItem = (id: string, target: ViewKey): void => {
     setView(target);
     // If the destination list renders as a board, the list-view Dnd isn't
     // mounted — hand the id to the Board's reveal path (select + scroll in
     // the resolved column) instead of the list-view scroll below.
     if (target.kind === "list" && listView(target.id).board) {
-      setBoardRevealIds([r.id]);
+      setBoardRevealIds([id]);
       return;
     }
     setTimeout(() => {
-      selection.selectOnly(r.id);
-      dndHandle?.scrollToKey(r.id);
+      selection.selectOnly(id);
+      dndHandle?.scrollToKey(id);
     }, 0);
+  };
+
+  // Selecting a palette result: jump to the view that contains it. Lists go
+  // straight to that list. Items pick the view based on their lifecycle —
+  // binned items live in the Bin, done-only items in Done, otherwise their
+  // list.
+  const onFindSelect = (r: SearchResult) => {
+    if (r.kind === "list") {
+      setView({ kind: "list", id: r.id });
+      return;
+    }
+    revealItem(
+      r.id,
+      r.lifecycle === "binned"
+        ? { kind: "bin" }
+        : r.lifecycle === "done"
+          ? { kind: "done" }
+          : { kind: "list", id: r.listId || "inbox" },
+    );
+  };
+
+  // Row context menu: hop an item between its home list and the Focus lens,
+  // landing selected on the other side. "list" resolves the item's owning
+  // list (falling back to the inbox if the id has gone stale); "focus" is
+  // only offered for items that already carry a Focus ref, so the lens is
+  // guaranteed to render it.
+  const revealItemIn = (id: string, where: "list" | "focus"): void => {
+    if (where === "focus") {
+      revealItem(id, { kind: "focus" });
+      return;
+    }
+    const listId = app.state.itemsById[id]?.listId;
+    revealItem(id, {
+      kind: "list",
+      id: listId && app.state.listsById[listId] ? listId : "inbox",
+    });
   };
 
   // While a row is expanded: right-click inside it → native browser menu;
@@ -1739,6 +1762,7 @@ export function Workspace(props: {
                           setOpenItemId(id);
                         }}
                         onSetDue={openDueCalendar}
+                        onReveal={revealItemIn}
                         openOnTap={itemsIsMobile}
                       />
                     );
@@ -1758,6 +1782,7 @@ export function Workspace(props: {
                 setOpenItemId(id);
               }}
               onSetDue={openDueCalendar}
+              onReveal={revealItemIn}
               openOnTap={itemsIsMobile}
               duplicateBlock={duplicateBlock}
               copyBlock={copyBlock}

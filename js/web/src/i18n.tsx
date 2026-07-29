@@ -203,6 +203,10 @@ type Messages = {
     remove: string;
     /** Static Focus-membership badge shown on pinned list rows. */
     badge: string;
+    /** Context-menu jump from the Focus lens to the item's home list. */
+    showInList: string;
+    /** Context-menu jump from a list / board to the item in the Focus lens. */
+    showInFocus: string;
     /** Flat Focus view lifecycle toggles (no lanes — spec/focus.md). */
     markLive: string;
     markBacklog: string;
@@ -380,6 +384,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       add: "Enfoque",
       remove: "Quitar de Enfoque",
       badge: "Enfoque",
+      showInList: "Ver en la lista",
+      showInFocus: "Ver en Enfoque",
       markLive: "Marcar en curso",
       markBacklog: "Marcar como pendiente",
       empty:
@@ -556,6 +562,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       add: "Focus",
       remove: "Remove from Focus",
       badge: "Focus",
+      showInList: "Show in list",
+      showInFocus: "Show in Focus",
       markLive: "Mark as in progress",
       markBacklog: "Mark as backlog",
       empty:

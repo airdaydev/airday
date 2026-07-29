@@ -71,6 +71,10 @@ export function Row(props: {
   /** Open the shared calendar modal to set a due date on the target set.
    *  `initial` seeds the calendar (this row's current due date, or null). */
   onSetDue?: (ids: readonly string[], initial: string | null) => void;
+  /** Jump to the item's other appearance and select it there: from the
+   *  Focus lens to its home list, or from a list / board to the Focus
+   *  lens. Only offered for items that appear in both (`spec/focus.md`). */
+  onReveal?: (id: string, where: "list" | "focus") => void;
 }) {
   const { m, locale } = useAppI18n();
   // Origin-list badge text for the flat cross-list views. Always shown in
@@ -602,6 +606,25 @@ export function Row(props: {
             >
               {m().focus.remove}
               <kbd class="menu-shortcut">F</kbd>
+            </ContextMenu.Item>
+          </Show>
+          {/* Cross-appearance jump. Only for items that exist on both
+              sides: from the Focus lens to the item's home list, and from
+              a list / board row that currently carries a Focus ref. */}
+          <Show when={props.onReveal && inFocusView()}>
+            <ContextMenu.Item
+              class="context-menu-item"
+              onSelect={() => props.onReveal?.(props.item().id, "list")}
+            >
+              <span>{m().focus.showInList}</span>
+            </ContextMenu.Item>
+          </Show>
+          <Show when={props.onReveal && canPinToFocus() && focused()}>
+            <ContextMenu.Item
+              class="context-menu-item"
+              onSelect={() => props.onReveal?.(props.item().id, "focus")}
+            >
+              <span>{m().focus.showInFocus}</span>
             </ContextMenu.Item>
           </Show>
           <Show when={!isBinned(props.item())}>

@@ -71,6 +71,9 @@ export function Board(props: {
   listId: string;
   onOpen: (id: string, focus?: "notes", caret?: number) => void;
   onSetDue: (ids: readonly string[], initial: string | null) => void;
+  /** Row context-menu jump to the item's other appearance (the Focus
+   *  lens). Forwarded to each card. */
+  onReveal?: (id: string, where: "list" | "focus") => void;
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
@@ -515,6 +518,7 @@ export function Board(props: {
         autofocus
         onOpen={props.onOpen}
         onSetDue={props.onSetDue}
+        onReveal={props.onReveal}
         openOnTap={props.openOnTap}
         duplicateBlock={props.duplicateBlock}
         copyBlock={props.copyBlock}
@@ -530,6 +534,7 @@ export function Board(props: {
         registerHandle={registerHandle}
         onOpen={props.onOpen}
         onSetDue={props.onSetDue}
+        onReveal={props.onReveal}
         openOnTap={props.openOnTap}
         duplicateBlock={props.duplicateBlock}
         copyBlock={props.copyBlock}
@@ -552,6 +557,7 @@ export function Board(props: {
           registerHandle={registerHandle}
           onOpen={props.onOpen}
           onSetDue={props.onSetDue}
+          onReveal={props.onReveal}
           openOnTap={props.openOnTap}
           duplicateBlock={props.duplicateBlock}
           copyBlock={props.copyBlock}
@@ -574,6 +580,7 @@ function BoardColumn(props: {
   onAddItem: () => void;
   onOpen: (id: string, focus?: "notes", caret?: number) => void;
   onSetDue: (ids: readonly string[], initial: string | null) => void;
+  onReveal?: (id: string, where: "list" | "focus") => void;
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
@@ -650,6 +657,7 @@ function BoardColumn(props: {
               copyBlock={props.copyBlock}
               onOpen={props.onOpen}
               onSetDue={props.onSetDue}
+              onReveal={props.onReveal}
               openOnTap={props.openOnTap}
               showCreated
             />
