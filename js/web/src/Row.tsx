@@ -75,6 +75,10 @@ export function Row(props: {
    *  Focus lens to its home list, or from a list / board to the Focus
    *  lens. Only offered for items that appear in both (`spec/focus.md`). */
   onReveal?: (id: string, where: "list" | "focus") => void;
+  /** Scroll the enclosing Dnd viewport so `key` is visible. Supplied by the
+   *  host that owns the Dnd handle (the list view, or the board per lane) so
+   *  the reorder actions below can keep the moved rows in sight. */
+  scrollToKey?: (key: string) => void;
 }) {
   const { m, locale } = useAppI18n();
   // Origin-list badge text for the flat cross-list views. Always shown in
@@ -322,6 +326,15 @@ export function Row(props: {
     const set = new Set(targetIds());
     return order.filter((id) => set.has(id));
   };
+  // The moved rows only reach the Dnd's item list once the store update has
+  // propagated, so defer the scroll a tick — scrolling inline would resolve
+  // the row's pre-move index. `key` is the edge of the moved block that ends
+  // up furthest from the old viewport (first for top, last for bottom).
+  const scrollAfterMove = (key: string) => {
+    const scroll = props.scrollToKey;
+    if (!scroll) return;
+    setTimeout(() => scroll(key), 0);
+  };
   const onMoveToTop = () => {
     if (props.viewKind === "focus") {
       const ordered = orderedTargets(props.app.state.focusOrder);
@@ -329,6 +342,7 @@ export function Row(props: {
       props.app.withActionBatch(() => {
         ordered.forEach((id, i) => props.app.moveInFocus(id, i));
       });
+      scrollAfterMove(ordered[0]);
       return;
     }
     const listId = props.item().listId;
@@ -337,6 +351,7 @@ export function Row(props: {
     props.app.withActionBatch(() => {
       ordered.forEach((id, i) => props.app.moveItem(id, listId, i));
     });
+    scrollAfterMove(ordered[0]);
   };
   const onMoveToBottom = () => {
     if (props.viewKind === "focus") {
@@ -346,6 +361,7 @@ export function Row(props: {
       props.app.withActionBatch(() => {
         for (const id of ordered) props.app.moveInFocus(id, lastIndex);
       });
+      scrollAfterMove(ordered[ordered.length - 1]);
       return;
     }
     const listId = props.item().listId;
@@ -355,6 +371,7 @@ export function Row(props: {
     props.app.withActionBatch(() => {
       for (const id of ordered) props.app.moveItem(id, listId, lastIndex);
     });
+    scrollAfterMove(ordered[ordered.length - 1]);
   };
   const onOpenChange = (open: boolean) => {
     // Register the menu in the shared overlay count so the workspace's

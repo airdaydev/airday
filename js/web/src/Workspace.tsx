@@ -815,12 +815,14 @@ export function Workspace(props: {
     const v = view();
     if (v.kind === "focus") {
       // Focus owns no items — each clone is created in its source's own
-      // list (appended, inheriting the source's lane), falling back to the
-      // inbox only if that list is gone, then pinned as a contiguous block
-      // right after the bottom-most source's Focus slot. One undo step.
+      // list directly below its source (inheriting the source's lane),
+      // falling back to the top of the inbox only if that list is gone,
+      // then pinned as a contiguous block right after the bottom-most
+      // source's Focus slot. One undo step.
       const visible = items().map((it) => it.id);
       const sourceSet = new Set(sourceIds);
       const sources: {
+        id: string;
         idx: number;
         text: string;
         live: boolean;
@@ -831,19 +833,25 @@ export function Workspace(props: {
         const it = app.getItem(id);
         if (!it || !isOpen(it)) return;
         const listId = app.state.listsById[it.listId] ? it.listId : "inbox";
-        sources.push({ idx, text: it.text, live: it.live, listId });
+        sources.push({ id, idx, text: it.text, live: it.live, listId });
       });
       if (sources.length === 0) return;
       const insertAt = sources[sources.length - 1].idx + 1;
-      const appended: Record<string, number> = {};
+      // `state.listOpen` doesn't update until the batch flushes, so track
+      // each touched list's Open order locally to keep the slots right when
+      // several sources share a list.
+      const openOrder: Record<string, string[]> = {};
       const newIds = app.withActionBatch(() => {
         const created: string[] = [];
         sources.forEach((s, i) => {
-          const at =
-            (app.state.listOpen[s.listId]?.length ?? 0) +
-            (appended[s.listId] ?? 0);
-          appended[s.listId] = (appended[s.listId] ?? 0) + 1;
+          const order = (openOrder[s.listId] ??= [
+            ...(app.state.listOpen[s.listId] ?? []),
+          ]);
+          // Source missing from its own list's Open order (the inbox
+          // fallback above, or a stale projection) — land the clone on top.
+          const at = order.indexOf(s.id) + 1;
           const id = app.addItemAt(s.listId, s.text, at);
+          order.splice(at, 0, id);
           if (s.live) app.setLifecycle(id, "live");
           app.addToFocus(id, insertAt + i);
           created.push(id);
@@ -1764,6 +1772,7 @@ export function Workspace(props: {
                         onSetDue={openDueCalendar}
                         onReveal={revealItemIn}
                         openOnTap={itemsIsMobile}
+                        scrollToKey={(k) => dndHandle?.scrollToKey(k)}
                       />
                     );
                   }}
