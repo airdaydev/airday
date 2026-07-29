@@ -213,6 +213,32 @@ export function ListPicker(props: {
         data-expanded={open() ? "" : undefined}
         onClick={toggle}
       >
+        {/* Same glyph rules as the option rows below, so the trigger reads
+            as the selected row lifted out of the panel. Nothing renders
+            while a new capture has no list yet. */}
+        <Show when={selected()}>
+          {(opt) => (
+            <Show
+              when={opt().icon}
+              fallback={
+                <span
+                  class="task-dialog-list-icon"
+                  aria-hidden="true"
+                  innerHTML={opt().id === "inbox" ? archiveSvg : fileSvg}
+                />
+              }
+            >
+              {(icon) => (
+                <span
+                  class="task-dialog-list-icon task-dialog-list-icon-emoji"
+                  aria-hidden="true"
+                >
+                  {icon()}
+                </span>
+              )}
+            </Show>
+          )}
+        </Show>
         <span class="task-dialog-list-value">{selected()?.name}</span>
         <span
           class="task-dialog-list-caret"

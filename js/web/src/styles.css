@@ -683,16 +683,43 @@ body {
    is cross-list). A subtle pill so it reads as metadata, not row text. */
 .row-list {
   flex-shrink: 0;
-  max-width: 14ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 16ch;
+  min-width: 0;
   color: var(--text-faint);
   font-size: 12px;
   line-height: 1.3em;
   padding: 1px 6px;
   border: 1px solid var(--border-row);
   border-radius: 4px;
+}
+
+/* The name is the only elastic part of the badge — the glyph keeps its
+   intrinsic size so a long list name ellipsizes rather than squashing it. */
+.row-list-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-list-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.row-list-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.row-list-icon-emoji {
+  font-size: 12px;
+  line-height: 1;
 }
 
 /* Remove (×) affordance shown inside the Focus lens, at the row's trailing
@@ -1731,7 +1758,9 @@ body {
   align-items: center;
   gap: 3px;
   width: fit-content;
-  max-width: 8em;
+  /* Widened from 8em when the list glyph joined the trigger, so the name
+     keeps roughly the same room before it ellipsizes. */
+  max-width: 10em;
   margin-left: -6px;
   padding: 2px 6px;
   border: 0;
@@ -1753,6 +1782,23 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.task-dialog-list-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.task-dialog-list-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.task-dialog-list-icon-emoji {
+  font-size: 13px;
+  line-height: 1;
 }
 
 .task-dialog-list-caret {

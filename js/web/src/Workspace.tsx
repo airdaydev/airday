@@ -478,6 +478,12 @@ export function Workspace(props: {
       ? m().nav.inbox
       : (state.listsById[listId]?.name ?? listId);
 
+  // Companion to `listLabel`: a list's chosen emoji, if it set one. The
+  // reserved Home list can't carry one, so it always falls through to the
+  // caller's default glyph.
+  const listIcon = (listId: string): string | undefined =>
+    listId === "inbox" ? undefined : state.listsById[listId]?.icon;
+
   createEffect(() => {
     const next = items();
     const d = draft();
@@ -1761,6 +1767,7 @@ export function Workspace(props: {
                         viewKind={view().kind}
                         showList={doneShowList}
                         listLabel={listLabel}
+                        listIcon={listIcon}
                         duplicateBlock={duplicateBlock}
                         copyBlock={copyBlock}
                         onDraftSettle={settleDraft}
