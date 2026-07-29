@@ -292,6 +292,10 @@ function materializeEngineSnapshot(engine: SyncEngine): WorkspaceState {
       id: list.id,
       name: list.name,
       icon: list.icon,
+      // Absent in the JSON when the list has no saved default; carry it
+      // through or a boot / coarse resync silently drops the saved view
+      // and the client falls back to the built-in list lens.
+      defaultView: list.defaultView,
       createdAt: list.createdAt,
     };
   }

@@ -51,3 +51,47 @@ test("bulk bootstrap crosses the app boundary as one full resync", () => {
   expect(Object.keys(app.state.itemsById)).toHaveLength(100);
   expect(app.state.listOpen.inbox).toHaveLength(100);
 });
+
+// Saved default views live in the doc, so a fresh boot has to read them
+// back off the workspace snapshot — not just off the live event stream
+// that carried the original save. Regression: the snapshot materializer
+// dropped `defaultView`, so every reload fell back to the list lens.
+test("a saved default view survives materializing a fresh store", () => {
+  const newEngine = () =>
+    new SyncEngine(
+      Doc.create(),
+      DOC_ID,
+      Dek.generate(),
+      0n,
+      "test",
+      "0",
+      new MemEngineStorage() as unknown as EngineStorage,
+    );
+
+  const engine = newEngine();
+  const listId = engine.addList("Work");
+  engine.setDefaultView(listId, "board:nodone");
+  engine.setDefaultView("inbox", "board");
+  const saved = engine.save();
+
+  // Reload the way a returning session does: rebuild the doc from the
+  // persisted snapshot, then materialize the store off the fresh engine.
+  const reloaded = new SyncEngine(
+    Doc.load(saved),
+    DOC_ID,
+    Dek.generate(),
+    0n,
+    "test",
+    "0",
+    new MemEngineStorage() as unknown as EngineStorage,
+  );
+  const app = createSyncedApp(reloaded);
+  expect(app.state.listsById[listId]?.defaultView).toBe("board:nodone");
+  expect(app.state.settings.inboxView).toBe("board");
+
+  // Clearing the default has to survive the same round trip as absence,
+  // not linger as a stale register.
+  reloaded.setDefaultView(listId, "");
+  app.drainEvents();
+  expect(app.state.listsById[listId]?.defaultView).toBeUndefined();
+});
