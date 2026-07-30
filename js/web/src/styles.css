@@ -310,6 +310,13 @@ body {
   color: #fff;
 }
 
+/* On the selected row, drop the muted glyph colour so the SVG icon reads
+   as part of the label rather than a dimmer decoration. Emoji icons are
+   already `color: inherit` and unaffected (their colour is intrinsic). */
+.nav-item[data-active] .nav-item-icon {
+  color: inherit;
+}
+
 .nav-item[data-drop-active] {
   background: var(--dnd-select-bg);
 }
