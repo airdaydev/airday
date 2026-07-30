@@ -75,3 +75,5 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 - Should delete from focus only delete the focus record?
 - Should we set an external url as a cache to quick open?
 - Emojis in other languages
+- Gaming controls?
+- Location based tasks
