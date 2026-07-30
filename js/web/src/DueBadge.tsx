@@ -6,8 +6,9 @@ import { useAppI18n } from "./i18n.tsx";
 // Compact due-date badge shared by list rows and board cards. Reads the
 // raw `YYYY-MM-DD` register and renders a short label whose color role
 // (`data-tone`) reflects urgency — unless `muted` (done/binned items),
-// which drops all urgency styling. Recomputes off the shared `nowMs()`
-// tick so "Today"/"Overdue" roll over at local midnight on their own.
+// which drops all urgency styling and shows a past due date as the date
+// itself rather than "Overdue". Recomputes off the shared `nowMs()` tick
+// so "Today"/"Overdue" roll over at local midnight on their own.
 export function DueBadge(props: { dueOn: string; muted?: boolean }) {
   const { m, locale } = useAppI18n();
   const info = createMemo(() =>
@@ -20,6 +21,7 @@ export function DueBadge(props: { dueOn: string; muted?: boolean }) {
         tomorrow: m().due.tomorrow,
       },
       locale(),
+      { pastAsDate: props.muted },
     ),
   );
   const tone = () => (props.muted ? "muted" : (info()?.urgency ?? "future"));

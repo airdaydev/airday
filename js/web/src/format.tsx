@@ -103,33 +103,46 @@ export interface DueBadgeInfo {
   urgency: DueUrgency;
 }
 
+// `Jul 12`, gaining the year only when it falls outside `ref`'s.
+function compactDate(date: Date, ref: Date, locale: string): string {
+  const opts: Intl.DateTimeFormatOptions =
+    date.getFullYear() === ref.getFullYear()
+      ? { month: "short", day: "numeric" }
+      : { month: "short", day: "numeric", year: "numeric" };
+  return new Intl.DateTimeFormat(locale, opts).format(date);
+}
+
 // Compact label + urgency for a due date, relative to `today` (both raw
 // `YYYY-MM-DD`). Rules: before today → "Overdue"; today → "Today";
 // tomorrow → "Tomorrow"; within the next 7 days → short weekday; else a
 // compact `Jul 12` (with the year when it differs from today's). Labels
 // for the fixed cases come from i18n so callers stay locale-correct.
+//
+// `pastAsDate` swaps the "Overdue" label for that same compact date:
+// nothing is still owed on a done/binned item, so the useful fact is when
+// it was due, not that the deadline slipped.
 export function formatDueBadge(
   dueOn: string,
   today: string,
   labels: { overdue: string; today: string; tomorrow: string },
   locale: string,
+  opts?: { pastAsDate?: boolean },
 ): DueBadgeInfo | null {
   const due = parseLocalDateParts(dueOn);
   const ref = parseLocalDateParts(today);
   if (!due || !ref) return null;
   const days = calendarDayDiff(due, ref);
-  if (days < 0) return { label: labels.overdue, urgency: "overdue" };
+  if (days < 0) {
+    const label = opts?.pastAsDate ? compactDate(due, ref, locale) : labels.overdue;
+    return { label, urgency: "overdue" };
+  }
   if (days === 0) return { label: labels.today, urgency: "today" };
   if (days === 1) return { label: labels.tomorrow, urgency: "future" };
   if (days < 7) {
     const weekday = new Intl.DateTimeFormat(locale, { weekday: "short" }).format(due);
     return { label: weekday, urgency: "future" };
   }
-  const opts: Intl.DateTimeFormatOptions =
-    due.getFullYear() === ref.getFullYear()
-      ? { month: "short", day: "numeric" }
-      : { month: "short", day: "numeric", year: "numeric" };
-  return { label: new Intl.DateTimeFormat(locale, opts).format(due), urgency: "future" };
+  return { label: compactDate(due, ref, locale), urgency: "future" };
 }
 
 // Done-view stamp: same calendar day as `now` → time of day; otherwise

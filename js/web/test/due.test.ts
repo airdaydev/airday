@@ -83,6 +83,19 @@ describe("formatDueBadge", () => {
     );
   });
 
+  test("pastAsDate shows the date instead of Overdue", () => {
+    expect(
+      formatDueBadge("2026-07-06", today, labels, "en-US", { pastAsDate: true }),
+    ).toEqual({ label: "Jul 6", urgency: "overdue" });
+    expect(
+      formatDueBadge("2020-01-01", today, labels, "en-US", { pastAsDate: true })?.label,
+    ).toBe("Jan 1, 2020");
+    // Only the past branch changes; today/tomorrow keep their labels.
+    expect(
+      formatDueBadge(today, today, labels, "en-US", { pastAsDate: true })?.label,
+    ).toBe("Today");
+  });
+
   test("today and tomorrow", () => {
     expect(formatDueBadge(today, today, labels, "en-US")).toEqual({
       label: "Today",
