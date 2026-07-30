@@ -427,6 +427,13 @@ export function Row(props: {
           type="checkbox"
           tabIndex={-1}
           checked={isDone(props.item())}
+          onMouseDown={(e) => {
+            // Clicking still focuses the checkbox despite tabIndex=-1, and
+            // the lingering focus makes a later Space press re-toggle it.
+            // Preventing mousedown's default suppresses the focus move while
+            // the click (and toggle) still fire.
+            e.preventDefault();
+          }}
           onChange={(e) =>
             props.app.setDone(props.item().id, e.currentTarget.checked)
           }
