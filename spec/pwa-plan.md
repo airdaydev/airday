@@ -37,18 +37,26 @@ and server plumbing to close that gap, plus a purpose-built auth-probe endpoint
   (`js/web/src/sync/sync.ts`), currently `api.listDevices()`; only a 401 there
   means "auth is bad".
 
-## Phase 1 — manifest + icons
+## Phase 1 — manifest + icons — **done**
 
-New `js/web/public/` (Vite copies it verbatim into `dist/` root):
+`js/web/public/` (Vite copies it verbatim into `dist/` root):
 
 - `icons/`: `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`,
-  `apple-touch-icon.png` (180×180). Placeholder artwork initially (simple
-  glyph on the brand background); swap for real artwork any time — the
-  filenames are the contract.
+  `apple-touch-icon.png` (180×180). The filenames are the contract; swap the
+  artwork any time. Current artwork is the marketing site's app mark (the
+  `Ad` glyph on the brand purple), lifted from `airday_website/public/`. The
+  maskable variant is derived from the 512: the same art inset to ~92% over a
+  flat-bleed brand-purple field, since the source tile has transparent
+  corners and would get chewed by a circular mask as-is.
+- Root favicons: `favicon.ico` (16/32/48), `favicon-32x32.png`,
+  `favicon-16x16.png` — same source, matching the website's tab icon.
 
-Manifest is declared in the vite-plugin-pwa config (Phase 2), not as a static
-file — the plugin emits `manifest.webmanifest` and injects the `<link>` into
-`index.html`. Contents:
+Manifest was to be declared in the vite-plugin-pwa config (Phase 2), but the
+icons landed ahead of the plugin, so `public/manifest.webmanifest` is a static
+file for now and `index.html` carries the `<link rel="manifest">` and the
+icon/apple-touch links by hand. When Phase 2 lands, either let the plugin emit
+the manifest (delete the static file, drop the `<link>`) or keep `manifest:
+false` and leave this as-is; do not ship both. Contents:
 
 ```json
 {
@@ -67,8 +75,9 @@ file — the plugin emits `manifest.webmanifest` and injects the `<link>` into
 ```
 
 `theme_color` is static while the in-app theme is a cookie; pick the light
-value (the html-level theme script still applies dark instantly).
-`index.html` additionally gets `<link rel="apple-touch-icon" ...>`.
+value (`--bg`, `#f9f9f9` — the html-level theme script still applies dark
+instantly). `index.html` additionally gets `<link rel="apple-touch-icon" ...>`
+and a matching `<meta name="theme-color">`.
 
 ## Phase 2 — service worker (vite-plugin-pwa, generateSW)
 
@@ -103,12 +112,18 @@ Notes:
 - `inlineWorkboxRuntime` keeps the server-side embedding surface to exactly
   `sw.js` + `manifest.webmanifest` + icons.
 
-## Phase 3 — server: root-level embedded files + cache policy
+## Phase 3 — server: root-level embedded files + cache policy — **done for icons/manifest**
 
-`web.rs` currently whitelists `/` and `/assets/*`. The build now emits
-root-level files (`sw.js`, `manifest.webmanifest`, `icons/*`,
-`registerSW.js` if the plugin emits one). Replace the explicit index routes
-with a single-segment catch-all plus the existing asset route:
+The routes below are in `web.rs` as of Phase 1: `/{file}` and `/icons/{file}`
+serve the favicons and the manifest. `sw.js` and `registerSW.js` don't exist
+yet — the `/{file}` catch-all will pick them up once Phase 2 emits them, but
+the `sw.js` → `no-cache` rule still needs adding to `root_file` at that point
+(it currently falls through to the icon policy, which for a service worker is
+the wrong answer).
+
+The build emits root-level files (`sw.js`, `manifest.webmanifest`, `icons/*`,
+`registerSW.js` if the plugin emits one), served by a single-segment catch-all
+alongside the existing asset route:
 
 - `/` and `/index.html` → embedded `index.html`, `no-cache` (as today)
 - `/assets/{*path}` → `immutable` (as today)
@@ -120,9 +135,10 @@ with a single-segment catch-all plus the existing asset route:
   - icons → `public, max-age=86400` (not content-hashed, but change rarely)
 
 Axum gives static routes precedence over captures at the same level, so
-`/healthz`, `/api/...` (all multi-segment), and `/admin/...` are unaffected.
-Check `rust_embed`'s mimetype for `.webmanifest` — if `mime_guess` doesn't
-yield `application/manifest+json`, add an extension override in `serve()`.
+`/healthz`, `/api/...` (all multi-segment), and `/admin/...` are unaffected —
+verified against a running bundled server. `mime_guess` does yield
+`application/manifest+json` for `.webmanifest`, so `serve()` needs no
+extension override.
 
 Build-order note: `bundled-web` embeds at compile time, so a production server
 build must run after `bun run --cwd js/web build` (which itself follows

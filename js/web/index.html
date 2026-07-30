@@ -7,6 +7,16 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <title>Airday</title>
+    <!-- Icons and manifest live in `public/`, so vite copies them to the
+         `dist/` root verbatim and these paths hold in dev and in the
+         server's embedded bundle alike. `theme_color` is static (light)
+         because the in-app theme is a cookie read by the script below. -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#f9f9f9" />
   </head>
   <body>
     <script>
