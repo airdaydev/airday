@@ -74,3 +74,4 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 - fuck, when i was dragging a kanban item, i couldn't see my drop target easily in the list on the left
 - Should delete from focus only delete the focus record?
 - Should we set an external url as a cache to quick open?
+- Emojis in other languages

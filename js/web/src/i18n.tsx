@@ -120,8 +120,35 @@ type Messages = {
     listIcon: string;
     /** Label for the button that clears a list's custom icon. */
     removeIcon: string;
-    /** Placeholder for the free-form emoji input in the icon picker. */
-    iconInputPlaceholder: string;
+  };
+  /** Chrome around the emoji picker. The emoji dataset itself is
+   *  English-only (see `emoji/data.ts`), so emoji names and search terms are
+   *  not localised — but the surrounding UI is. */
+  emoji: {
+    /** Placeholder + accessible name for the picker's search field. */
+    search: string;
+    /** Accessible name for the category tab strip. */
+    category: string;
+    /** Tab label for the recently-picked row. */
+    recent: string;
+    /** Grid placeholder while the dataset is being fetched. */
+    loading: string;
+    /** Grid placeholder when the dataset fetch failed (e.g. cold offline). */
+    loadFailed: string;
+    /** Grid placeholder when a search matches nothing. */
+    noResults: string;
+    /** Emojibase category names, keyed by `EMOJI_GROUPS[].labelKey`. */
+    groups: {
+      smileys: string;
+      people: string;
+      nature: string;
+      food: string;
+      travel: string;
+      activities: string;
+      objects: string;
+      symbols: string;
+      flags: string;
+    };
   };
   board: {
     viewAsBoard: string;
@@ -325,7 +352,25 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       logCompleted: "Registrar elemento completado",
       listIcon: "Icono de la lista",
       removeIcon: "Quitar icono",
-      iconInputPlaceholder: "Emoji",
+    },
+    emoji: {
+      search: "Buscar emoji",
+      category: "Categoría",
+      recent: "Recientes",
+      loading: "Cargando emoji…",
+      loadFailed: "No se pudieron cargar los emoji",
+      noResults: "No se encontraron emoji",
+      groups: {
+        smileys: "Caras y emociones",
+        people: "Personas y cuerpo",
+        nature: "Animales y naturaleza",
+        food: "Comida y bebida",
+        travel: "Viajes y lugares",
+        activities: "Actividades",
+        objects: "Objetos",
+        symbols: "Símbolos",
+        flags: "Banderas",
+      },
     },
     board: {
       viewAsBoard: "Vista de tablero",
@@ -503,7 +548,25 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       logCompleted: "Log completed item",
       listIcon: "List icon",
       removeIcon: "Remove icon",
-      iconInputPlaceholder: "Emoji",
+    },
+    emoji: {
+      search: "Search emoji",
+      category: "Category",
+      recent: "Recently used",
+      loading: "Loading emoji…",
+      loadFailed: "Couldn't load emoji",
+      noResults: "No emoji found",
+      groups: {
+        smileys: "Smileys & emotion",
+        people: "People & body",
+        nature: "Animals & nature",
+        food: "Food & drink",
+        travel: "Travel & places",
+        activities: "Activities",
+        objects: "Objects",
+        symbols: "Symbols",
+        flags: "Flags",
+      },
     },
     board: {
       viewAsBoard: "Board view",

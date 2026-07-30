@@ -1083,49 +1083,26 @@ body {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   outline: none;
   z-index: 60;
-  width: 232px;
 }
 
-.list-icon-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 2px;
-}
+/* ---- emoji picker panel (EmojiPicker.tsx) ---- */
 
-.list-icon-option {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 32px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.list-icon-option:hover {
-  background: var(--bg-hover);
-}
-
-.list-icon-option[data-active] {
-  border-color: var(--border-surface);
-  background: var(--bg-hover);
-}
-
-.list-icon-actions {
+/* Width is derived from the grid: 8 columns × 32px + 7 × 2px gaps = 270px.
+   Keep `--emoji-cell` and the COLUMNS constant in EmojiPicker.tsx in sync —
+   arrow-key up/down steps by that column count. */
+.emoji-picker {
+  --emoji-cell: 32px;
+  --emoji-gap: 2px;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
+  flex-direction: column;
+  gap: 8px;
+  width: calc(8 * var(--emoji-cell) + 7 * var(--emoji-gap));
 }
 
-.list-icon-input {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 8px;
+.emoji-picker__search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
   border: 1px solid var(--border-input);
   border-radius: 6px;
   background: transparent;
@@ -1133,25 +1110,132 @@ body {
   outline: none;
 }
 
-.list-icon-input:focus {
+.emoji-picker__search:focus {
   border-color: var(--text-muted);
 }
 
-.list-icon-remove {
-  padding: 5px 8px;
+.emoji-picker__tabs {
+  display: flex;
+  gap: 1px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+
+.emoji-picker__tab {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  /* Category glyphs are wayfinding, not content — muted until active so the
+     emoji grid below stays the loudest thing in the panel. */
+  opacity: 0.55;
+}
+
+.emoji-picker__tab:hover {
+  background: var(--bg-hover);
+  opacity: 0.85;
+}
+
+.emoji-picker__tab[data-active] {
+  background: var(--bg-hover);
+  opacity: 1;
+}
+
+.emoji-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(8, var(--emoji-cell));
+  gap: var(--emoji-gap);
+  /* Eight rows before scrolling; the tallest group (people & body, 388) is
+     well past that, so the panel height is effectively fixed. */
+  height: calc(8 * var(--emoji-cell) + 7 * var(--emoji-gap));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  align-content: start;
+}
+
+.emoji-picker__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--emoji-cell);
+  height: var(--emoji-cell);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* The keyboard cursor. Focus never leaves the search field, so this — driven
+   by aria-activedescendant — is the only cursor the user sees. */
+.emoji-picker__option[data-cursor] {
+  background: var(--bg-hover);
+}
+
+/* The list's currently-saved icon, distinct from the cursor: the cursor is
+   where you are, this is what's already chosen. */
+.emoji-picker__option[data-chosen] {
+  border-color: var(--border-surface);
+}
+
+.emoji-picker__status {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px 4px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.emoji-picker__footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  min-height: 26px;
+}
+
+.emoji-picker__preview {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Names run long ("man detective: medium-dark skin tone"), and the panel is
+   a fixed width — clip rather than reflow the footer. */
+.emoji-picker__preview-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.emoji-picker__clear {
+  padding: 4px 8px;
   border: 1px solid var(--border-input);
   border-radius: 6px;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.list-icon-remove:hover:not(:disabled) {
+.emoji-picker__clear:hover:not(:disabled) {
   background: var(--bg-hover);
 }
 
-.list-icon-remove:disabled {
+.emoji-picker__clear:disabled {
   opacity: 0.5;
   cursor: default;
 }
