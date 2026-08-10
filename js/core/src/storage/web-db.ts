@@ -22,21 +22,22 @@
 // for the schema; every caller goes through `openAirdayDb()`.
 //
 // IDB's compound-index quirk — records where any key element is
-// `undefined` are skipped — gives the engine `ops` store the spec's
-// partial-unique indexes for free (`clientOpId` is unset on remote rows,
-// `serverSeq` is unset until ack).
+// `undefined` are skipped — gives the engine `ops` store a partial
+// unique index for free (`serverSeq` is unset on local-origin rows).
 
 const DB_NAME = "airday-web";
 // v1–v6 built up (and re-keyed) the config stores plus a now-defunct
 // op-log-on-OPFS data plane (`ops` / `snapshot_meta`). v7 retired that
 // data plane and briefly homed the engine op log in a *separate*
-// `airday-engine` database. v8 collapses that split back in: the engine stores
-// (`docs` / `ops` / `snapshots`) are created here, and `airday-engine`
-// is abandoned (its op log is re-pulled from the server, matching the
-// "abandon, not drain" convention). Note `ops` is reused as an engine
-// store name — the legacy `ops` is dropped before the engine `ops` is
-// created so any prior version converges to the current shape.
-const DB_VERSION = 8;
+// `airday-engine` database. v8 collapsed that split back in: the engine
+// stores (`docs` / `ops` / `snapshots`) were created here, and
+// `airday-engine` abandoned. v9 is the WAL/VV separation
+// (spec/vv-wal-separation.md): `ops` becomes the pure crash-recovery
+// WAL (no more `clientOpId` / outbox role — it's recreated fresh, its
+// v8 rows abandoned; authed devices re-pull, and the snapshot baseline
+// carries anonymous docs), the `docs` row gains `serverKnownVv`, and
+// the new `inflight` store holds the single durable in-flight push.
+const DB_VERSION = 9;
 
 // Config-plane stores.
 export const STORE_VAULT = "vault";
@@ -47,7 +48,7 @@ export const STORE_PREFS = "prefs";
 export const STORE_DOCS = "docs";
 export const STORE_OPS = "ops";
 export const STORE_SNAPSHOTS = "snapshots";
-export const INDEX_OPS_CLIENT_OP_ID = "docIdClientOpId";
+export const STORE_INFLIGHT = "inflight";
 export const INDEX_OPS_SERVER_SEQ = "docIdServerSeq";
 
 // Pre-v7 oplog/OPFS stores, deleted on upgrade if present. `ops` is in
@@ -59,13 +60,14 @@ const LEGACY_STORES = ["snapshot_meta"];
 // after the consolidated DB opens so it doesn't linger as an orphan.
 const RETIRED_ENGINE_DB = "airday-engine";
 
-/** One row in the engine `ops` store. `clientOpId` (hex) is set on
- *  local-origin rows; `serverSeq` is filled on ack (local) or at
- *  insert (remote). */
+/** One WAL row in the engine `ops` store. `serverSeq` is set on
+ *  server-delivered rows (idempotent re-delivery detection) and unset
+ *  on local-origin rows. Pure crash recovery — pruned whenever a
+ *  snapshot contains it; upload is derived from `serverKnownVv`, never
+ *  from these rows. */
 export interface OpRow {
   docId: string;
   localSeq: number;
-  clientOpId?: string;
   serverSeq?: number;
   ciphertext: Uint8Array;
   nonce: Uint8Array;
@@ -84,11 +86,28 @@ export interface SnapshotRow {
  *  resume cursor — the highest *contiguous* serverSeq the engine has
  *  durably applied. Set explicitly via `writeAckedSeq` (never derived
  *  from `MAX(serverSeq)`, which over-shoots gaps and under-shoots after
- *  compaction). See `spec/local-storage.md`. */
+ *  a snapshot prunes rows). `serverKnownVv` is the encoded Loro
+ *  VersionVector of operations proven to exist in the server op stream
+ *  — the outbound-delta base. See `spec/local-storage.md`. */
 export interface DocRow {
   id: string;
   createdAt: number;
   lastAckedServerSeq: number;
+  serverKnownVv?: Uint8Array;
+}
+
+/** The single durable in-flight push for a doc (`inflight` store,
+ *  keyed by `docId`). Written before the blob's first send; cleared on
+ *  ack. `pushId` is hex uuid bytes; `fromVv`/`toVv` are encoded Loro
+ *  VersionVectors. */
+export interface InFlightRow {
+  docId: string;
+  pushId: string;
+  ciphertext: Uint8Array;
+  nonce: Uint8Array;
+  fromVv: Uint8Array;
+  toVv: Uint8Array;
+  createdAt: number;
 }
 
 let cached: Promise<IDBDatabase> | null = null;
@@ -148,23 +167,27 @@ function openOnce(): Promise<IDBDatabase> {
       }
       // Engine-data-plane stores. The logical model mirrors
       // `SqliteStorage` (CLI): one `docs` row per doc, an append-only
-      // `ops` log keyed by `(docId, localSeq)`, one `snapshots` row per
-      // doc. `ops` is always created fresh here (the delete above
-      // cleared any legacy store of the same name).
-      db.createObjectStore(STORE_DOCS, { keyPath: "id" });
+      // WAL (`ops`) keyed by `(docId, localSeq)`, one `snapshots` row
+      // per doc, one `inflight` push row per doc. `ops` is always
+      // created fresh here (the delete above cleared any prior-version
+      // store of the same name — v8's outbox-era rows are abandoned).
+      if (!db.objectStoreNames.contains(STORE_DOCS)) {
+        db.createObjectStore(STORE_DOCS, { keyPath: "id" });
+      }
       const ops = db.createObjectStore(STORE_OPS, {
         keyPath: ["docId", "localSeq"],
       });
       // Partial-unique by IDB's undefined-skipping rule (see header):
-      //   - clientOpId set on local rows only → uniqueness among them;
-      //   - serverSeq set once acked → uniqueness among acked rows.
-      ops.createIndex(INDEX_OPS_CLIENT_OP_ID, ["docId", "clientOpId"], {
-        unique: true,
-      });
+      // serverSeq set on server-delivered rows → uniqueness among them.
       ops.createIndex(INDEX_OPS_SERVER_SEQ, ["docId", "serverSeq"], {
         unique: true,
       });
-      db.createObjectStore(STORE_SNAPSHOTS, { keyPath: "docId" });
+      if (!db.objectStoreNames.contains(STORE_SNAPSHOTS)) {
+        db.createObjectStore(STORE_SNAPSHOTS, { keyPath: "docId" });
+      }
+      if (!db.objectStoreNames.contains(STORE_INFLIGHT)) {
+        db.createObjectStore(STORE_INFLIGHT, { keyPath: "docId" });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);

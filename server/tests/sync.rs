@@ -8,8 +8,8 @@
 use airday_core::{Dek, derive_password_master, random_bytes};
 use airday_protocol::{
     ClientFrame, DeviceCredential, DeviceRegistration, EncryptedBlob, Hello, HelloAck,
-    HelloRejected, KdfParams, PROTOCOL_VERSION, ServerFrame, SignupRequest, SignupResponse,
-    StoredBlob,
+    HelloRejected, KdfParams, PROTOCOL_VERSION, PushBlob, ServerFrame, SignupRequest,
+    SignupResponse, StoredBlob,
 };
 use airday_server::sync::{SnapshotCoordinator, queries};
 use airday_server::{AppState, router};
@@ -235,6 +235,26 @@ fn fake_blob(seed: u8) -> EncryptedBlob {
     }
 }
 
+/// Wrap a fake blob with a fresh push_id, as a real client would.
+fn fake_push(seed: u8) -> PushBlob {
+    PushBlob {
+        push_id: Uuid::new_v4(),
+        blob: fake_blob(seed),
+    }
+}
+
+fn fake_pushes(range: std::ops::Range<u8>) -> Vec<PushBlob> {
+    range.map(fake_push).collect()
+}
+
+/// Extract the assigned seqs from an OpsAck frame, in input order.
+fn ack_seqs(frame: ServerFrame) -> Vec<u64> {
+    match frame {
+        ServerFrame::OpsAck { acks } => acks.into_iter().map(|a| a.seq).collect(),
+        other => panic!("expected OpsAck, got {other:?}"),
+    }
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn ack_does_not_move_backwards() {
     let acc = signup_account().await;
@@ -245,15 +265,12 @@ async fn ack_does_not_move_backwards() {
     send_msgpack(
         &mut ws,
         &ClientFrame::PushOps {
-            ops: vec![fake_blob(1)],
+            ops: vec![fake_push(1)],
         },
     )
     .await;
     let resp: ServerFrame = recv_msgpack(&mut ws).await;
-    let id = match resp {
-        ServerFrame::OpsAck { assigned_seqs } => assigned_seqs[0],
-        other => panic!("expected OpsAck, got {other:?}"),
-    };
+    let id = ack_seqs(resp)[0];
 
     send_msgpack(&mut ws, &ClientFrame::Ack { last_acked_seq: id }).await;
     wait_for_acked(&acc, id).await;
@@ -265,6 +282,66 @@ async fn ack_does_not_move_backwards() {
         .await
         .unwrap();
     assert_eq!(stored, id);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn repeated_push_id_dedups_to_original_seq_without_new_row() {
+    // Crash-retry contract (spec/vv-wal-separation.md test 10, server
+    // half): re-sending the same (device, push_id) acks the ORIGINAL
+    // seq, inserts no second row, and is not re-broadcast to peers.
+    let acc = signup_account().await;
+    let device_b = register_second_device(&acc, "device-b").await;
+    let mut ws_a = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut ws_a).await;
+    let mut ws_b = connect_ws(&acc.server, &device_b.device_token).await;
+    handshake(&mut ws_b).await;
+    wait_for_subscribers(&acc, 2).await;
+
+    let push = fake_push(3);
+    send_msgpack(
+        &mut ws_a,
+        &ClientFrame::PushOps {
+            ops: vec![push.clone()],
+        },
+    )
+    .await;
+    let first = ack_seqs(recv_msgpack::<ServerFrame>(&mut ws_a).await);
+    assert_eq!(first, vec![1]);
+    // B sees the original broadcast once.
+    let broadcast = match recv_msgpack::<ServerFrame>(&mut ws_b).await {
+        ServerFrame::OpsBroadcast { ops } => ops,
+        other => panic!("expected OpsBroadcast on B, got {other:?}"),
+    };
+    assert_eq!(broadcast.len(), 1);
+
+    // Retry the exact same push (simulating a lost ack).
+    send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: vec![push] }).await;
+    let second = ack_seqs(recv_msgpack::<ServerFrame>(&mut ws_a).await);
+    assert_eq!(second, vec![1], "retry must ack the original seq");
+
+    // No second stored row.
+    let batch = queries::fetch_ops_batch(&acc.server.state.db, acc.primary_doc_id, 0)
+        .await
+        .unwrap();
+    assert_eq!(batch.ops.len(), 1, "dedup must not insert a second row");
+
+    // No duplicate broadcast to B.
+    let nothing = tokio::time::timeout(std::time::Duration::from_millis(200), ws_b.next()).await;
+    assert!(
+        nothing.is_err(),
+        "B unexpectedly received a re-broadcast: {nothing:?}"
+    );
+
+    // A *different* push_id from the same device still inserts fresh.
+    send_msgpack(
+        &mut ws_a,
+        &ClientFrame::PushOps {
+            ops: vec![fake_push(4)],
+        },
+    )
+    .await;
+    let third = ack_seqs(recv_msgpack::<ServerFrame>(&mut ws_a).await);
+    assert_eq!(third, vec![2], "fresh push_id gets the next dense seq");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -312,16 +389,19 @@ async fn push_on_a_broadcasts_to_b_not_a() {
     // the registry to reflect that before pushing into broadcast.
     wait_for_subscribers(&acc, 2).await;
 
-    let blobs = vec![fake_blob(7), fake_blob(8)];
-    send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: blobs.clone() }).await;
+    let pushes = vec![fake_push(7), fake_push(8)];
+    send_msgpack(
+        &mut ws_a,
+        &ClientFrame::PushOps {
+            ops: pushes.clone(),
+        },
+    )
+    .await;
 
     // A receives its own OpsAck; A must NOT receive a broadcast for
     // its own push. Asserting absence requires a small wait —
     // anything pending arrives well within 200ms on localhost.
-    let assigned_seqs = match recv_msgpack::<ServerFrame>(&mut ws_a).await {
-        ServerFrame::OpsAck { assigned_seqs } => assigned_seqs,
-        other => panic!("expected OpsAck on A, got {other:?}"),
-    };
+    let assigned_seqs = ack_seqs(recv_msgpack::<ServerFrame>(&mut ws_a).await);
     assert_eq!(assigned_seqs.len(), 2);
 
     // B receives the broadcast with the same ids/blobs.
@@ -332,8 +412,8 @@ async fn push_on_a_broadcasts_to_b_not_a() {
     let want: Vec<StoredBlob> = assigned_seqs
         .iter()
         .copied()
-        .zip(blobs)
-        .map(|(seq, blob)| StoredBlob { seq, blob })
+        .zip(pushes)
+        .map(|(seq, p)| StoredBlob { seq, blob: p.blob })
         .collect();
     assert_eq!(broadcast, want);
 
@@ -356,14 +436,17 @@ async fn push_on_one_tab_broadcasts_to_other_tab_same_device() {
     handshake(&mut tab_b).await;
     wait_for_subscribers(&acc, 2).await;
 
-    let blobs = vec![fake_blob(11)];
-    send_msgpack(&mut tab_a, &ClientFrame::PushOps { ops: blobs.clone() }).await;
+    let pushes = vec![fake_push(11)];
+    send_msgpack(
+        &mut tab_a,
+        &ClientFrame::PushOps {
+            ops: pushes.clone(),
+        },
+    )
+    .await;
 
     // Tab A — its own ack, no broadcast echo.
-    let assigned_seqs = match recv_msgpack::<ServerFrame>(&mut tab_a).await {
-        ServerFrame::OpsAck { assigned_seqs } => assigned_seqs,
-        other => panic!("expected OpsAck on A, got {other:?}"),
-    };
+    let assigned_seqs = ack_seqs(recv_msgpack::<ServerFrame>(&mut tab_a).await);
     assert_eq!(assigned_seqs.len(), 1);
 
     // Tab B — receives the broadcast even though it shares device_id.
@@ -373,8 +456,8 @@ async fn push_on_one_tab_broadcasts_to_other_tab_same_device() {
     };
     let want: Vec<StoredBlob> = assigned_seqs
         .into_iter()
-        .zip(blobs)
-        .map(|(seq, blob)| StoredBlob { seq, blob })
+        .zip(pushes)
+        .map(|(seq, p)| StoredBlob { seq, blob: p.blob })
         .collect();
     assert_eq!(broadcast, want);
 }
@@ -424,12 +507,9 @@ async fn no_snapshot_request_below_threshold() {
     let mut ws = connect_ws(&acc.server, &acc.device_token).await;
     handshake(&mut ws).await;
 
-    let blobs: Vec<EncryptedBlob> = (0..3).map(fake_blob).collect();
-    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: blobs }).await;
-    let assigned_seqs = match recv_msgpack::<ServerFrame>(&mut ws).await {
-        ServerFrame::OpsAck { assigned_seqs } => assigned_seqs,
-        other => panic!("expected OpsAck, got {other:?}"),
-    };
+    let pushes = fake_pushes(0..3);
+    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: pushes }).await;
+    let assigned_seqs = ack_seqs(recv_msgpack::<ServerFrame>(&mut ws).await);
     let last_id = *assigned_seqs.last().unwrap();
     send_msgpack(
         &mut ws,
@@ -450,8 +530,8 @@ async fn push_path_triggers_snapshot_request_and_persists() {
     let mut ws = connect_ws(&acc.server, &acc.device_token).await;
     handshake(&mut ws).await;
 
-    let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
-    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: blobs }).await;
+    let pushes = fake_pushes(0..5);
+    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: pushes }).await;
     let (up_to_seq, compaction_floor_seq) = expect_snapshot_request(&mut ws).await;
     assert_eq!(up_to_seq, 5);
     // Single device, just pushed-and-acked: horizon = 5 = up_to.
@@ -479,11 +559,16 @@ async fn ack_path_triggers_snapshot_request() {
     // device acks the latest blob id, the Ack handler must drive
     // evaluate and emit a SnapshotRequest.
     let acc = signup_account_with_snapshot_config(5, std::time::Duration::from_secs(60)).await;
-    let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
-    let assigned_seqs = queries::insert_ops(&acc.server.state.db, acc.primary_doc_id, blobs)
-        .await
-        .unwrap();
-    let last_id = *assigned_seqs.last().unwrap();
+    let pushes = fake_pushes(0..5);
+    let inserted = queries::insert_ops(
+        &acc.server.state.db,
+        acc.primary_doc_id,
+        acc.device_id,
+        pushes,
+    )
+    .await
+    .unwrap();
+    let last_id = inserted.acks.last().unwrap().seq;
 
     let mut ws = connect_ws(&acc.server, &acc.device_token).await;
     handshake(&mut ws).await;
@@ -509,8 +594,8 @@ async fn stale_snapshot_after_lease_expiry_rejected() {
 
     let mut ws_a = connect_ws(&acc.server, &acc.device_token).await;
     handshake(&mut ws_a).await;
-    let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
-    send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: blobs }).await;
+    let pushes = fake_pushes(0..5);
+    send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: pushes }).await;
     let (up_to_seq, compaction_floor_seq) = expect_snapshot_request(&mut ws_a).await;
     assert_eq!(up_to_seq, 5);
     // B has never acked, so horizon == 0 — first snapshot has no
@@ -577,10 +662,11 @@ async fn compact_doc_deletes_ops_below_floor_and_prunes_old_snapshots() {
     // snapshots; with KEEP=2, only the newest two should survive.
     let acc = signup_account().await;
     let db = &acc.server.state.db;
-    let blobs: Vec<EncryptedBlob> = (0..10).map(fake_blob).collect();
-    let ids = queries::insert_ops(db, acc.primary_doc_id, blobs)
+    let pushes = fake_pushes(0..10);
+    let inserted = queries::insert_ops(db, acc.primary_doc_id, acc.device_id, pushes)
         .await
         .unwrap();
+    let ids: Vec<u64> = inserted.acks.iter().map(|a| a.seq).collect();
     assert_eq!(ids, (1..=10).collect::<Vec<_>>());
 
     let snap1 = queries::insert_snapshot(db, acc.primary_doc_id, 10, 6, fake_blob(0xA1))
@@ -637,9 +723,14 @@ async fn compact_doc_deletes_ops_below_floor_and_prunes_old_snapshots() {
 async fn compact_doc_with_no_snapshot_is_noop() {
     let acc = signup_account().await;
     let db = &acc.server.state.db;
-    queries::insert_ops(db, acc.primary_doc_id, vec![fake_blob(1), fake_blob(2)])
-        .await
-        .unwrap();
+    queries::insert_ops(
+        db,
+        acc.primary_doc_id,
+        acc.device_id,
+        vec![fake_push(1), fake_push(2)],
+    )
+    .await
+    .unwrap();
     let stats = queries::compact_doc(db, acc.primary_doc_id, queries::KEEP_SNAPSHOTS)
         .await
         .unwrap();
@@ -662,8 +753,8 @@ async fn push_snapshot_opportunistically_compacts_ops_below_floor() {
     let mut ws = connect_ws(&acc.server, &acc.device_token).await;
     handshake(&mut ws).await;
 
-    let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
-    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: blobs }).await;
+    let pushes = fake_pushes(0..5);
+    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: pushes }).await;
     let (up_to_seq, compaction_floor_seq) = expect_snapshot_request(&mut ws).await;
     assert_eq!(compaction_floor_seq, 5);
 

@@ -38,7 +38,7 @@ This keeps Loro + crypto + protocol behavior identical across clients while lett
 
 Two boundary rules matter:
 
-- **No push pipelining.** The engine serializes pushes. If local mutations happen while a push is in flight, the engine marks itself dirty and re-ships its outbox only after the server ack arrives. This avoids duplicate export windows and keeps host adapters simple.
+- **No push pipelining.** The engine serializes pushes: at most one durable in-flight push at a time, identified by its `push_id`. If local mutations happen while a push is in flight, the engine marks itself dirty and derives the next delta (from `server_known_vv`) only after the server ack arrives. This avoids duplicate export windows and keeps host adapters simple.
 - **Auth stays outside the engine.** The engine starts from "socket is authenticated and usable". Whether that came from a bearer header, cookie-backed browser session, or future ticket exchange is a client / transport concern documented in `auth.md`.
 
 Platform policy stays outside `core`:
@@ -50,11 +50,11 @@ Platform policy stays outside `core`:
 
 ## Local persistence
 
-Persistence is **inside** the engine's contract, via one Rust trait — `core::LocalStorage` (`core/src/storage.rs`). The engine appends an encrypted op row on each local commit (`capture_local_ops`) and each applied remote op, stamps `server_seq` on ack, drives the push from `storage.outbox()`, and rebuilds the doc from snapshot + replay on boot. Storage is mandatory: there is no storage-less engine mode.
+Persistence is **inside** the engine's contract, via one Rust trait — `core::LocalStorage` (`core/src/storage.rs`). Crash recovery and outbound sync are separate concerns (`spec/vv-wal-separation.md`): the engine appends an encrypted WAL row on each local commit (`capture_local_ops`) and each applied remote op, folds the WAL into a full-history snapshot when it crosses the host's threshold (regardless of sync state), and derives what to push from Loro history against `server_known_vv` — never from which WAL rows exist. It rebuilds the doc from snapshot + replay on boot. Storage is mandatory: there is no storage-less engine mode.
 
 Two implementations satisfy the same semantics on different substrates:
 
-- **CLI / server-side single-account flows:** `SqliteStorage` (`cli/src/storage.rs`, `rusqlite`, file on disk; synchronously durable).
+- **CLI / server-side single-account flows:** `SqliteStorage` (`crates/storage-sqlite`, `rusqlite`, file on disk; synchronously durable).
 - **Web:** `IdbStorage` (`js/core/src/storage/idb-storage.ts`) behind a wasm-bindgen `EngineStorage` extern (`core/web/src/lib.rs`). The trait is synchronous; IDB is async, so `IdbStorage` keeps a synchronous in-memory mirror the engine reads/writes immediately and flushes IDB in the background, signalling real durability back via `notify_oplog_durable`. The engine stays on the main thread (no Worker).
 
 The rationale and history — including why web uses IDB rather than sqlite-wasm — live in `spec/local-storage.md`.

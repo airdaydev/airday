@@ -8,7 +8,7 @@
 
 import { createEffect, createSignal, on, onCleanup } from "solid-js";
 import { Doc, SyncEngine } from "@airday/core/wasm";
-import { IdbStorage, putDevice } from "@airday/core";
+import { IdbStorage, type InFlightPushJs, putDevice } from "@airday/core";
 import { savePrefs, type Prefs, type ViewKey } from "../prefs.ts";
 import { type Session } from "../Login.tsx";
 import { createSyncedApp, type DocApp } from "./store.ts";
@@ -58,6 +58,16 @@ export type BootInfo = {
   storage: IdbStorage;
   /** Highest `localSeq` the store has assigned — seeds the engine. */
   lastLocalSeq: number;
+  /** Encoded `serverKnownVv` (empty = never synced) — seeds the
+   *  engine's outbound-delta base. */
+  serverKnownVv: Uint8Array;
+  /** Durable in-flight push left by a previous session, if any —
+   *  re-sent (same pushId) after the initial pull. */
+  inFlightPush: InFlightPushJs | null;
+  /** Surviving WAL rows / payload bytes past the last snapshot —
+   *  seeds the engine's fold-threshold statistics. */
+  walRows: number;
+  walBytes: number;
   /** True when the doc was freshly created (`Doc.create()`) and its
    *  seeded built-ins still need an initial `captureLocalOps`. */
   seeded: boolean;
@@ -90,9 +100,24 @@ export function createWorkspaceRuntime(props: {
     CLIENT_VERSION,
     storage,
   );
-  // Seed the engine's `localSeq` cursor from what the store loaded so
-  // new appends continue past the persisted log.
+  // Seed the engine's persisted cursors from what the store loaded:
+  // the localSeq counter, the WAL fold statistics, the server-known
+  // VV (the outbound-delta base), and any in-flight push a previous
+  // session left durable (re-sent with the same pushId after the
+  // initial pull; the server deduplicates).
   engine.setLastLocalSeq(props.boot.lastLocalSeq);
+  engine.seedWalStats(props.boot.walRows, props.boot.walBytes);
+  engine.seedServerKnownVv(props.boot.serverKnownVv);
+  const inFlight = props.boot.inFlightPush;
+  if (inFlight) {
+    engine.seedInFlightPush(
+      inFlight.pushId,
+      inFlight.ciphertext,
+      inFlight.nonce,
+      inFlight.fromVv,
+      inFlight.toVv,
+    );
+  }
   const app = createSyncedApp(engine);
 
   if (import.meta.env.DEV) {
@@ -143,28 +168,35 @@ export function createWorkspaceRuntime(props: {
   // lifetime items under wasm), and this runs on the per-ack pulse —
   // i.e. one RTT after *every* local mutation. Unthresholded it turned
   // each keystroke into a whole-doc export; see spec/list-perf-plan.md.
-  // So the hot pulse only folds once ≥250 op rows accumulated, and a
-  // quiet-period timer (below) folds whatever's left so short sessions
-  // don't boot into a long op-log replay.
-  const COMPACT_MIN_OPS = 250;
+  // So the hot pulse only folds once the WAL crosses ≥250 rows (or the
+  // byte safety net), and a quiet-period timer (below) folds whatever's
+  // left so short sessions don't boot into a long WAL replay. Folding
+  // is independent of sync state (spec/vv-wal-separation.md): unsent
+  // local ops survive inside the full-history snapshot, so anonymous
+  // and authed sessions compact identically.
+  const COMPACT_MAX_WAL_ROWS = 250;
+  const COMPACT_MAX_WAL_BYTES = 8 * 1024 * 1024;
   const COMPACT_IDLE_MS = 20_000;
-  const compact = (minOps: number): void => {
-    // Pull/bootstrap frames may install a server snapshot baseline. Do not
-    // immediately export another whole-doc snapshot while that phase is in
-    // progress; compaction starts only once catch-up reaches steady-state.
-    if (!engine.isIdle()) return;
+  const compactIfWalExceeds = (): void => {
     try {
-      engine.snapshotIfFullySynced(minOps);
+      engine.snapshotIfWalExceeds(COMPACT_MAX_WAL_ROWS, COMPACT_MAX_WAL_BYTES);
     } catch (e) {
-      console.error("snapshotIfFullySynced failed:", e);
+      console.error("snapshotIfWalExceeds failed:", e);
+    }
+  };
+  const foldNow = (): void => {
+    try {
+      engine.forceSnapshot();
+    } catch (e) {
+      console.error("forceSnapshot failed:", e);
     }
   };
   // Debounced idle fold-down: re-armed on every server round-trip, so
-  // it fires once things go quiet. minOps=1 → folds any synced ops.
+  // it fires once things go quiet and folds any remaining WAL rows.
   let compactIdleTimer: ReturnType<typeof setTimeout> | undefined;
   const scheduleIdleCompact = (): void => {
     clearTimeout(compactIdleTimer);
-    compactIdleTimer = setTimeout(() => compact(1), COMPACT_IDLE_MS);
+    compactIdleTimer = setTimeout(foldNow, COMPACT_IDLE_MS);
   };
   onCleanup(() => clearTimeout(compactIdleTimer));
 
@@ -225,11 +257,11 @@ export function createWorkspaceRuntime(props: {
       },
       onServerFrame: () => {
         app.drainEvents();
-        // The engine already mirrored remote ops + acks into storage
-        // inside `handleServerBytes`. Compact (thresholded — this pulse
-        // fires one RTT after every mutation) if that drained the
-        // outbox, then ratchet the durable cursor once the writes land.
-        compact(COMPACT_MIN_OPS);
+        // The engine already mirrored remote ops into the WAL inside
+        // `handleServerBytes`. Fold if the WAL crossed the threshold
+        // (this pulse fires one RTT after every mutation), then
+        // ratchet the durable cursor once the writes land.
+        compactIfWalExceeds();
         scheduleIdleCompact();
         scheduleDurable();
         saveDeviceSoon();
@@ -239,12 +271,20 @@ export function createWorkspaceRuntime(props: {
     const b = bridge;
     app.setOnFlush(() => {
       b.pumpOutbox();
-      compact(COMPACT_MIN_OPS);
+      compactIfWalExceeds();
       scheduleIdleCompact();
       scheduleDurable();
     });
     bridge.start();
     onCleanup(() => b.stop());
+  } else {
+    // Anonymous sessions have no server round-trips to pulse off, but
+    // the WAL still needs bounding — fold on the same thresholds after
+    // every local flush.
+    app.setOnFlush(() => {
+      compactIfWalExceeds();
+      scheduleIdleCompact();
+    });
   }
 
   // ---------- Device config: light writes on each frontier change ----------
@@ -320,19 +360,12 @@ export function createWorkspaceRuntime(props: {
   const onVisibility = () => {
     if (document.visibilityState === "hidden") {
       if (deviceTimer) clearTimeout(deviceTimer);
-      // Persist any uncommitted local op, then compact so the next boot
-      // has a fresh base. Anonymous sessions never sync, so their outbox
-      // never drains and `snapshotIfFullySynced` would never fire —
-      // force a full-state snapshot (prune-all) instead. Best-effort.
+      // Persist any uncommitted local op, then fold the whole WAL so
+      // the next boot has a fresh base — safe regardless of sync state
+      // (unsent ops survive folding; the push derives them from
+      // `serverKnownVv`). Best-effort.
       capture();
-      try {
-        // Tab going hidden: fold everything synced regardless of the
-        // hot-pulse threshold, so the next boot replays a short log.
-        if (props.session.anonymous) engine.forceSnapshot();
-        else engine.snapshotIfFullySynced(1);
-      } catch (e) {
-        console.error("snapshot on hide failed:", e);
-      }
+      foldNow();
       void persistDeviceNow().catch(() => {});
     }
   };

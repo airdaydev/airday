@@ -74,7 +74,10 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
         session2.doc().get_item(&item_id).is_some(),
         "item survived round-trip"
     );
-    assert!(!session2.doc().has_pending_ops(), "no new local mutations");
+    assert!(
+        !session2.doc().has_uncaptured_ops(),
+        "no new local mutations"
+    );
     session2.flush().await.unwrap();
 
     // No new op blobs should have been pushed.

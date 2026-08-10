@@ -7,7 +7,7 @@
 //! need to re-key the data plane. Device frontiers stay per-device (which
 //! is also per-doc while 1:1 holds).
 
-use airday_protocol::{EncryptedBlob, StoredBlob};
+use airday_protocol::{EncryptedBlob, PushAck, PushBlob, StoredBlob};
 use rusqlite::{OptionalExtension, params};
 use uuid::Uuid;
 
@@ -18,48 +18,95 @@ use crate::db::{Db, now_millis};
 pub const MAX_OPS_PER_BATCH: usize = 500;
 pub const MAX_BYTES_PER_BATCH: usize = 256 * 1024;
 
-/// Append ops in a single transaction. Returns the server-assigned
-/// per-doc seqs in input order. Seqs are dense and gap-free for a
-/// doc: a holes-in-the-stream check on the client is meaningful,
-/// unlike a global counter where another doc's writes would look
-/// like holes from this doc's perspective.
+/// Result of [`insert_ops`]: the wire acks (one per input blob, in
+/// input order) plus the subset of ops that were freshly inserted —
+/// deduplicated retries must be acked but NOT re-broadcast (peers
+/// already received them on the original insert).
+pub struct InsertedOps {
+    pub acks: Vec<PushAck>,
+    pub fresh: Vec<StoredBlob>,
+}
+
+/// Append pushed ops in a single transaction, deduplicating on
+/// `(doc, device, push_id)`. A repeat of an already-inserted push
+/// returns its original seq without inserting another row — the
+/// client-side crash-retry contract (spec/sync-protocol.md). Fresh
+/// inserts get dense, gap-free per-doc seqs: a holes-in-the-stream
+/// check on the client is meaningful, unlike a global counter where
+/// another doc's writes would look like holes from this doc's
+/// perspective.
 pub async fn insert_ops(
     db: &Db,
     doc_id: Uuid,
-    blobs: Vec<EncryptedBlob>,
-) -> anyhow::Result<Vec<u64>> {
+    device_id: Uuid,
+    blobs: Vec<PushBlob>,
+) -> anyhow::Result<InsertedOps> {
     if blobs.is_empty() {
-        return Ok(Vec::new());
+        return Ok(InsertedOps {
+            acks: Vec::new(),
+            fresh: Vec::new(),
+        });
     }
     let doc_bytes = doc_id.as_bytes().to_vec();
+    let dev_bytes = device_id.as_bytes().to_vec();
     let now = now_millis();
     db.call(move |c| {
         let tx = c.transaction()?;
-        let n = blobs.len() as i64;
-        // Reserve n seqs atomically. UPSERT keeps the counter row
-        // initialisation in the same write so we don't need a separate
-        // bootstrap step at doc creation.
-        let next_before: i64 = tx.query_row(
-            "INSERT INTO doc_sequences (doc_id, next_seq) VALUES (?, 1 + ?)
-             ON CONFLICT(doc_id) DO UPDATE SET next_seq = next_seq + ?
-             RETURNING next_seq - ?",
-            params![doc_bytes, n, n, n],
-            |r| r.get::<_, i64>(0),
-        )?;
-        let mut seqs = Vec::with_capacity(blobs.len());
-        {
-            let mut stmt = tx.prepare(
-                "INSERT INTO ops (doc_id, seq, payload, payload_nonce, created_at)
-                 VALUES (?, ?, ?, ?, ?)",
-            )?;
-            for (i, blob) in blobs.iter().enumerate() {
-                let seq = next_before + i as i64;
-                stmt.execute(params![doc_bytes, seq, blob.ciphertext, blob.nonce, now])?;
-                seqs.push(seq as u64);
+        let mut acks = Vec::with_capacity(blobs.len());
+        let mut fresh = Vec::new();
+        for op in blobs {
+            let push_bytes = op.push_id.as_bytes().to_vec();
+            // Dedup lookup before reserving a seq — a retry must not
+            // burn a counter value (seqs are dense and gap-free).
+            let existing: Option<i64> = tx
+                .query_row(
+                    "SELECT seq FROM ops
+                     WHERE doc_id = ? AND device_id = ? AND push_id = ?",
+                    params![doc_bytes, dev_bytes, push_bytes],
+                    |r| r.get(0),
+                )
+                .optional()?;
+            if let Some(seq) = existing {
+                acks.push(PushAck {
+                    push_id: op.push_id,
+                    seq: seq as u64,
+                });
+                continue;
             }
+            // Reserve one seq atomically. UPSERT keeps the counter row
+            // initialisation in the same write so we don't need a
+            // separate bootstrap step at doc creation.
+            let seq: i64 = tx.query_row(
+                "INSERT INTO doc_sequences (doc_id, next_seq) VALUES (?, 2)
+                 ON CONFLICT(doc_id) DO UPDATE SET next_seq = next_seq + 1
+                 RETURNING next_seq - 1",
+                params![doc_bytes],
+                |r| r.get(0),
+            )?;
+            tx.execute(
+                "INSERT INTO ops (doc_id, seq, device_id, push_id, payload, payload_nonce, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)",
+                params![
+                    doc_bytes,
+                    seq,
+                    dev_bytes,
+                    push_bytes,
+                    op.blob.ciphertext,
+                    op.blob.nonce,
+                    now
+                ],
+            )?;
+            acks.push(PushAck {
+                push_id: op.push_id,
+                seq: seq as u64,
+            });
+            fresh.push(StoredBlob {
+                seq: seq as u64,
+                blob: op.blob,
+            });
         }
         tx.commit()?;
-        Ok(seqs)
+        Ok(InsertedOps { acks, fresh })
     })
     .await
 }

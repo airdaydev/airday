@@ -1,10 +1,10 @@
 //! `airday status` — local-only summary. Never opens a WS.
 
-use airday_core::LocalStorage;
 use clap::Parser;
 use serde::Serialize;
 
 use crate::config::Profile;
+use crate::keystore::dek_from_hex;
 
 use super::items::print_json;
 
@@ -29,16 +29,18 @@ pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
     let profile = Profile::require_active()?;
     let config = profile.read_config()?;
 
-    // Identity + sync cursor live in the db; "pending" = unacked local
-    // ops still in the outbox. Read straight from storage — no need to
-    // decrypt and rebuild the whole doc.
+    // Identity + sync cursor live in the db; "pending" = local
+    // operations beyond `server_known_vv` (or an outstanding in-flight
+    // push). That answer is derived from the decrypted Loro history —
+    // WAL rows alone can't tell (folded rows may carry unsent ops) —
+    // so this rebuilds the doc.
     let storage = crate::storage::open_storage(&profile)?;
     let account = storage.read_account()?;
     let cursor = storage.read_sync_cursor(account.primary_doc_id)?;
-    let pending = !storage
-        .outbox(account.primary_doc_id)
-        .map_err(|e| anyhow::anyhow!("read outbox: {e}"))?
-        .is_empty();
+    let secrets = profile.read_secrets()?;
+    let dek = dek_from_hex(&secrets.dek_hex)?;
+    let pending = crate::storage::has_unsynced_ops(&storage, &dek, account.primary_doc_id)
+        .map_err(|e| anyhow::anyhow!("read pending state: {e}"))?;
 
     if args.json {
         print_json(&StatusJson {

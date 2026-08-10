@@ -16,8 +16,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use airday_core::{
-    ClientOpId, Dek, Doc, DocId, ItemView as CoreItemView, ListView as CoreListView, LocalOpRow,
-    LocalStorage, boot_doc,
+    Dek, Doc, DocId, ItemView as CoreItemView, ListView as CoreListView, LocalStorage, boot_doc,
 };
 use airday_storage_sqlite::{DbError, SqliteStorage};
 use uuid::Uuid;
@@ -139,7 +138,7 @@ impl From<CoreListView> for ListView {
 ///
 /// The `Doc` is wrapped in a `Mutex`: Loro's `Doc` uses interior
 /// mutability but a uniffi object must be `Send + Sync`, and the capture
-/// step needs `&mut Doc` (`mark_pushed_at`). The `Mutex` gives both — and
+/// step needs `&mut Doc` (`mark_persisted_at`). The `Mutex` gives both — and
 /// serialises the otherwise-single-threaded calls a UI makes.
 #[derive(uniffi::Object)]
 pub struct AirdayStore {
@@ -159,7 +158,7 @@ impl AirdayStore {
         let dek = Dek::from_bytes(&dek)?;
         let path = PathBuf::from(dir).join(DB_FILE);
         let storage = SqliteStorage::open(&path)?;
-        let (doc, _last_local, _last_acked) = boot_doc(&storage, &dek, FFI_DOC_ID)?;
+        let (doc, _boot_meta) = boot_doc(&storage, &dek, FFI_DOC_ID)?;
         Ok(Arc::new(AirdayStore {
             doc_id: FFI_DOC_ID,
             dek,
@@ -256,25 +255,20 @@ impl AirdayStore {
 }
 
 impl AirdayStore {
-    /// Capture the doc's pending Loro delta into an encrypted oplog row,
-    /// so a later reopen replays it. Mirrors `SyncEngine::capture_local_ops`
-    /// minus the wire concerns: seal the delta, append it as a local op,
-    /// and advance the capture cursor. Events the mutation queued are
-    /// drained and dropped — nothing consumes them offline.
+    /// Capture the doc's uncaptured Loro delta into an encrypted WAL
+    /// row, so a later reopen replays it. Mirrors
+    /// `SyncEngine::capture_local_ops` minus the wire concerns: seal
+    /// the delta, append it to the WAL, and advance the capture
+    /// cursor. Events the mutation queued are drained and dropped —
+    /// nothing consumes them offline.
     fn persist(&self, doc: &mut Doc) -> Result<(), AirdayError> {
-        if doc.has_pending_ops() {
+        if doc.has_uncaptured_ops() {
             // Snapshot the oplog VV before export so a concurrent commit
-            // stays pending for the next capture (matches the engine).
+            // stays uncaptured for the next capture (matches the engine).
             let vv = doc.oplog_vv();
             if let Some(blob) = doc.pending_export(&self.dek)? {
-                self.storage.append_local_op(
-                    self.doc_id,
-                    LocalOpRow {
-                        client_op_id: ClientOpId(Uuid::new_v4()),
-                        payload: blob,
-                    },
-                )?;
-                doc.mark_pushed_at(vv);
+                self.storage.append_local_wal(self.doc_id, blob)?;
+                doc.mark_persisted_at(vv);
             }
         }
         doc.drain_events();

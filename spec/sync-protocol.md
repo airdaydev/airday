@@ -6,14 +6,14 @@ WebSocket per device. Frames are binary, MessagePack-encoded (`rmp-serde`). Each
 
 **Status:** Implemented.
 
-The wire calls them "ops" (`PushOps`, `OpsAck`, `seq`, `since_seq`, `last_acked_seq`) but each one is an **encrypted op blob** — a single `EncryptedBlob` carrying a Loro update-pack that contains *1..N* CRDT operations. The client engine bundles every pending mutation since the last push into one blob per `PushOps`, so "1 seq" on the server ≈ "one push cycle" on the client, not "one user action".
+The wire calls them "ops" (`PushOps`, `OpsAck`, `seq`, `since_seq`, `last_acked_seq`) but each one is an **encrypted op blob** — a single `EncryptedBlob` carrying a Loro update-pack that contains *1..N* CRDT operations. The client engine derives one blob per push cycle (`Updates(server_known_vv)` — everything the server has no proof of, see `spec/vv-wal-separation.md`), so "1 seq" on the server ≈ "one push cycle" on the client, not "one user action".
 
 Consequences worth remembering:
 
 - Server-assigned `seq` enumerates *blobs*, not user actions. A user typing 1000 characters in one session and pressing flush once = 1 seq.
 - `snapshot_threshold_blobs` (below) is in blob count, not action count or bytes.
 - Compaction by `seq ≤ snapshot.compaction_floor_seq` deletes *whole blobs* — a single fat blob is uncompactable.
-- `PushOps { ops: [EncryptedBlob] }` accepts a vector, so the wire supports >1 blob per push even though the current engine sends one.
+- `PushOps { ops: [PushBlob] }` accepts a vector, so the wire supports >1 blob per push even though the current engine sends one.
 
 A future move to byte-based eligibility / compaction would close the asymmetry; tracked in `roadmap.md`.
 
@@ -42,7 +42,7 @@ Note: the per-list order-container CRDT schema (`spec/data-model.md` "Schema ver
 
 | Type | Body | Purpose |
 |---|---|---|
-| `PushOps` | `{ ops: [EncryptedBlob] }` | Append ops. Server assigns per-account seqs. |
+| `PushOps` | `{ ops: [PushBlob] }` | Append ops. Server assigns per-account seqs. `PushBlob = { push_id: uuid, blob: EncryptedBlob }` — see §Push identity & retry. |
 | `PullOps` | `{ since_seq: u64 }` | Request ops with seq > since_seq. |
 | `Ack` | `{ last_acked_seq: u64 }` | Advance this device's contiguous-prefix frontier. |
 | `PushSnapshot` | `{ up_to_seq: u64, compaction_floor_seq: u64, blob: EncryptedBlob }` | In response to `SnapshotRequest`. `up_to_seq` = encoded state frontier; `compaction_floor_seq` = echo of the server's requested compaction floor (server-side op-blob GC bookkeeping; does not affect the produced blob). |
@@ -54,7 +54,7 @@ Note: the per-list order-container CRDT schema (`spec/data-model.md` "Schema ver
 
 | Type | Body | Purpose |
 |---|---|---|
-| `OpsAck` | `{ assigned_seqs: [u64] }` | Response to `PushOps`. `assigned_seqs[i]` corresponds to `ops[i]` in the request, in order. |
+| `OpsAck` | `{ acks: [PushAck] }` | Response to `PushOps`. One `PushAck = { push_id: uuid, seq: u64 }` per pushed blob, in input order — self-describing across retries (see §Push identity & retry). |
 | `OpsBatch` | `{ ops: [(u64, EncryptedBlob)], complete: bool }` | Response to `PullOps`; may chunk. Each tuple's `u64` is the per-account `seq`. |
 | `OpsBroadcast` | `{ ops: [(u64, EncryptedBlob)] }` | Pushed when another device sends ops. |
 | `SnapshotRequest` | `{ up_to_seq: u64, compaction_floor_seq: u64 }` | Server asks a connected client to produce a snapshot. `up_to_seq` = state frontier to encode at (= the producer's `last_acked_seq`); `compaction_floor_seq` = seq at/below which op blobs become eligible for GC once this snapshot lands (= `max(horizon, prev compaction_floor_seq)`). |
@@ -62,6 +62,18 @@ Note: the per-list order-container CRDT schema (`spec/data-model.md` "Schema ver
 | `SnapshotRequired` | `{ up_to_seq: u64 }` | Sent in lieu of `OpsBatch` when the client's `since_seq` is below the latest snapshot's `compaction_floor_seq` — server can't serve the missing ops. Client must bootstrap from snapshot before resuming ops. `up_to_seq` is informational; the authoritative state frontier is the one returned in `Snapshot`. |
 
 `EncryptedBlob = { nonce: bytes, ciphertext: bytes }`.
+
+## Push identity & retry
+
+**Status:** Implemented.
+
+Every pushed blob carries a client-minted **`push_id`** (uuid, 16 raw bytes under MessagePack). It is the crash-retry idempotency key:
+
+- The client persists `{push_id, blob, from_vv, to_vv}` durably **before** the first send (`spec/local-storage.md` §Outbound sync). At most one push is in flight per doc at a time.
+- The server stores `(device_id, push_id)` on the inserted op row. A repeat of an already-inserted `(device, push_id)` returns the **original** seq in `OpsAck` without inserting a second row, and is **not** re-broadcast to peers (they received it on the original insert).
+- On reconnect the client always pulls before retrying the in-flight push. The pull may deliver the client's own op back (proving server possession via the blob's declared Loro range); the retry is still sent and deduplicated — durable push ids are the primary crash-safety mechanism, pulled copies are corroboration.
+- A deduplicated ack's seq may be at or below the client's contiguous frontier (the pull already covered it); the client treats that as a duplicate seq, not an error.
+- Dedup records live on the op rows themselves, so they persist until compaction — and compaction only deletes rows below the horizon, i.e. rows every device (including the originator) has acked past, at which point the originator can no longer legitimately retry that push id.
 
 ## Ordering & ack flow
 
@@ -118,7 +130,7 @@ Orchestration:
   Horizon is intentionally **not** a trigger condition. Snapshotting is valuable for bootstrap perf independent of compaction — a single snapshot row replaces an arbitrarily long `OpsBatch` replay. If horizon hasn't moved, the new snapshot's `compaction_floor_seq` is the same as the previous one, so compaction doesn't advance — but the new snapshot still cuts bootstrap cost.
 - `up_to_seq` = the producer's `last_acked_seq` = `server_last_seq` (since the producer is caught up).
 - `compaction_floor_seq` = `max(horizon, previous_snapshot.compaction_floor_seq)`. Normally just horizon; the `max` enforces monotonicity for the edge case where a fresh device's join drops horizon below the existing floor — compaction is one-way, so the floor stays put.
-- Production: server sends `SnapshotRequest { up_to_seq, compaction_floor_seq }`. Client serializes a full Loro snapshot at `up_to_seq`, encrypts with DEK, uploads via `PushSnapshot { up_to_seq, compaction_floor_seq, blob }`. `compaction_floor_seq` is echoed unchanged — the client does not interpret it.
+- Production: server sends `SnapshotRequest { up_to_seq, compaction_floor_seq }`. The client exports a full Loro snapshot **at the frontiers of its `server_known_vv`** (`fork_at`) — exactly the state/history the server op stream represents, never the current doc, which may contain unsent local operations that must not leak into a blob other devices bootstrap from (`spec/vv-wal-separation.md` §Server snapshots). It encrypts with the DEK and uploads via `PushSnapshot { up_to_seq, compaction_floor_seq, blob }`, tagging `up_to_seq` with its `last_contiguous_seq` (the seq-coordinate twin of `server_known_vv`). `compaction_floor_seq` is echoed unchanged — the client does not interpret it.
 - Compaction: after a snapshot is durable, compaction may delete ops with `seq ≤ snapshot.compaction_floor_seq`.
 
 Server keeps **at most one in-flight snapshot request per account**:
@@ -184,8 +196,8 @@ Until shallow snapshotting ships, the producer's snapshot blob is full-history a
 A device whose `since_seq` is below the latest snapshot's `compaction_floor_seq` cannot resume from ops alone — the ops it needs have been compacted. (Devices whose `since_seq` is between `compaction_floor_seq` and `up_to_seq` *can* still delta-pull, because those ops are preserved by horizon-bounded compaction.) On receiving a `PullOps` with `since_seq < compaction_floor_seq`, the server replies `SnapshotRequired { up_to_seq }` instead of `OpsBatch`. The client then:
 
 1. `PullSnapshot` → server returns `Snapshot { up_to_seq, blob }`.
-2. Decrypt the blob and apply it to the local doc (Loro merges — local-only commits not yet pushed are preserved automatically; CRDT op-id reconciliation handles overlap with the device's own prior contributions).
-3. Persist the exact encrypted blob as the local snapshot with a `ServerFrontier(up_to_seq)` cutoff before advancing/acknowledging the server frontier. This prunes every confirmed local row (`server_seq ≤ up_to_seq`) the blob already contains, while preserving pending work (`server_seq NULL`) and any above-frontier tail — so subsequent boots replay only that short tail, never the full history (see `spec/local-storage.md` "Snapshot policy").
+2. Decrypt the blob and apply it to the local doc (Loro merges — local-only commits not yet pushed are preserved automatically; CRDT op-id reconciliation handles overlap with the device's own prior contributions). Merge the blob's declared Loro range into `server_known_vv` and persist it.
+3. Write the local checkpoint: a fresh full-history export of the **merged** doc (server state ∪ any unsent local work), replacing the local snapshot and pruning the whole WAL prefix. The server blob alone would not be a valid checkpoint — it lacks unsent local operations the pruned WAL rows carried; the merged export contains them and the next push still derives them from `server_known_vv` (see `spec/local-storage.md` §Server snapshots vs local snapshots).
 4. Emit one application-level `FullResync` control event; consumers materialize current state once rather than processing one synthetic event per item.
 5. `PullOps { since_seq: up_to_seq }` to catch up on any ops written after the snapshot was taken.
 

@@ -83,7 +83,7 @@ function ConnectionStatusPopover(props: {
   // forwards into the doc.
   const pending = (): boolean => {
     props.app.version();
-    return props.app.engine.hasPendingOps();
+    return props.app.engine.hasUnsyncedOps();
   };
   const seqLabel = (): string => {
     props.app.version();

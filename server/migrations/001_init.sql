@@ -59,11 +59,22 @@ CREATE TABLE doc_sequences (
 CREATE TABLE ops (
   doc_id          BLOB NOT NULL REFERENCES docs(id),
   seq             INTEGER NOT NULL,                            -- per-doc monotonic, gap-free
+  device_id       BLOB,                                        -- originating device (uuid bytes)
+  push_id         BLOB,                                        -- client-minted durable push id (uuid bytes)
   payload         BLOB NOT NULL,
   payload_nonce   BLOB NOT NULL,
   created_at      INTEGER NOT NULL,
   PRIMARY KEY (doc_id, seq)
 );
+-- Push idempotency: a client that crashed (or lost the ack) re-sends
+-- the same (device_id, push_id); the lookup below returns the original
+-- seq instead of inserting a duplicate row. Dedup records live on the
+-- ops rows themselves, so they persist at least until compaction — and
+-- compaction only deletes rows below the horizon, i.e. rows every
+-- device (including the originator) has already acked past, at which
+-- point the originator can no longer legitimately retry that push_id.
+CREATE UNIQUE INDEX ops_device_push_idx ON ops (doc_id, device_id, push_id)
+  WHERE device_id IS NOT NULL AND push_id IS NOT NULL;
 
 CREATE TABLE snapshots (
   id                    INTEGER PRIMARY KEY AUTOINCREMENT,

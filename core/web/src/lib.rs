@@ -7,15 +7,14 @@
 use wasm_bindgen::prelude::*;
 
 use airday_core::{
-    AEAD_NONCE_LEN, AppEvent as CoreAppEvent, BootState as CoreBootState,
-    ClientOpId as CoreClientOpId, Dek as CoreDek, Doc as CoreDoc, DocId as CoreDocId,
-    EngineOptions as CoreEngineOptions, Event as CoreEvent, ImportSummary as CoreImportSummary,
-    ItemLifecycle as CoreItemLifecycle, Kek as CoreKek, LocalOpRow as CoreLocalOpRow,
-    LocalSeq as CoreLocalSeq, LocalStorage as CoreLocalStorage, OutboxRow as CoreOutboxRow,
-    RemoteOpRow as CoreRemoteOpRow, ServerSeq as CoreServerSeq,
-    SnapshotCutoff as CoreSnapshotCutoff, StorageError as CoreStorageError,
-    SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek, derive_password_master,
-    derive_recovery_master, generate_recovery_code, kek_from_master, parse_recovery_code,
+    AEAD_NONCE_LEN, AppEvent as CoreAppEvent, BootState as CoreBootState, Dek as CoreDek,
+    Doc as CoreDoc, DocId as CoreDocId, EngineOptions as CoreEngineOptions, Event as CoreEvent,
+    ImportSummary as CoreImportSummary, InFlightPush as CoreInFlightPush,
+    ItemLifecycle as CoreItemLifecycle, Kek as CoreKek, LocalSeq as CoreLocalSeq,
+    LocalStorage as CoreLocalStorage, PushId as CorePushId, RemoteWalRow as CoreRemoteWalRow,
+    ServerSeq as CoreServerSeq, StorageError as CoreStorageError, SyncEngine as CoreSyncEngine,
+    WrappedDek as CoreWrappedDek, derive_password_master, derive_recovery_master,
+    generate_recovery_code, kek_from_master, parse_recovery_code,
 };
 use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
 
@@ -420,13 +419,13 @@ impl Doc {
 
     // -- op stream --
 
-    #[wasm_bindgen(js_name = hasPendingOps)]
-    pub fn has_pending_ops(&self) -> bool {
-        self.inner.has_pending_ops()
+    #[wasm_bindgen(js_name = hasUncapturedOps)]
+    pub fn has_uncaptured_ops(&self) -> bool {
+        self.inner.has_uncaptured_ops()
     }
 
-    /// Encrypted blob containing every commit since `last_pushed_vv`.
-    /// Returns `null` if there's nothing new.
+    /// Encrypted blob containing every commit since `last_persisted_vv`
+    /// (the WAL capture cursor). Returns `null` if there's nothing new.
     #[wasm_bindgen(js_name = pendingExport)]
     pub fn pending_export(&self, dek: &Dek) -> Result<Option<EncryptedBlob>, JsError> {
         Ok(self
@@ -436,11 +435,11 @@ impl Doc {
             .map(|b| EncryptedBlob { inner: b }))
     }
 
-    /// Mark every committed op as shipped. Call after `pending_export`'s
-    /// blob has been ack'd by the server.
-    #[wasm_bindgen(js_name = markPushed)]
-    pub fn mark_pushed(&mut self) {
-        self.inner.mark_pushed();
+    /// Mark every committed op as durably captured. Call after
+    /// `pendingExport`'s blob has been persisted.
+    #[wasm_bindgen(js_name = markPersisted)]
+    pub fn mark_persisted(&mut self) {
+        self.inner.mark_persisted();
     }
 
     /// Decrypt and apply a peer op blob.
@@ -448,6 +447,7 @@ impl Doc {
     pub fn apply_remote(&mut self, dek: &Dek, blob: &EncryptedBlob) -> Result<(), JsError> {
         self.inner
             .apply_remote(&dek.inner, &blob.inner)
+            .map(|_| ())
             .map_err(js_err)
     }
 
@@ -822,55 +822,41 @@ impl EncryptedBlob {
 // Marshalling conventions across the boundary:
 //   - encrypted payloads cross as `(ciphertext, nonce)` byte pairs;
 //   - `localSeq` / `serverSeq` cross as JS `number` (`f64`) — both fit
-//     in 2^53 for any realistic op log, so we skip the `bigint` dance;
-//   - `clientOpId` crosses as the raw 16 UUID bytes;
-//   - `outbox()` returns a JS array of
-//     `{ localSeq, clientOpId, ciphertext, nonce }` objects, read back
-//     via `js_sys` reflection.
+//     in 2^53 for any realistic WAL, so we skip the `bigint` dance;
+//   - `pushId` crosses as the raw 16 UUID bytes;
+//   - encoded VersionVectors cross as opaque byte arrays;
+//   - `appendRemoteWal` returns `{ localSeq, inserted }`, read back via
+//     `js_sys` reflection.
 //
 // `boot()` is intentionally absent — on web the host reconstructs the
-// `Doc` in JS directly from IDB before constructing the engine, and
-// the engine never calls `storage.boot()` itself (verified in
-// `core/src/sync.rs`). `WebStorage::boot` returns an empty
-// `BootState` to satisfy the trait.
+// `Doc` in JS directly from IDB before constructing the engine (and
+// seeds the engine's cursors via the `seed*` methods), so the engine
+// never calls `storage.boot()` itself (verified in `core/src/sync.rs`).
+// `WebStorage::boot` returns an empty `BootState` to satisfy the trait.
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(typescript_type = "EngineStorage")]
     pub type EngineStorage;
 
-    #[wasm_bindgen(method, catch, js_name = appendLocalOp)]
-    fn append_local_op(
+    #[wasm_bindgen(method, catch, js_name = appendLocalWal)]
+    fn append_local_wal(
         this: &EngineStorage,
-        client_op_id: &[u8],
         ciphertext: &[u8],
         nonce: &[u8],
     ) -> Result<f64, JsValue>;
 
-    #[wasm_bindgen(method, catch, js_name = appendRemoteOp)]
-    fn append_remote_op(
+    #[wasm_bindgen(method, catch, js_name = appendRemoteWal)]
+    fn append_remote_wal(
         this: &EngineStorage,
         server_seq: f64,
         ciphertext: &[u8],
         nonce: &[u8],
-    ) -> Result<f64, JsValue>;
+        server_known_vv: &[u8],
+    ) -> Result<JsValue, JsValue>;
 
-    #[wasm_bindgen(method, catch, js_name = ackLocalOp)]
-    fn ack_local_op(
-        this: &EngineStorage,
-        client_op_id: &[u8],
-        server_seq: f64,
-    ) -> Result<(), JsValue>;
-
-    #[wasm_bindgen(method, catch, js_name = outbox)]
-    fn outbox(this: &EngineStorage) -> Result<JsValue, JsValue>;
-
-    // `cutoffKind`: 0 = local-prefix (prune local_seq <= cutoff), 1 =
-    // server-frontier (prune confirmed rows with server_seq <= cutoff).
-    // See `SnapshotCutoff`.
     #[wasm_bindgen(method, catch, js_name = writeSnapshot)]
     fn write_snapshot(
         this: &EngineStorage,
-        cutoff_kind: u32,
         cutoff: f64,
         ciphertext: &[u8],
         nonce: &[u8],
@@ -878,17 +864,38 @@ extern "C" {
 
     #[wasm_bindgen(method, catch, js_name = writeAckedSeq)]
     fn write_acked_seq(this: &EngineStorage, seq: f64) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = writeServerKnownVv)]
+    fn write_server_known_vv(this: &EngineStorage, vv: &[u8]) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = putInFlightPush)]
+    fn put_in_flight_push(
+        this: &EngineStorage,
+        push_id: &[u8],
+        ciphertext: &[u8],
+        nonce: &[u8],
+        from_vv: &[u8],
+        to_vv: &[u8],
+    ) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = completePush)]
+    fn complete_push(
+        this: &EngineStorage,
+        push_id: &[u8],
+        server_known_vv: &[u8],
+    ) -> Result<(), JsValue>;
 }
 
 #[wasm_bindgen(typescript_custom_section)]
 const TS_ENGINE_STORAGE: &'static str = r#"
 export interface EngineStorage {
-  appendLocalOp(clientOpId: Uint8Array, ciphertext: Uint8Array, nonce: Uint8Array): number;
-  appendRemoteOp(serverSeq: number, ciphertext: Uint8Array, nonce: Uint8Array): number;
-  ackLocalOp(clientOpId: Uint8Array, serverSeq: number): void;
-  outbox(): { localSeq: number; clientOpId: Uint8Array; ciphertext: Uint8Array; nonce: Uint8Array }[];
-  writeSnapshot(cutoffKind: number, cutoff: number, ciphertext: Uint8Array, nonce: Uint8Array): void;
+  appendLocalWal(ciphertext: Uint8Array, nonce: Uint8Array): number;
+  appendRemoteWal(serverSeq: number, ciphertext: Uint8Array, nonce: Uint8Array, serverKnownVv: Uint8Array): { localSeq: number; inserted: boolean };
+  writeSnapshot(cutoff: number, ciphertext: Uint8Array, nonce: Uint8Array): void;
   writeAckedSeq(seq: number): void;
+  writeServerKnownVv(vv: Uint8Array): void;
+  putInFlightPush(pushId: Uint8Array, ciphertext: Uint8Array, nonce: Uint8Array, fromVv: Uint8Array, toVv: Uint8Array): void;
+  completePush(pushId: Uint8Array, serverKnownVv: Uint8Array): void;
 }
 "#;
 
@@ -912,12 +919,14 @@ fn reflect_f64(obj: &JsValue, key: &str) -> Result<f64, CoreStorageError> {
     js_sys::Reflect::get(obj, &JsValue::from_str(key))
         .map_err(jsval_err)?
         .as_f64()
-        .ok_or_else(|| CoreStorageError::Backend(format!("outbox row: {key} not a number")))
+        .ok_or_else(|| CoreStorageError::Backend(format!("appendRemoteWal: {key} not a number")))
 }
 
-fn reflect_bytes(obj: &JsValue, key: &str) -> Result<Vec<u8>, CoreStorageError> {
-    let v = js_sys::Reflect::get(obj, &JsValue::from_str(key)).map_err(jsval_err)?;
-    Ok(js_sys::Uint8Array::new(&v).to_vec())
+fn reflect_bool(obj: &JsValue, key: &str) -> Result<bool, CoreStorageError> {
+    js_sys::Reflect::get(obj, &JsValue::from_str(key))
+        .map_err(jsval_err)?
+        .as_bool()
+        .ok_or_else(|| CoreStorageError::Backend(format!("appendRemoteWal: {key} not a boolean")))
 }
 
 impl CoreLocalStorage for WebStorage {
@@ -928,81 +937,46 @@ impl CoreLocalStorage for WebStorage {
         Ok(CoreBootState::default())
     }
 
-    fn append_local_op(
+    fn append_local_wal(
         &self,
         _doc_id: CoreDocId,
-        row: CoreLocalOpRow,
+        payload: CoreEncryptedBlob,
     ) -> Result<CoreLocalSeq, CoreStorageError> {
         let seq = self
             .js
-            .append_local_op(
-                row.client_op_id.0.as_bytes(),
-                &row.payload.ciphertext,
-                &row.payload.nonce,
-            )
+            .append_local_wal(&payload.ciphertext, &payload.nonce)
             .map_err(jsval_err)?;
         Ok(CoreLocalSeq(seq as u64))
     }
 
-    fn append_remote_op(
+    fn append_remote_wal(
         &self,
         _doc_id: CoreDocId,
-        row: CoreRemoteOpRow,
-    ) -> Result<CoreLocalSeq, CoreStorageError> {
-        let seq = self
+        row: CoreRemoteWalRow,
+        server_known_vv: &[u8],
+    ) -> Result<(CoreLocalSeq, bool), CoreStorageError> {
+        let result = self
             .js
-            .append_remote_op(
+            .append_remote_wal(
                 row.server_seq.0 as f64,
                 &row.payload.ciphertext,
                 &row.payload.nonce,
+                server_known_vv,
             )
             .map_err(jsval_err)?;
-        Ok(CoreLocalSeq(seq as u64))
-    }
-
-    fn ack_local_op(
-        &self,
-        _doc_id: CoreDocId,
-        client_op_id: CoreClientOpId,
-        server_seq: CoreServerSeq,
-    ) -> Result<(), CoreStorageError> {
-        self.js
-            .ack_local_op(client_op_id.0.as_bytes(), server_seq.0 as f64)
-            .map_err(jsval_err)
-    }
-
-    fn outbox(&self, _doc_id: CoreDocId) -> Result<Vec<CoreOutboxRow>, CoreStorageError> {
-        let arr = js_sys::Array::from(&self.js.outbox().map_err(jsval_err)?);
-        let mut out = Vec::with_capacity(arr.length() as usize);
-        for item in arr.iter() {
-            let local_seq = reflect_f64(&item, "localSeq")? as u64;
-            let client_op_id = reflect_bytes(&item, "clientOpId")?;
-            let ciphertext = reflect_bytes(&item, "ciphertext")?;
-            let nonce = reflect_bytes(&item, "nonce")?;
-            let uuid = uuid::Uuid::from_slice(&client_op_id).map_err(|e| {
-                CoreStorageError::Backend(format!("outbox row: invalid clientOpId: {e}"))
-            })?;
-            out.push(CoreOutboxRow {
-                local_seq: CoreLocalSeq(local_seq),
-                client_op_id: CoreClientOpId(uuid),
-                payload: CoreEncryptedBlob { nonce, ciphertext },
-            });
-        }
-        Ok(out)
+        let local_seq = reflect_f64(&result, "localSeq")? as u64;
+        let inserted = reflect_bool(&result, "inserted")?;
+        Ok((CoreLocalSeq(local_seq), inserted))
     }
 
     fn write_snapshot(
         &self,
         _doc_id: CoreDocId,
-        cutoff: CoreSnapshotCutoff,
+        cutoff: CoreLocalSeq,
         payload: CoreEncryptedBlob,
     ) -> Result<(), CoreStorageError> {
-        let (kind, value) = match cutoff {
-            CoreSnapshotCutoff::LocalPrefix(seq) => (0u32, seq.0 as f64),
-            CoreSnapshotCutoff::ServerFrontier(seq) => (1u32, seq.0 as f64),
-        };
         self.js
-            .write_snapshot(kind, value, &payload.ciphertext, &payload.nonce)
+            .write_snapshot(cutoff.0 as f64, &payload.ciphertext, &payload.nonce)
             .map_err(jsval_err)
     }
 
@@ -1012,6 +986,37 @@ impl CoreLocalStorage for WebStorage {
         seq: CoreServerSeq,
     ) -> Result<(), CoreStorageError> {
         self.js.write_acked_seq(seq.0 as f64).map_err(jsval_err)
+    }
+
+    fn write_server_known_vv(&self, _doc_id: CoreDocId, vv: &[u8]) -> Result<(), CoreStorageError> {
+        self.js.write_server_known_vv(vv).map_err(jsval_err)
+    }
+
+    fn put_in_flight_push(
+        &self,
+        _doc_id: CoreDocId,
+        push: CoreInFlightPush,
+    ) -> Result<(), CoreStorageError> {
+        self.js
+            .put_in_flight_push(
+                push.push_id.0.as_bytes(),
+                &push.payload.ciphertext,
+                &push.payload.nonce,
+                &push.from_vv,
+                &push.to_vv,
+            )
+            .map_err(jsval_err)
+    }
+
+    fn complete_push(
+        &self,
+        _doc_id: CoreDocId,
+        push_id: CorePushId,
+        server_known_vv: &[u8],
+    ) -> Result<(), CoreStorageError> {
+        self.js
+            .complete_push(push_id.0.as_bytes(), server_known_vv)
+            .map_err(jsval_err)
     }
 }
 
@@ -1060,10 +1065,10 @@ impl SyncEngine {
         })
     }
 
-    /// Persist any locally-committed mutations as a durable op-log row
+    /// Persist any locally-committed mutations as a durable WAL row
     /// (and advance the capture cursor). Returns the assigned `localSeq`
     /// or `undefined` when nothing was pending. Call **before**
-    /// `flush()` so the outbox-driven push ships the captured row.
+    /// `flush()` so pushed bytes are always disk-bound first.
     #[wasm_bindgen(js_name = captureLocalOps)]
     pub fn capture_local_ops(&mut self) -> Result<Option<f64>, JsError> {
         Ok(self
@@ -1073,21 +1078,26 @@ impl SyncEngine {
             .map(|s| s.0 as f64))
     }
 
-    /// Compact the op log into a fresh snapshot when fully synced
-    /// (outbox drained) **and** at least `min_ops` rows accumulated
-    /// past the last snapshot. Snapshot export is O(doc) — pass a real
-    /// threshold on hot pulses (per-ack) and `1` from idle hooks. No-op
-    /// while unacked ops remain. Returns whether a snapshot was written.
-    #[wasm_bindgen(js_name = snapshotIfFullySynced)]
-    pub fn snapshot_if_fully_synced(&mut self, min_ops: u32) -> Result<bool, JsError> {
+    /// Fold the WAL into a fresh full-history snapshot when it has at
+    /// least `max_rows` rows or more than `max_bytes` payload bytes.
+    /// Runs regardless of sync state — unsent local ops survive
+    /// folding (the push derives them from `server_known_vv`).
+    /// Snapshot export is O(doc) — pass a real row threshold on hot
+    /// pulses (per-ack) and `1` from idle hooks. Returns whether a
+    /// snapshot was written.
+    #[wasm_bindgen(js_name = snapshotIfWalExceeds)]
+    pub fn snapshot_if_wal_exceeds(
+        &mut self,
+        max_rows: u32,
+        max_bytes: f64,
+    ) -> Result<bool, JsError> {
         self.inner
-            .snapshot_if_fully_synced(u64::from(min_ops))
+            .snapshot_if_wal_exceeds(u64::from(max_rows), max_bytes as u64)
             .map_err(js_err)
     }
 
-    /// Unconditionally compact every op row into a snapshot — for
-    /// local-only (anonymous) sessions that never sync. MUST NOT be
-    /// used on a syncing doc; see `core::SyncEngine::force_snapshot`.
+    /// Unconditionally fold any non-empty WAL into a snapshot — the
+    /// exit/hide hook. `false` when the WAL was already empty.
     #[wasm_bindgen(js_name = forceSnapshot)]
     pub fn force_snapshot(&mut self) -> Result<bool, JsError> {
         self.inner.force_snapshot().map_err(js_err)
@@ -1098,6 +1108,45 @@ impl SyncEngine {
     #[wasm_bindgen(js_name = setLastLocalSeq)]
     pub fn set_last_local_seq(&mut self, seq: f64) {
         self.inner.set_last_local_seq(CoreLocalSeq(seq as u64));
+    }
+
+    /// Seed the WAL statistics (surviving rows / payload bytes past
+    /// the last snapshot) from the JS boot.
+    #[wasm_bindgen(js_name = seedWalStats)]
+    pub fn seed_wal_stats(&mut self, rows: f64, bytes: f64) {
+        self.inner.seed_wal_stats(rows as u64, bytes as u64);
+    }
+
+    /// Seed `server_known_vv` from its persisted encoding (empty array
+    /// = never synced). Call once right after construction.
+    #[wasm_bindgen(js_name = seedServerKnownVv)]
+    pub fn seed_server_known_vv(&mut self, encoded: &[u8]) {
+        self.inner.seed_server_known_vv(encoded);
+    }
+
+    /// Seed the durable in-flight push from a previous session; the
+    /// reconnect flow re-sends it (same `pushId`) after the initial
+    /// pull and the server deduplicates.
+    #[wasm_bindgen(js_name = seedInFlightPush)]
+    pub fn seed_in_flight_push(
+        &mut self,
+        push_id: &[u8],
+        ciphertext: &[u8],
+        nonce: &[u8],
+        from_vv: &[u8],
+        to_vv: &[u8],
+    ) -> Result<(), JsError> {
+        let push_id = uuid::Uuid::from_slice(push_id).map_err(js_err)?;
+        self.inner.seed_in_flight_push(CoreInFlightPush {
+            push_id: CorePushId(push_id),
+            payload: CoreEncryptedBlob {
+                nonce: nonce.to_vec(),
+                ciphertext: ciphertext.to_vec(),
+            },
+            from_vv: from_vv.to_vec(),
+            to_vv: to_vv.to_vec(),
+        });
+        Ok(())
     }
 
     // -- transport callbacks --
@@ -1238,9 +1287,17 @@ impl SyncEngine {
         self.inner.doc().fingerprint().to_vec()
     }
 
-    #[wasm_bindgen(js_name = hasPendingOps)]
-    pub fn has_pending_ops(&self) -> bool {
-        self.inner.doc().has_pending_ops()
+    #[wasm_bindgen(js_name = hasUncapturedOps)]
+    pub fn has_uncaptured_ops(&self) -> bool {
+        self.inner.doc().has_uncaptured_ops()
+    }
+
+    /// True when local operations lack server proof (commits beyond
+    /// `server_known_vv`, or an outstanding in-flight push) — the UI's
+    /// "pending changes" indicator.
+    #[wasm_bindgen(js_name = hasUnsyncedOps)]
+    pub fn has_unsynced_ops(&self) -> bool {
+        self.inner.has_unsynced_ops()
     }
 
     // -- oplog passthrough --

@@ -175,15 +175,15 @@ function BootGate(props: {
   setBootError: (m: string | null) => void;
 }) {
   const { m } = useAppI18n();
-  // Rebuild the doc from the engine op log (`spec/local-storage.md`
+  // Rebuild the doc from the engine WAL (`spec/local-storage.md`
   // §"Web boot"), mirroring the CLI's `boot_doc`: load the snapshot (a bare
-  // Loro snapshot) and replay every op row after it via the deferred replay
-  // API, finalize indexes once, then `markPushed()` so the engine's push cursor
-  // covers the replayed ops (unacked ones re-push from the persisted
-  // outbox, not `pending_export`). Fresh signups — and brand-new
-  // anonymous docs with an empty store — start from `Doc.create()` so
-  // the seeded built-ins land; authed devices with an empty store start
-  // empty and let sync deliver a snapshot.
+  // Loro snapshot) and replay every WAL row after it via the deferred replay
+  // API, finalize indexes once, then `markPersisted()` so the WAL capture
+  // cursor covers the replayed ops (what still needs *uploading* is
+  // derived separately from the persisted `serverKnownVv`). Fresh
+  // signups — and brand-new anonymous docs with an empty store — start
+  // from `Doc.create()` so the seeded built-ins land; authed devices
+  // with an empty store start empty and let sync deliver a snapshot.
   onMount(async () => {
     try {
       // Prefs are independent of the op-log replay — fire in parallel so
@@ -211,7 +211,7 @@ function BootGate(props: {
           doc.replayOplogUpdate(dek.open(new EncryptedBlob(r.nonce, r.ciphertext)));
         }
         doc.finishOplogReplay();
-        doc.markPushed();
+        doc.markPersisted();
       } else if (props.session.anonymous) {
         // Brand-new (or wiped) local-only doc — seed the built-ins.
         doc = Doc.create();
@@ -228,6 +228,10 @@ function BootGate(props: {
         lastAcked: BigInt(rows.lastAckedSeq),
         storage,
         lastLocalSeq: rows.lastLocalSeq,
+        serverKnownVv: rows.serverKnownVv,
+        inFlightPush: rows.inFlightPush,
+        walRows: rows.replay.length,
+        walBytes: rows.walBytes,
         seeded,
         prefs: await prefsPromise,
       });

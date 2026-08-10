@@ -8,8 +8,8 @@
 use std::time::Instant;
 
 use airday_protocol::{
-    ClientFrame, EncryptedBlob, Hello, HelloAck, HelloRejected, PROTOCOL_VERSION, ServerFrame,
-    StoredBlob,
+    ClientFrame, EncryptedBlob, Hello, HelloAck, HelloRejected, PROTOCOL_VERSION, PushBlob,
+    ServerFrame,
 };
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Extension, Query, State};
@@ -325,47 +325,50 @@ async fn push_ops(
     socket: &mut WebSocket,
     state: &AppState,
     ws_session: &mut WSSession,
-    ops: Vec<EncryptedBlob>,
+    ops: Vec<PushBlob>,
 ) -> Result<(), SessionError> {
     let push_span = tracing::info_span!("ws.push_ops", op_count = ops.len());
     if ops.is_empty() {
         return async {
             tracing::debug!("ws push_ops empty");
-            send_msgpack(
-                socket,
-                &ServerFrame::OpsAck {
-                    assigned_seqs: Vec::new(),
-                },
-            )
-            .await
+            send_msgpack(socket, &ServerFrame::OpsAck { acks: Vec::new() }).await
         }
         .instrument(push_span)
         .await;
     }
 
     async {
-        let blobs_for_broadcast = ops.clone();
-        let assigned_seqs =
-            queries::insert_ops(&state.db, ws_session.auth.primary_doc_id, ops).await?;
+        // Insert with (device, push_id) dedup: a crash-retry of an
+        // already-inserted push acks its original seq without a second
+        // row.
+        let inserted = queries::insert_ops(
+            &state.db,
+            ws_session.auth.primary_doc_id,
+            ws_session.auth.device_id,
+            ops,
+        )
+        .await?;
 
-        // Post-commit fan-out, before acking the originator. Both branches
-        // are correct (the originator's ack and peer broadcasts are
-        // independent), but queueing first means peers don't race the
-        // originator's "I'm done pushing" signal.
-        let stored: Vec<StoredBlob> = assigned_seqs
-            .iter()
-            .copied()
-            .zip(blobs_for_broadcast)
-            .map(|(seq, blob)| StoredBlob { seq, blob })
-            .collect();
-        state
-            .sync_sessions
-            .broadcast(ws_session.auth.primary_doc_id, ws_session.sub_id, stored);
+        // Post-commit fan-out, before acking the originator — but only
+        // the FRESH rows: a deduplicated retry was already broadcast on
+        // its original insert. Both branches are correct (the
+        // originator's ack and peer broadcasts are independent), but
+        // queueing first means peers don't race the originator's "I'm
+        // done pushing" signal.
+        let fresh_count = inserted.fresh.len();
+        if fresh_count > 0 {
+            state.sync_sessions.broadcast(
+                ws_session.auth.primary_doc_id,
+                ws_session.sub_id,
+                inserted.fresh,
+            );
+        }
 
         tracing::info!(
-            assigned_seq_count = assigned_seqs.len(),
-            first_assigned_seq = assigned_seqs.first().copied(),
-            last_assigned_seq = assigned_seqs.last().copied(),
+            ack_count = inserted.acks.len(),
+            fresh_count = fresh_count,
+            first_seq = inserted.acks.first().map(|a| a.seq),
+            last_seq = inserted.acks.last().map(|a| a.seq),
             "ws push_ops persisted"
         );
 
@@ -377,13 +380,19 @@ async fn push_ops(
         // arrives first, the client snapshots at its pre-push frontier,
         // landing a snapshot with `up_to < compaction_floor`, which
         // traps later bootstrappers in an infinite SnapshotRequired loop.
-        let snapshot_decision = if let Some(latest_seq) = assigned_seqs.last().copied() {
+        let snapshot_decision = if let Some(latest_seq) = inserted.acks.last().map(|a| a.seq) {
             Some(evaluate_snapshot_decision(state, ws_session, latest_seq).await?)
         } else {
             None
         };
 
-        send_msgpack(socket, &ServerFrame::OpsAck { assigned_seqs }).await?;
+        send_msgpack(
+            socket,
+            &ServerFrame::OpsAck {
+                acks: inserted.acks,
+            },
+        )
+        .await?;
 
         if let Some(decision) = snapshot_decision {
             issue_snapshot_request(socket, ws_session, decision).await?;

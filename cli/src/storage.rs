@@ -18,8 +18,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use airday_core::{
-    BootState, ClientOpId, DocId, LocalOpRow, LocalSeq, LocalStorage, OutboxRow, RemoteOpRow,
-    ServerSeq, SnapshotCutoff, StorageError,
+    BootState, DocId, InFlightPush, LocalSeq, LocalStorage, PushId, RemoteWalRow, ServerSeq,
+    StorageError,
 };
 use airday_protocol::EncryptedBlob;
 use airday_storage_sqlite::SqliteStorage as SqliteBackend;
@@ -28,7 +28,7 @@ use uuid::Uuid;
 
 use crate::config::Profile;
 
-pub use airday_core::{BootError, boot_doc, load_doc, seed_snapshot};
+pub use airday_core::{BootError, boot_doc, has_unsynced_ops, load_doc, seed_snapshot};
 pub use airday_storage_sqlite::DbError;
 
 /// Ledger name for the CLI's extra migration (`cli/migrations/001_init.sql`).
@@ -178,19 +178,22 @@ impl SqliteStorage {
         Ok(())
     }
 
-    /// Drop the doc cache (ops + snapshot) and reset the sync cursor,
-    /// keeping account identity. Backs `airday cache clear`: the next
-    /// sync rehydrates from server_seq 0.
+    /// Drop the doc cache (WAL + snapshot + in-flight push) and reset
+    /// every sync cursor, keeping account identity. Backs `airday cache
+    /// clear`: the next sync rehydrates from server_seq 0.
     pub fn clear_cache(&self, doc_id: DocId) -> Result<(), StorageError> {
         let mut conn = self.conn().lock().expect("SqliteStorage mutex poisoned");
         let id = doc_id.0.as_bytes().to_vec();
         let tx = conn.transaction().map_err(backend)?;
-        tx.execute("DELETE FROM ops WHERE doc_id = ?1", [&id])
+        tx.execute("DELETE FROM wal WHERE doc_id = ?1", [&id])
             .map_err(backend)?;
         tx.execute("DELETE FROM snapshots WHERE doc_id = ?1", [&id])
             .map_err(backend)?;
+        tx.execute("DELETE FROM in_flight_push WHERE doc_id = ?1", [&id])
+            .map_err(backend)?;
         tx.execute(
-            "UPDATE docs SET last_acked_server_seq = 0, last_sync_at = NULL WHERE id = ?1",
+            "UPDATE docs SET last_acked_server_seq = 0, server_known_vv = NULL,
+                             last_sync_at = NULL WHERE id = ?1",
             [&id],
         )
         .map_err(backend)?;
@@ -205,33 +208,45 @@ impl LocalStorage for SqliteStorage {
     fn boot(&self, doc_id: DocId) -> Result<BootState, StorageError> {
         self.0.boot(doc_id)
     }
-    fn append_local_op(&self, doc_id: DocId, row: LocalOpRow) -> Result<LocalSeq, StorageError> {
-        self.0.append_local_op(doc_id, row)
-    }
-    fn append_remote_op(&self, doc_id: DocId, row: RemoteOpRow) -> Result<LocalSeq, StorageError> {
-        self.0.append_remote_op(doc_id, row)
-    }
-    fn ack_local_op(
+    fn append_local_wal(
         &self,
         doc_id: DocId,
-        client_op_id: ClientOpId,
-        server_seq: ServerSeq,
-    ) -> Result<(), StorageError> {
-        self.0.ack_local_op(doc_id, client_op_id, server_seq)
+        payload: EncryptedBlob,
+    ) -> Result<LocalSeq, StorageError> {
+        self.0.append_local_wal(doc_id, payload)
     }
-    fn outbox(&self, doc_id: DocId) -> Result<Vec<OutboxRow>, StorageError> {
-        self.0.outbox(doc_id)
+    fn append_remote_wal(
+        &self,
+        doc_id: DocId,
+        row: RemoteWalRow,
+        server_known_vv: &[u8],
+    ) -> Result<(LocalSeq, bool), StorageError> {
+        self.0.append_remote_wal(doc_id, row, server_known_vv)
     }
     fn write_snapshot(
         &self,
         doc_id: DocId,
-        cutoff: SnapshotCutoff,
+        cutoff: LocalSeq,
         payload: EncryptedBlob,
     ) -> Result<(), StorageError> {
         self.0.write_snapshot(doc_id, cutoff, payload)
     }
     fn write_acked_seq(&self, doc_id: DocId, seq: ServerSeq) -> Result<(), StorageError> {
         self.0.write_acked_seq(doc_id, seq)
+    }
+    fn write_server_known_vv(&self, doc_id: DocId, vv: &[u8]) -> Result<(), StorageError> {
+        self.0.write_server_known_vv(doc_id, vv)
+    }
+    fn put_in_flight_push(&self, doc_id: DocId, push: InFlightPush) -> Result<(), StorageError> {
+        self.0.put_in_flight_push(doc_id, push)
+    }
+    fn complete_push(
+        &self,
+        doc_id: DocId,
+        push_id: PushId,
+        server_known_vv: &[u8],
+    ) -> Result<(), StorageError> {
+        self.0.complete_push(doc_id, push_id, server_known_vv)
     }
 }
 

@@ -152,12 +152,12 @@ describe("doc passthrough", () => {
     expect(lists.some((l) => l.id === LIST_MAIN)).toBe(false);
   });
 
-  test("hasPendingOps reflects unpushed mutations", () => {
+  test("hasUncapturedOps reflects uncaptured mutations", () => {
     const eng = newEngine();
-    // Fresh doc has no commits → nothing pending.
-    expect(eng.hasPendingOps()).toBe(false);
+    // Fresh doc has no commits → nothing uncaptured.
+    expect(eng.hasUncapturedOps()).toBe(false);
     eng.addItem(LIST_MAIN, "later");
-    expect(eng.hasPendingOps()).toBe(true);
+    expect(eng.hasUncapturedOps()).toBe(true);
   });
 
   test("flush before connect is a queued no-op (no outbox bytes)", () => {

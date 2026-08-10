@@ -33,9 +33,12 @@
 //! items reference it by string id and clients render it with a
 //! hardcoded label ("Inbox").
 //!
-//! The struct holds a `last_pushed_vv` so we can hand the sync engine
-//! "what's new since the last server interaction" as a single sealed
-//! blob without re-shipping ops we already saw.
+//! The struct holds a `last_persisted_vv` — the local WAL capture
+//! cursor. Everything at or below it has been durably appended to the
+//! local encrypted WAL (see `spec/local-storage.md`); `pending_export`
+//! hands the engine exactly the commits past it. This cursor is about
+//! *local durability only* — what the server has is tracked separately
+//! by the engine's `server_known_vv`.
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -977,7 +980,7 @@ fn make_diff_subscriber(
 
 pub struct Doc {
     inner: LoroDoc,
-    last_pushed_vv: VersionVector,
+    last_persisted_vv: VersionVector,
     /// Domain-level change events. Mutation methods push directly;
     /// `apply_remote` does diff translation and pushes a batch. Drain
     /// via `pop_event` / `drain_events`. Wrapped in `Mutex` so mutation
@@ -1026,7 +1029,7 @@ impl Doc {
         let _diff_sub = inner.subscribe_root(make_diff_subscriber(diff_capture.clone()));
         Ok(Self {
             inner,
-            last_pushed_vv: VersionVector::default(),
+            last_persisted_vv: VersionVector::default(),
             events: Mutex::new(VecDeque::new()),
             undo,
             item_index,
@@ -1043,7 +1046,7 @@ impl Doc {
         let diff_capture = Arc::new(Mutex::new(DiffCapture::default()));
         let _diff_sub = inner.subscribe_root(make_diff_subscriber(diff_capture.clone()));
         Self {
-            last_pushed_vv: inner.oplog_vv(),
+            last_persisted_vv: inner.oplog_vv(),
             inner,
             events: Mutex::new(VecDeque::new()),
             undo,
@@ -1109,23 +1112,23 @@ impl Doc {
         idx
     }
 
-    pub fn last_pushed_vv(&self) -> &VersionVector {
-        &self.last_pushed_vv
+    pub fn last_persisted_vv(&self) -> &VersionVector {
+        &self.last_persisted_vv
     }
 
     /// Snapshot of the oplog VV — every commit currently in the log,
-    /// across every peer we've seen. Sync engine captures this at the
-    /// moment of `pending_export` and feeds it back via
-    /// `mark_pushed_at` on ack so a mutation made *during* the in-flight
-    /// push doesn't get marked-as-pushed alongside the ops on the wire.
+    /// across every peer we've seen. The engine captures this at the
+    /// moment of an export and feeds it back via `mark_persisted_at`
+    /// once the exported bytes are durably in the WAL, so a mutation
+    /// committed *during* the append isn't silently skipped.
     pub fn oplog_vv(&self) -> VersionVector {
         self.inner.oplog_vv()
     }
 
-    /// True iff there are local commits the server hasn't seen.
-    pub fn has_pending_ops(&self) -> bool {
+    /// True iff there are commits not yet captured into the local WAL.
+    pub fn has_uncaptured_ops(&self) -> bool {
         // `Updates { from: oplog_vv }` is empty; `Updates { from: VV<oplog }` isn't.
-        self.inner.oplog_vv() != self.last_pushed_vv
+        self.inner.oplog_vv() != self.last_persisted_vv
     }
 
     // ---------- mutations: items ----------
@@ -2876,7 +2879,7 @@ impl Doc {
 
     /// Encrypted full-state snapshot at the doc's current frontier.
     /// Used by the sync engine to satisfy a server `SnapshotRequest`.
-    /// Independent of `last_pushed_vv` — the snapshot covers the whole
+    /// Independent of `last_persisted_vv` — the snapshot covers the whole
     /// doc, not a delta — so this does not advance any push-state
     /// bookkeeping; producing a snapshot is side-effect-free locally.
     pub fn snapshot_blob(&self, dek: &Dek) -> Result<EncryptedBlob, DocError> {
@@ -2896,15 +2899,16 @@ impl Doc {
         Ok(self.inner.export(ExportMode::Snapshot)?)
     }
 
-    /// Encrypted blob containing every commit since `last_pushed_vv`.
-    /// Returns `None` if there's nothing new to ship.
+    /// Encrypted blob containing every commit since `last_persisted_vv`
+    /// — the delta the WAL capture path appends. Returns `None` if
+    /// there's nothing new to capture.
     pub fn pending_export(&self, dek: &Dek) -> Result<Option<EncryptedBlob>, DocError> {
-        if !self.has_pending_ops() {
+        if !self.has_uncaptured_ops() {
             return Ok(None);
         }
         let plaintext = self
             .inner
-            .export(ExportMode::updates(&self.last_pushed_vv))?;
+            .export(ExportMode::updates(&self.last_persisted_vv))?;
         let (ciphertext, nonce) = dek.seal(&plaintext)?;
         Ok(Some(EncryptedBlob {
             nonce: nonce.to_vec(),
@@ -2912,15 +2916,61 @@ impl Doc {
         }))
     }
 
-    /// Mark the local view as "everything currently in oplog has now
-    /// been shipped." Caller-friendly shortcut for the common
-    /// synchronous case (CLI tests). The sync engine uses
-    /// `mark_pushed_at` instead so a concurrent local mutation between
-    /// `pending_export` and the server's `OpsAck` isn't silently
-    /// included in the advance.
-    pub fn mark_pushed(&mut self) {
+    /// Encrypted blob containing every commit strictly after `from` —
+    /// the outbound-sync export. The engine passes its `server_known_vv`
+    /// here so the delta is derived from Loro history, independent of
+    /// which WAL rows still exist. Returns `None` when `from` already
+    /// covers the whole oplog.
+    pub fn export_updates_since(
+        &self,
+        dek: &Dek,
+        from: &VersionVector,
+    ) -> Result<Option<EncryptedBlob>, DocError> {
+        if from.includes_vv(&self.inner.oplog_vv()) {
+            return Ok(None);
+        }
+        let plaintext = self.inner.export(ExportMode::updates(from))?;
+        if plaintext.is_empty() {
+            return Ok(None);
+        }
+        let (ciphertext, nonce) = dek.seal(&plaintext)?;
+        Ok(Some(EncryptedBlob {
+            nonce: nonce.to_vec(),
+            ciphertext,
+        }))
+    }
+
+    /// Encrypted full-history snapshot at the state described by `vv`,
+    /// excluding everything past it. Backs server-snapshot production:
+    /// the producer must snapshot exactly the server-known frontier
+    /// (`server_known_vv`), never its own unsent local operations, or a
+    /// bootstrapping device would receive ops the server op stream
+    /// doesn't contain. Implemented as a `fork_at` of the frontiers
+    /// corresponding to `vv`.
+    pub fn snapshot_blob_at(
+        &self,
+        dek: &Dek,
+        vv: &VersionVector,
+    ) -> Result<EncryptedBlob, DocError> {
+        let frontiers = self.inner.vv_to_frontiers(vv);
+        let fork = self.inner.fork_at(&frontiers)?;
+        let plaintext = fork.export(ExportMode::Snapshot)?;
+        let (ciphertext, nonce) = dek.seal(&plaintext)?;
+        Ok(EncryptedBlob {
+            nonce: nonce.to_vec(),
+            ciphertext,
+        })
+    }
+
+    /// Mark the local view as "everything currently in oplog is now
+    /// durably captured in the WAL." Caller-friendly shortcut for the
+    /// common synchronous case (CLI tests). The sync engine uses
+    /// `mark_persisted_at` instead so a mutation committed between the
+    /// export and the durable append isn't silently included in the
+    /// advance.
+    pub fn mark_persisted(&mut self) {
         let vv = self.inner.oplog_vv();
-        self.last_pushed_vv.merge(&vv);
+        self.last_persisted_vv.merge(&vv);
     }
 
     /// Encoded current oplog VersionVector. The browser oplog adapter
@@ -2981,7 +3031,7 @@ impl Doc {
     /// Convenience for a one-blob replay. Multi-row boot paths should use
     /// [`Doc::replay_oplog_update`] + [`Doc::finish_oplog_replay`] instead.
     ///
-    /// Does *not* advance `last_pushed_vv`. Whether the original local
+    /// Does *not* advance `last_persisted_vv`. Whether the original local
     /// commit reached the server before the crash is unknowable from
     /// disk; the next push retries, and Loro / the server dedupe.
     pub fn import_oplog_updates(&mut self, plaintext: &[u8]) -> Result<(), DocError> {
@@ -2990,19 +3040,22 @@ impl Doc {
         Ok(())
     }
 
-    /// Merge `vv` into `last_pushed_vv`. Pair with `oplog_vv()` captured
-    /// at the moment of `pending_export` — on the server's ack, this
-    /// advances only past the ops that were actually on the wire,
-    /// leaving any concurrently-committed local mutations in the
-    /// pending set.
-    pub fn mark_pushed_at(&mut self, vv: VersionVector) {
-        self.last_pushed_vv.merge(&vv);
+    /// Merge `vv` into `last_persisted_vv`. Pair with `oplog_vv()`
+    /// captured at the moment of the export — once the exported bytes
+    /// are durably appended to the WAL, this advances only past the
+    /// ops the append actually covered, leaving any concurrently
+    /// committed local mutations in the uncaptured set.
+    pub fn mark_persisted_at(&mut self, vv: VersionVector) {
+        self.last_persisted_vv.merge(&vv);
     }
 
-    /// Decrypt and apply a peer op blob. Advances `last_pushed_vv` for
-    /// the imported peers only — the server clearly has those ops, but
-    /// any local commits already in the oplog stay in the pending set
-    /// until our own push lands.
+    /// Decrypt and apply a peer op blob. Returns the blob's *declared*
+    /// operation range (its decoded `partial_end_vv`) — the proof of
+    /// which Loro ops the blob carries, independent of whether the
+    /// import was a no-op duplicate. The engine merges this into its
+    /// `server_known_vv`. `last_persisted_vv` advances by the same
+    /// range (the engine WAL-logs the very same blob, and boot replay
+    /// feeds stored rows back through this path).
     ///
     /// Translates the import's Loro container diffs (captured by the
     /// root subscription) into per-id `AppEvent`s, so a frame's cost is
@@ -3010,13 +3063,22 @@ impl Doc {
     /// diff shape the translator can't handle (or a bulk frame touching
     /// ≥ `DIFF_TRANSLATE_MAX_DIRTY` items) rebuilds the disposable index
     /// once and emits one `FullResync` control event.
-    pub fn apply_remote(&mut self, dek: &Dek, blob: &EncryptedBlob) -> Result<(), DocError> {
+    pub fn apply_remote(
+        &mut self,
+        dek: &Dek,
+        blob: &EncryptedBlob,
+    ) -> Result<VersionVector, DocError> {
         self.apply_remote_batch(dek, std::iter::once(blob))
     }
 
     /// Batch variant of [`Doc::apply_remote`]. Imports all blobs first,
     /// then translates once so catch-up batches don't pay per-op cost.
-    pub fn apply_remote_batch<'a, I>(&mut self, dek: &Dek, blobs: I) -> Result<(), DocError>
+    /// Returns the union of every blob's declared operation range.
+    pub fn apply_remote_batch<'a, I>(
+        &mut self,
+        dek: &Dek,
+        blobs: I,
+    ) -> Result<VersionVector, DocError>
     where
         I: IntoIterator<Item = &'a EncryptedBlob>,
     {
@@ -3024,16 +3086,19 @@ impl Doc {
         let pre_settings = self.get_settings();
         self.begin_diff_capture(DiffCaptureMode::Import);
 
-        let result = blobs
-            .into_iter()
-            .try_for_each(|blob| self.import_remote_blob(dek, blob));
+        let mut imported_vv = VersionVector::new();
+        let result = blobs.into_iter().try_for_each(|blob| {
+            let vv = self.import_remote_blob(dek, blob)?;
+            imported_vv.merge(&vv);
+            Ok::<(), DocError>(())
+        });
         let diffs = self.finish_diff_capture();
-        if result.is_err() {
+        if let Err(e) = result {
             // A batch may have applied earlier blobs before a later one
             // failed — resync events for whatever landed, then surface
             // the error.
             self.emit_diff_fallback();
-            return result;
+            return Err(e);
         }
         if self
             .translate_captured_diffs(diffs, &pre_lists, &pre_settings)
@@ -3041,7 +3106,7 @@ impl Doc {
         {
             self.emit_diff_fallback();
         }
-        Ok(())
+        Ok(imported_vv)
     }
 
     /// Translate captured import or undo diffs into surgical `AppEvent`s
@@ -3680,7 +3745,7 @@ impl Doc {
         let envelope = LocalState {
             version: 1,
             snapshot,
-            last_pushed_vv: self.last_pushed_vv.encode(),
+            last_persisted_vv: self.last_persisted_vv.encode(),
         };
         Ok(rmp_serde::to_vec_named(&envelope)?)
     }
@@ -3689,7 +3754,7 @@ impl Doc {
         let envelope: LocalState = rmp_serde::from_slice(bytes)?;
         let inner = LoroDoc::new();
         inner.import(&envelope.snapshot)?;
-        let last_pushed_vv = VersionVector::decode(&envelope.last_pushed_vv)
+        let last_persisted_vv = VersionVector::decode(&envelope.last_persisted_vv)
             .map_err(|e| DocError::Loro(e.to_string()))?;
         let undo = Mutex::new(make_undo_manager(&inner));
         let item_index = Mutex::new(ProjectionIndex::default());
@@ -3699,7 +3764,7 @@ impl Doc {
         let _diff_sub = inner.subscribe_root(make_diff_subscriber(diff_capture.clone()));
         let doc = Self {
             inner,
-            last_pushed_vv,
+            last_persisted_vv,
             events: Mutex::new(VecDeque::new()),
             item_index,
             undo,
@@ -3911,7 +3976,11 @@ impl Doc {
         }
     }
 
-    fn import_remote_blob(&mut self, dek: &Dek, blob: &EncryptedBlob) -> Result<(), DocError> {
+    fn import_remote_blob(
+        &mut self,
+        dek: &Dek,
+        blob: &EncryptedBlob,
+    ) -> Result<VersionVector, DocError> {
         if blob.nonce.len() != AEAD_NONCE_LEN {
             return Err(DocError::Invalid(format!(
                 "expected {AEAD_NONCE_LEN}-byte nonce, got {}",
@@ -3919,16 +3988,17 @@ impl Doc {
             )));
         }
         let plaintext = dek.open(&blob.ciphertext, &blob.nonce)?;
-        let import_status = self.inner.import_with(&plaintext, "remote")?;
-        // VersionRange is `(start, end)` per peer — `end` is the
-        // exclusive upper bound, which matches `VersionVector`'s
-        // counter semantics (cf. loro `VersionRange::from_vv`).
-        let mut imported_vv = VersionVector::new();
-        for (peer, (_, end)) in import_status.success.iter() {
-            imported_vv.insert(*peer, *end);
-        }
-        self.last_pushed_vv.merge(&imported_vv);
-        Ok(())
+        // The blob's *declared* range, not `ImportStatus.success`: a
+        // duplicate import is a no-op success-wise but still proves the
+        // sender possesses those ops — exactly what `server_known_vv`
+        // needs. (`partial_end_vv` covers only peers present in the
+        // blob, which is the correct merge shape.) Checksum already
+        // guaranteed by the AEAD open above.
+        let meta = LoroDoc::decode_import_blob_meta(&plaintext, false)
+            .map_err(|e| DocError::Loro(e.to_string()))?;
+        self.inner.import_with(&plaintext, "remote")?;
+        self.last_persisted_vv.merge(&meta.partial_end_vv);
+        Ok(meta.partial_end_vv)
     }
 
     fn emit_state_diff(
@@ -3959,7 +4029,7 @@ struct LocalState {
     #[serde(with = "serde_bytes")]
     snapshot: Vec<u8>,
     #[serde(with = "serde_bytes")]
-    last_pushed_vv: Vec<u8>,
+    last_persisted_vv: Vec<u8>,
 }
 
 fn assert_unique_item_ids(item_ids: &[&str]) -> Result<(), DocError> {
@@ -4538,7 +4608,7 @@ mod tests {
         let refs2: Vec<&str> = texts2.iter().map(String::as_str).collect();
         let a_ids = a.add_items_at(LIST_INBOX, &refs2, 0).unwrap();
         let seed = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
+        a.mark_persisted();
         let mut b = Doc::empty();
         b.apply_remote(&dek, &seed).unwrap();
         let _ = a.drain_events();
@@ -4772,7 +4842,7 @@ mod tests {
         let mut a = Doc::new().unwrap();
         let list = a.add_list("Work").unwrap();
         let seed = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
+        a.mark_persisted();
         let mut b = Doc::empty();
         b.apply_remote(&dek, &seed).unwrap();
         let _ = b.drain_events();
@@ -4857,7 +4927,7 @@ mod tests {
         let mut a = Doc::new().unwrap();
         let list = a.add_list("Work").unwrap();
         let seed = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
+        a.mark_persisted();
         let mut b = Doc::empty();
         b.apply_remote(&dek, &seed).unwrap();
         let _ = b.drain_events();
@@ -5102,7 +5172,7 @@ mod tests {
     #[test]
     fn pending_export_is_none_when_clean() {
         let mut doc = Doc::new().unwrap();
-        doc.mark_pushed();
+        doc.mark_persisted();
         let dek = Dek::generate();
         assert!(doc.pending_export(&dek).unwrap().is_none());
     }
@@ -5120,14 +5190,14 @@ mod tests {
         // testing.
         let mut b = Doc::empty();
         let blob_a1 = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
+        a.mark_persisted();
         b.apply_remote(&dek, &blob_a1).unwrap();
         assert!(b.get_item(&item_a).is_some());
 
         // B mutates concurrently, ships back to A.
         let item_b = b.add_item(LIST_INBOX, "from B").unwrap();
         let blob_b1 = b.pending_export(&dek).unwrap().unwrap();
-        b.mark_pushed();
+        b.mark_persisted();
         a.apply_remote(&dek, &blob_b1).unwrap();
         assert!(a.get_item(&item_b).is_some());
 
@@ -5142,8 +5212,8 @@ mod tests {
         let mut b = Doc::new().unwrap();
         let _ = a.add_item(LIST_INBOX, "A only").unwrap();
         let _ = b.add_item(LIST_INBOX, "B only").unwrap();
-        a.mark_pushed();
-        b.mark_pushed();
+        a.mark_persisted();
+        b.mark_persisted();
         assert_ne!(a.fingerprint(), b.fingerprint());
     }
 
@@ -5399,7 +5469,7 @@ mod tests {
         let list_y = a.add_list("Y").unwrap();
         let id = a.add_item(LIST_INBOX, "contested").unwrap();
         let seed = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
+        a.mark_persisted();
         let mut b = Doc::empty();
         b.apply_remote(&dek, &seed).unwrap();
 
@@ -5407,9 +5477,9 @@ mod tests {
         a.move_item(&id, &list_x, 0).unwrap();
         b.move_item(&id, &list_y, 0).unwrap();
         let blob_a = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
+        a.mark_persisted();
         let blob_b = b.pending_export(&dek).unwrap().unwrap();
-        b.mark_pushed();
+        b.mark_persisted();
         a.apply_remote(&dek, &blob_b).unwrap();
         b.apply_remote(&dek, &blob_a).unwrap();
 
@@ -5440,16 +5510,16 @@ mod tests {
             .map(|t| a.add_item(LIST_INBOX, t).unwrap())
             .collect();
         let seed = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
+        a.mark_persisted();
         let mut b = Doc::empty();
         b.apply_remote(&dek, &seed).unwrap();
 
         a.move_item(&ids[3], LIST_INBOX, 0).unwrap();
         b.set_item_done(&ids[1], true).unwrap();
         let blob_a = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
+        a.mark_persisted();
         let blob_b = b.pending_export(&dek).unwrap().unwrap();
-        b.mark_pushed();
+        b.mark_persisted();
         a.apply_remote(&dek, &blob_b).unwrap();
         b.apply_remote(&dek, &blob_a).unwrap();
 
@@ -5751,7 +5821,7 @@ mod tests {
     /// only thing under test.
     fn sync_fresh_peer(a: &mut Doc, dek: &Dek) -> Doc {
         let blob = a.pending_export(dek).unwrap().expect("seed blob");
-        a.mark_pushed();
+        a.mark_persisted();
         let mut b = Doc::empty();
         b.apply_remote(dek, &blob).unwrap();
         let _ = a.drain_events();
@@ -6191,7 +6261,7 @@ mod tests {
         let mut a = Doc::new().unwrap();
         let id = a.add_item(LIST_INBOX, "old").unwrap();
         let setup_blob = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
+        a.mark_persisted();
 
         let mut b = Doc::empty();
         b.apply_remote(&dek, &setup_blob).unwrap();
@@ -6214,7 +6284,7 @@ mod tests {
         let mut src = Doc::new().unwrap();
         let id = src.add_item(LIST_INBOX, "old").unwrap();
         let setup_blob = src.pending_export(&dek).unwrap().unwrap();
-        src.mark_pushed();
+        src.mark_persisted();
 
         src.edit_item_text(&id, "new").unwrap();
         let edit_blob = src.pending_export(&dek).unwrap().unwrap();
@@ -6242,19 +6312,19 @@ mod tests {
     #[test]
     fn snapshot_then_multiple_trailing_deltas_converge_on_fresh_peer() {
         // Mirrors the e2e bootstrap: a producer captures N ops one at a
-        // time (pending_export + mark_pushed, the capture-cursor model),
+        // time (pending_export + mark_persisted, the capture-cursor model),
         // a full snapshot is taken mid-stream, then more ops are
         // captured. A fresh peer applies the snapshot followed by the
         // trailing per-op deltas as a batch and must converge.
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
-        a.mark_pushed(); // cursor at the seed, like Doc.create() on web
+        a.mark_persisted(); // cursor at the seed, like Doc.create() on web
 
         // Five captured ops, one delta each.
         for i in 0..5 {
             a.add_item(LIST_INBOX, &format!("item {i}")).unwrap();
             let _ = a.pending_export(&dek).unwrap().unwrap();
-            a.mark_pushed();
+            a.mark_persisted();
         }
         // Snapshot taken here (frontier = 5 items).
         let snapshot = a.snapshot_blob(&dek).unwrap();
@@ -6264,7 +6334,7 @@ mod tests {
         for i in 5..8 {
             a.add_item(LIST_INBOX, &format!("item {i}")).unwrap();
             trailing.push(a.pending_export(&dek).unwrap().unwrap());
-            a.mark_pushed();
+            a.mark_persisted();
         }
 
         // Fresh peer: snapshot, then the trailing deltas as a batch.
@@ -6782,7 +6852,7 @@ mod tests {
         let mut a = Doc::new().unwrap();
         let id = a.add_item(LIST_INBOX, "sync me").unwrap();
         let seed = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
+        a.mark_persisted();
         let mut b = Doc::empty();
         b.apply_remote(&dek, &seed).unwrap();
         let _ = a.drain_events();
@@ -7008,7 +7078,7 @@ mod tests {
         let _diff_sub = restored_inner.subscribe_root(make_diff_subscriber(diff_capture.clone()));
         let restored = Doc {
             inner: restored_inner,
-            last_pushed_vv: VersionVector::default(),
+            last_persisted_vv: VersionVector::default(),
             item_index: Mutex::new(ProjectionIndex::default()),
             events: Mutex::new(VecDeque::new()),
             undo,
@@ -7215,7 +7285,7 @@ mod tests {
         let mut a = Doc::new().unwrap();
         let remote_id = a.add_item(LIST_INBOX, "from A").unwrap();
         let remote_blob = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
+        a.mark_persisted();
 
         let mut b = Doc::empty();
         b.apply_remote(&dek, &remote_blob).unwrap();
@@ -7482,7 +7552,7 @@ mod tests {
         let item = a.add_item(LIST_INBOX, "shared").unwrap();
         let mut b = Doc::empty();
         let blob = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
+        a.mark_persisted();
         b.apply_remote(&dek, &blob).unwrap();
 
         // Concurrent divergent lifecycle writes: A marks Done, B marks Live.
@@ -7490,8 +7560,8 @@ mod tests {
         b.set_item_lifecycle(&item, ItemLifecycle::Live).unwrap();
         let blob_a = a.pending_export(&dek).unwrap().unwrap();
         let blob_b = b.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
-        b.mark_pushed();
+        a.mark_persisted();
+        b.mark_persisted();
         a.apply_remote(&dek, &blob_b).unwrap();
         b.apply_remote(&dek, &blob_a).unwrap();
 
@@ -7752,8 +7822,8 @@ mod tests {
         b.add_to_focus(&y, usize::MAX).unwrap();
         let blob_a = a.pending_export(&dek).unwrap().unwrap();
         let blob_b = b.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
-        b.mark_pushed();
+        a.mark_persisted();
+        b.mark_persisted();
         a.apply_remote(&dek, &blob_b).unwrap();
         b.apply_remote(&dek, &blob_a).unwrap();
 

@@ -1,179 +1,143 @@
 # Local Storage
 
-Per-account local persistence for the doc — the **same logical model on every client**, behind one Rust trait (`core::LocalStorage`, `core/src/storage.rs`). Encrypted-at-rest op rows are the hot path; occasional encrypted snapshot rows are the cheap-replay base. The substrate differs by platform — **CLI: sqlite on disk; web: IndexedDB on the main thread** — but the schema, boot semantics, and snapshot policy are identical (the engine only ever sees the trait).
+Per-account local persistence for the doc — the **same logical model on every client**, behind one Rust trait (`core::LocalStorage`, `core/src/storage.rs`). The model separates two concerns that used to share one mechanism (`spec/vv-wal-separation.md`):
 
-## Thesis
+1. **Crash recovery** is snapshot + WAL: one encrypted full-history Loro snapshot plus a bounded encrypted WAL of updates applied after it. Every commit — local mutation or applied remote op — appends a WAL row; when the WAL crosses a threshold it is folded into a fresh snapshot and the folded prefix pruned. Folding runs **regardless of online/sync status**.
+2. **Outbound sync** is derived from Loro history against `server_known_vv` — the operations proven to exist in the server op stream — never from which WAL rows still exist. There is no outbox of rows; a full Loro snapshot retains operation history, so even unsent local operations survive folding and re-derive at push time.
 
-The local store mirrors the server's storage shape: append-only encrypted op blobs plus periodic encrypted snapshots, keyed by `doc_id`. The two differences from the server schema are:
+The substrate differs by platform — **CLI: sqlite on disk; web: IndexedDB on the main thread** — but the schema, boot semantics, and fold policy are identical (the engine only ever sees the trait).
 
-1. Local rows carry a client-minted `client_op_id` so the server can dedupe retries and so the client can map acks back to rows.
-2. Each row carries a `server_seq` that is `NULL` until the server acks the upload. `server_seq IS NULL` is the outbox.
+## Persisted state (per doc)
 
-A oplog row is *the* unit. It is what Loro exported, what gets encrypted at rest, what gets sent on the wire, what the server stores under its own seq, what gets ack-mapped, and what gets replayed on boot. There is no separate "upload parcel" abstraction.
+- One encrypted full-history **Loro snapshot**.
+- A bounded encrypted **WAL** of updates applied after that snapshot.
+- **`server_known_vv`** — encoded Loro VersionVector of operations proven to exist in the server op stream (merged from every applied server blob's declared range and every acked push's `to_vv`).
+- **`last_acked_server_seq`** — the durable server-log delivery frontier (resume `PullOps` cursor).
+- At most one durable **in-flight push**: `{ push_id, encrypted blob, from_vv, to_vv }`, written *before* the blob's first send and cleared on ack, so a crash between server insert and client ack retries the exact same `push_id` (the server deduplicates — `spec/sync-protocol.md`).
+
+The in-memory WAL capture cursor is the doc's `last_persisted_vv`: it advances when an update is durably appended to the WAL, **not** on server acknowledgement. `pending_export` = `Updates(last_persisted_vv)` is the capture delta; `export_updates_since(server_known_vv)` is the push delta. The two cursors are independent.
 
 ## Storage substrate
 
-Per account, one sqlite database.
+- **CLI**: `SqliteStorage` (`crates/storage-sqlite`, CLI newtype in `cli/src/storage.rs`) — a file on disk under the profile dir. Same pragmas as the server (`spec/storage.md` §Sqlite settings). Writes are synchronously durable: the trait method returns only after the transaction commits.
+- **Web**: `IdbStorage` (`js/core/src/storage/idb-storage.ts`) — IndexedDB on the **main thread**, behind a wasm-bindgen `EngineStorage` extern (`core/web/src/lib.rs`). The trait is synchronous but IDB is async, so `IdbStorage` keeps a synchronous in-memory mirror that the extern methods read/write immediately and flushes the real IDB transaction on a background promise chain; durability is signalled back out-of-band (`whenFlushed()` → the host's `notify_oplog_durable`) so an `Ack` isn't shipped until the bytes are on disk. Writes the trait requires to be atomic run as one queued IDB transaction spanning the involved stores. IndexedDB is **hard-required** — a session that can't open it surfaces a "Failed to start" screen rather than booting on a storage-less engine.
 
-- **CLI**: `SqliteStorage` (`cli/src/storage.rs`) — a file on disk under the profile dir. Same pragmas as the server (`spec/storage.md` §Sqlite settings). Writes are synchronously durable: the trait method returns only after the `INSERT` commits.
-- **Web**: `IdbStorage` (`js/core/src/storage/idb-storage.ts`) — IndexedDB on the **main thread**, behind a wasm-bindgen `EngineStorage` extern (`core/web/src/lib.rs`). No Worker, no OPFS, no sqlite-wasm. The trait is synchronous but IDB is async, so `IdbStorage` keeps a synchronous in-memory mirror of the op log that the extern methods read/write immediately and flushes the real IDB transaction on a background promise chain; durability is signalled back out-of-band (`whenFlushed()` → the host's `notify_oplog_durable`) so an `Ack` isn't shipped until the bytes are on disk. IndexedDB is **hard-required** — a session that can't open it surfaces a "Failed to start" screen rather than booting on a storage-less engine.
+The engine sees a single `LocalStorage` trait; storage is mandatory — there is no storage-less engine mode.
 
-The engine sees a single `LocalStorage` trait; the CLI binds a native sqlite handle, the web binds the IDB-backed extern. Storage is mandatory — there is no storage-less engine mode.
-
-## Schema
+## Schema (sqlite; the IDB stores mirror it)
 
 ```sql
 CREATE TABLE docs (
-  id                    BLOB PRIMARY KEY,          -- uuid v7, matches server-side docs.id
+  id                    BLOB PRIMARY KEY,           -- uuid v7, matches server-side docs.id
   created_at            INTEGER NOT NULL,
-  last_acked_server_seq INTEGER NOT NULL DEFAULT 0, -- per-doc pull cursor; persisted, not derived (survives compaction)
-  last_sync_at          INTEGER                    -- unix millis of last successful ONLINE sync; NULL = never (not bumped by offline/local flushes)
+  last_acked_server_seq INTEGER NOT NULL DEFAULT 0, -- resume PullOps cursor; persisted, never derived
+  server_known_vv       BLOB,                       -- encoded Loro VV; NULL = never synced
+  last_sync_at          INTEGER                     -- unix millis of last ONLINE sync; observability only
 );
 
-CREATE TABLE ops (
-  doc_id          BLOB    NOT NULL REFERENCES docs(id),
-  local_seq       INTEGER NOT NULL,               -- client-minted, dense, gap-free per doc
-  client_op_id    BLOB,                           -- uuid v7; NOT NULL for local rows, NULL for server-originated
-  server_seq      INTEGER,                        -- NULL until server acks (local rows); set on insert for remote
-  payload         BLOB    NOT NULL,               -- encrypted Loro update bytes (DEK)
-  payload_nonce   BLOB    NOT NULL,
-  created_at      INTEGER NOT NULL,
+CREATE TABLE wal (
+  doc_id        BLOB    NOT NULL REFERENCES docs(id),
+  local_seq     INTEGER NOT NULL,                   -- storage-assigned, dense, per doc
+  server_seq    INTEGER,                            -- set on server-delivered rows; NULL for local-origin
+  payload       BLOB    NOT NULL,                   -- encrypted Loro update bytes (DEK)
+  payload_nonce BLOB    NOT NULL,
+  created_at    INTEGER NOT NULL,
   PRIMARY KEY (doc_id, local_seq)
 );
-CREATE UNIQUE INDEX ops_client_op_id_idx ON ops (doc_id, client_op_id) WHERE client_op_id IS NOT NULL;
-CREATE UNIQUE INDEX ops_server_seq_idx   ON ops (doc_id, server_seq)   WHERE server_seq   IS NOT NULL;
+CREATE UNIQUE INDEX wal_server_seq_idx ON wal (doc_id, server_seq) WHERE server_seq IS NOT NULL;
 
 CREATE TABLE snapshots (
-  doc_id            BLOB    NOT NULL PRIMARY KEY REFERENCES docs(id),
-  up_to_local_seq   INTEGER NOT NULL,             -- local-counter high-water at write time (keeps local_seq monotonic after a prune); NOT a replay cutoff
-  payload           BLOB    NOT NULL,             -- encrypted Loro snapshot bytes (DEK)
-  payload_nonce     BLOB    NOT NULL,
-  created_at        INTEGER NOT NULL
+  doc_id          BLOB    PRIMARY KEY REFERENCES docs(id),
+  up_to_local_seq INTEGER NOT NULL,                 -- local-counter high-water at write time; NOT a replay cutoff
+  payload         BLOB    NOT NULL,                 -- encrypted full-history Loro snapshot (DEK)
+  payload_nonce   BLOB    NOT NULL,
+  created_at      INTEGER NOT NULL
 );
 
--- CLI-only: singleton (id pinned to 1) account/device identity. Not part
--- of the shared doc-storage model — web holds identity elsewhere — but it
--- lives in the same db on the CLI so identity and the doc cache share one
--- transactional store. See spec/cli.md "Local state".
-CREATE TABLE account (
-  id             INTEGER PRIMARY KEY CHECK (id = 1),
-  account_id     TEXT NOT NULL,
-  email          TEXT NOT NULL,
-  device_id      TEXT NOT NULL,
-  primary_doc_id BLOB NOT NULL                    -- uuid bytes; matches docs.id
+CREATE TABLE in_flight_push (
+  doc_id        BLOB PRIMARY KEY REFERENCES docs(id),
+  push_id       BLOB NOT NULL,                      -- uuid bytes; retry/idempotency key
+  payload       BLOB NOT NULL,
+  payload_nonce BLOB NOT NULL,
+  from_vv       BLOB NOT NULL,                      -- encoded VV the delta was exported from (forensics)
+  to_vv         BLOB NOT NULL,                      -- encoded oplog VV at export; merged into server_known_vv on ack
+  created_at    INTEGER NOT NULL
 );
 ```
 
 Notes:
 
-- `local_seq` is local bookkeeping only: the append/replay **order** and the `(doc_id, local_seq)` PK. It is *not* a sync coordinate and *not* a replay cutoff — pruning keys on `server_seq` (see Replay / Snapshots). It increases monotonically as rows are appended, regardless of origin (local vs remote).
-- `client_op_id` is the idempotency key on the wire. Server keeps a recent-ids dedupe window so a retried upload after a crash maps to the existing server-side row instead of creating a duplicate.
-- `server_seq` here is **the same `seq`** that the server's `ops` table assigns. On the local row it is `NULL` until the corresponding ack arrives.
-- One snapshot row per doc — `INSERT OR REPLACE` on each new snapshot. There's no need for the M=2 retention the server uses (no concurrent bootstrap reader to protect).
-- `docs.last_acked_server_seq` is the **persisted** pull cursor — the highest `server_seq` applied. It is *not* derived from `MAX(ops.server_seq)`, which would underestimate once compaction prunes the acked ops it was read from.
+- `local_seq` is local bookkeeping only: append/replay order and the snapshot-fold cutoff. Not a sync coordinate.
+- `wal.server_seq` exists solely for idempotent re-delivery detection (resume re-pull, broadcast overlap) — a duplicate `server_seq` returns the existing row instead of inserting a phantom. It plays no role in deciding what uploads.
+- `docs.last_acked_server_seq` is the **persisted** pull cursor. Never derived from `MAX(wal.server_seq)` — that underestimates once folding prunes the rows it was read from, and overestimates past a gap.
+- `docs.server_known_vv` is the upload-derivation base. The engine holds the decoded VV in memory and hands storage the full merged encoding on every advance.
+- One snapshot row per doc — replaced on each fold.
 
-## Origin invariants
+## Write paths
 
-Two row shapes, distinguished by which nullable columns are set:
+Local mutation (engine `capture_local_ops`):
 
-| Origin   | `client_op_id` | `server_seq`        | When written                         |
-|----------|----------------|---------------------|--------------------------------------|
-| local    | set            | `NULL` until acked  | engine commits a local mutation      |
-| remote   | `NULL`         | set at insert       | server frame applied to local doc    |
+1. Commit the Loro mutation.
+2. Export `Updates(last_persisted_vv)`, encrypt with the DEK.
+3. Append to the WAL (`append_local_wal`).
+4. Advance `last_persisted_vv` to the pre-export oplog VV.
+5. `server_known_vv` is untouched.
 
-A row never changes origin. The only mutation after insert is `UPDATE ops SET server_seq = ? WHERE doc_id = ? AND client_op_id = ?` on ack.
+Remote server update (engine `apply_remote_ops`):
 
-## Append path
+1. Decrypt; decode the blob's **declared** operation range (`decode_import_blob_meta` → `partial_end_vv`); apply to the doc.
+2. Merge the declared range into `server_known_vv` — the *declared* range, not `ImportStatus.success`: a duplicate import is a no-op but still proves the server possesses those operations.
+3. Append the encrypted server blob to the WAL with its `server_seq`, persisting the advanced `server_known_vv` **atomically with the row** (`append_remote_wal`).
+4. `last_acked_server_seq` advances only later, via `notify_oplog_durable`, once the host confirms durability. Because the VV persists with the row and the cursor persists after, the cursor can never run ahead of its `server_known_vv`.
 
-Local mutation:
+## Fold (local snapshot) policy
 
-1. Engine commits → Loro produces a delta blob covering the new ops.
-2. Encrypt the blob with the DEK → `(payload, payload_nonce)`.
-3. Mint `client_op_id = uuid_v7()`.
-4. `INSERT INTO ops (doc_id, local_seq, client_op_id, server_seq=NULL, payload, payload_nonce, created_at)` with `local_seq = MAX(local_seq)+1` for this doc (computed inside the same transaction).
-5. Treat the mutation as locally durable. Hand the encrypted bytes + `client_op_id` to the WS layer for push.
+Trigger: WAL row count ≥ threshold (CLI: 100, evaluated after every command's append and once at boot so an interrupted fold self-heals; web hot pulse: 250, plus an idle/hidden-tab full fold) **or** WAL payload bytes over a safety cap (CLI 4 MiB, web 8 MiB — initial values pending measurement).
 
-Remote frame:
+Procedure (engine `snapshot_if_wal_exceeds` / `force_snapshot` → storage `write_snapshot`, one transaction):
 
-1. Decrypt and apply the frame to the live Loro doc (this is what the engine does today regardless of persistence).
-2. `INSERT INTO ops (doc_id, local_seq, client_op_id=NULL, server_seq, payload, payload_nonce, created_at)` — the encrypted bytes are the ones the server sent, stored verbatim. This insert does **not** touch the pull cursor.
-3. Separately, when the host signals durability (`SyncEngine::notify_oplog_durable`) the engine advances its in-memory contiguous/durable frontier and persists the new value through `LocalStorage::write_acked_seq(doc_id, seq)` → `docs.last_acked_server_seq`. The engine is the sole authority: it passes the *contiguous* frontier (an out-of-order op above a gap does not move it), so storage never derives the cursor itself (see `spec/sync-protocol.md`).
+1. Capture any uncommitted mutations to the WAL first (so the export provably contains every row at or below the cutoff).
+2. Cutoff = current `last_local_seq`.
+3. Export a full `ExportMode::Snapshot`, encrypt.
+4. Atomically replace the snapshot row (recording the local-counter high-water as `up_to_local_seq`) and delete every WAL row with `local_seq ≤ cutoff`.
+5. `server_known_vv`, `last_acked_server_seq`, and any in-flight push are preserved. Rows appended after the cutoff survive.
 
-Wire batching is a separate concern: the WS layer **may** pack multiple rows into one frame for throughput. Each row keeps its own `client_op_id` and gets its own `server_seq` in the ack. The storage layer does not know about batching.
+The snapshot intentionally contains both unsent local operations and server-originated operations: full Loro snapshots retain history, so unsent operations re-derive later from `server_known_vv`. **There is no "pending rows cannot be pruned" rule** — that rule belonged to the outbox model this spec replaced.
+
+For a multi-blob pull, the host applies/appends the entire batch first and evaluates the fold at most once afterwards.
+
+## Outbound sync
+
+After the initial pull completes (always pull before pushing — see retry below):
+
+1. If a durable in-flight push exists, re-send it verbatim (same `push_id`).
+2. Otherwise: capture pending commits to the WAL, then export `Updates(server_known_vv)`. Empty → nothing to do.
+3. `to_vv = doc.oplog_vv()` at export time. Encrypt; persist `{push_id, blob, from_vv, to_vv}` (`put_in_flight_push`) **before** the first send.
+4. On the ack naming this `push_id`: **merge** `to_vv` into `server_known_vv` (never assign — remote updates may have advanced other peers' ranges mid-flight), persist the merged VV and clear the record atomically (`complete_push`), ingest the assigned seq.
+5. If the doc advanced beyond `to_vv` while the push was in flight, the next delta exports immediately.
+
+A disconnect mid-push keeps the durable record; the reconnect re-pulls, then retries the same `push_id`. The server deduplicates by `(device, push_id)` and acks the original seq, which may already be at or below the client's contiguous frontier (the pull may have delivered the op) — that is tolerated as a duplicate.
+
+## Server snapshots vs local snapshots
+
+- **Local snapshot** (this spec): the current full document, including unsent work. Crash-recovery baseline.
+- **Server snapshot** (produced on `SnapshotRequest`): exactly the state/history the server op stream represents. The producer exports at the frontiers corresponding to `server_known_vv` (`fork_at`), never the current doc — unsent local operations must not leak into a blob other devices bootstrap from.
+
+Bootstrapping **from** a server snapshot: apply it, merge its declared frontier into `server_known_vv` (persisted via `write_server_known_vv`), then write the local checkpoint as a fresh full export of the **merged** doc with a full-prefix prune. The server blob alone is not a valid local checkpoint — it lacks any unsent local work the pruned WAL rows carried. Then pull and WAL-log the server tail after the snapshot's `up_to_seq`.
 
 ## Replay / boot
 
-Per doc, in a single transaction:
+Per doc: read the snapshot row (if any), decrypt and import; then decrypt and import every surviving WAL row in `local_seq` order; `finish_oplog_replay` once. Boot replays **every surviving row** with no cutoff — the fold already pruned exactly what the snapshot contains. The imports advance `last_persisted_vv` (via their declared ranges), so a booted doc reports `has_uncaptured_ops() == false`. `BootState` also hands back `server_known_vv`, `last_acked_server_seq`, the in-flight push, and the WAL row/byte statistics; the engine seeds from them (`seed_boot`).
 
-1. Read the snapshot row (if any). Decrypt → seed Loro doc.
-2. `SELECT payload, payload_nonce FROM ops WHERE doc_id = ? ORDER BY local_seq` — decrypt each and apply to the Loro doc in order.
-
-Boot replays **every surviving row**, with no `local_seq` cutoff: the snapshot write already pruned exactly the rows the payload contains (see Snapshots), so whatever remains — pending local work and any op above the snapshot's frontier — is genuinely not in the snapshot and must replay. A `local_seq > x` filter would be wrong, because a surviving pending row can sit *below* the pruned confirmed rows in local order.
-
-That's the entire boot. The same path covers:
-
-- **Fresh account** — no snapshot row, ops table may be empty (signup-seeded built-ins arrive as the first appends).
-- **Pure-oplog recovery** — no snapshot yet, replay all ops.
-- **Snapshot + tail** — the common steady-state case.
-
-Pending rows (`server_seq IS NULL`) are the client's unpushed work; a snapshot's server frontier can never cover them, so pruning always keeps them and boot always replays them. They also stay on disk for re-upload; see Outbox.
-
-## Outbox
-
-```sql
-SELECT doc_id, client_op_id, payload, payload_nonce
-FROM ops
-WHERE server_seq IS NULL
-ORDER BY local_seq;
-```
-
-On every reconnect, the WS layer drains the outbox and pushes the rows verbatim. Ack handling:
-
-```sql
-UPDATE ops SET server_seq = ? WHERE doc_id = ? AND client_op_id = ?;
-```
-
-`client_op_id` is unique per doc (enforced by the partial index), so the mapping is unambiguous. If the server re-issues an ack for a row already acked locally (network reorder), the UPDATE is a no-op — `server_seq` only ever transitions `NULL → set`, never the reverse.
-
-## Snapshot policy
-
-A snapshot is written in three situations, each carrying a **cutoff** (`core::SnapshotCutoff`) that says which op rows the new payload provably contains and may therefore delete:
-
-- **Steady-state compaction** (synced doc, outbox drained) and **server bootstrap** (a `Snapshot` frame received on catch-up) both use `ServerFrontier(F)`: the payload is authoritative for server history through `server_seq = F`. Prune every **confirmed** row (`server_seq` set) `≤ F`; keep pending rows (`server_seq IS NULL` — unpushed work the payload can't contain) and any confirmed row `> F`. For a server bootstrap `F = up_to_seq`; for compaction `F` is the engine's contiguous frontier (with the outbox empty, that covers every confirmed row).
-- **Local-only fold** (anonymous sessions that never sync) uses `LocalPrefix(n)`: those rows never get a `server_seq`, but a full-state payload encodes them and there is no server to push them to, so prune the whole `local_seq ≤ n` prefix.
-
-`server_seq`, not `local_seq`, is the coordinate: it's the only value that says whether an op is rolled into the snapshot. Keying the prune on `local_seq` cannot express "keep pending, drop covered" because the two interleave in local order — the mistake behind the old cutoff-zero bootstrap baseline, which pruned nothing and made every subsequent boot replay the entire history.
-
-Snapshot procedure (one transaction):
-
-1. Export the current Loro state for this doc; encrypt → `(payload, payload_nonce)`.
-2. Record the current local-counter high-water (`MAX(local_seq)`, before pruning) as `up_to_local_seq` — bookkeeping so post-prune `append_*` stays monotonic, **not** a replay cutoff.
-3. `INSERT OR REPLACE INTO snapshots (...)`.
-4. Prune per the cutoff: `DELETE FROM ops WHERE doc_id = ? AND server_seq IS NOT NULL AND server_seq ≤ F` (`ServerFrontier`) or `... AND local_seq ≤ n` (`LocalPrefix`).
-5. Commit.
-
-Atomicity is the store's job; no double-buffering needed. Either the new snapshot + pruned ops are visible together or neither is.
-
-## Compaction
-
-There is no separate compaction job. Step 4 of the snapshot procedure (the prune) is the compaction. Run cadence: snapshot is fired by the engine (or its persistence bridge) when a write trips the threshold above; it is not synchronous with each commit.
-
-Pending rows (`server_seq IS NULL`) are never compacted. An offline client accumulates them in the outbox indefinitely; on reconnect they all upload. This matches the server-side reality that the doc's history cannot be compacted past the slowest device's frontier.
+The same path covers a fresh account (no rows at all), pure-WAL recovery (no snapshot yet), and the steady-state snapshot + tail case.
 
 ## Failure semantics
 
-- **Crash during local append**: the row is either fully committed in sqlite or not — sqlite transaction guarantees. No torn rows.
-- **Crash between append and send**: row exists with `server_seq IS NULL`. On boot, outbox drain re-sends it. Server dedupes by `client_op_id`.
-- **Crash between send and ack**: row exists with `server_seq IS NULL`; server may already have it. On boot, outbox drain re-sends; server's recent-ids window maps the retry to the existing server row and returns the original `server_seq` in the ack.
-- **Crash during remote-frame apply**: the row is either fully inserted with its `server_seq` or not — sqlite transaction guarantees. The `docs.last_acked_server_seq` cursor is persisted by a *separate* write (`write_acked_seq`, driven by the engine on `notify_oplog_durable` after the op rows are durable), so a crash after the op insert but before the cursor advance leaves the cursor *behind* the stored ops — never ahead. This self-heals: on reboot the engine re-pulls from the lower cursor and `append_remote_op` dedupes the already-stored `server_seq` rows. The two writes are deliberately *not* one transaction: the cursor value is the engine's contiguous frontier (unknown at op-insert time, since out-of-order ops above a gap mustn't advance it), and the durability seam (`notify_oplog_durable`) is what lets the sync engine straddle synchronous sqlite and async IDB.
-- **Crash during snapshot**: the snapshot + the ops DELETE are one transaction; either both land or neither. Pre-snapshot ops survive in full if the transaction aborted, so replay still works from the previous snapshot row (or pure-oplog if there wasn't one).
-
-## Design constraints
-
-- Local rows are encrypted at rest with the DEK. The local DB file is not a security boundary on its own — it matches the at-rest posture of the server's `ops` table.
-- The engine never sees `client_op_id` or `server_seq`. They live entirely between the storage layer and the WS layer.
-- Op blobs in the local DB are byte-for-byte the same as what's on the wire and what's stored on the server. No re-encryption, no re-encoding on resend.
-- The wire ack format must carry `{client_op_id → server_seq}` per acknowledged op. The exact frame layout is specified in `spec/sync-protocol.md`.
+- **Crash during any append/fold**: each is one transaction — either fully visible or not. No torn rows.
+- **Crash between WAL append and push**: the ops are in the WAL (or the snapshot); the next session derives them from `server_known_vv` and pushes.
+- **Crash after `put_in_flight_push`, at any point up to the ack**: the durable record retries the same `push_id`; the server dedupes, so no duplicate server row regardless of whether the original insert landed.
+- **Crash after remote-row insert but before the cursor advance**: cursor is *behind* the stored rows — never ahead. Reboot re-pulls from the lower cursor; `append_remote_wal` dedupes the re-delivered `server_seq`s, and the re-delivery re-proves `server_known_vv`.
+- **Crash before a fold's transaction commits**: old snapshot + full WAL remain valid. **After** it commits: new snapshot + the surviving tail are valid.
 
 ## Why IDB on web (not sqlite / Worker / OPFS)
 
@@ -182,46 +146,31 @@ An earlier spike (`spike/shared-worker`) ran sqlite-wasm on the OPFS-SAH-pool VF
 1. **`createSyncAccessHandle` is `DedicatedWorkerGlobalScope`-only by spec** — not a vendor bug. A SharedWorker therefore *cannot* host OPFS-backed sqlite in any browser. ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/FileSystemFileHandle/createSyncAccessHandle), [wa-sqlite #79](https://github.com/rhashimoto/wa-sqlite/discussions/79)). Don't propose this combination again.
 2. **sqlite-wasm buys nothing here.** We store opaque encrypted blobs, not queryable data, so we never use SQL's query power — but we'd pay ~1 MB of bundle plus the COOP/COEP header requirement. IDB is exactly the right shape (ordered keyed store with transactions) and ships in every browser for free.
 3. **The engine must stay on the main thread.** Moving it into a Worker adds a postMessage round-trip to every mutation; the lag is perceptible in tight UI loops (typing, drag-reorder). Multi-tab coherence and Argon2id-off-main are real wins but not worth that regression.
-4. **The trait is the prize, not a unified storage technology.** "Same Rust engine, same boot semantics, same op log, same snapshot policy" is the value. sqlite on one side and IDB on the other satisfy it identically — the engine never knows which.
+4. **The trait is the prize, not a unified storage technology.** "Same Rust engine, same boot semantics, same WAL, same fold policy" is the value. sqlite on one side and IDB on the other satisfy it identically — the engine never knows which.
 
 ### Web boot + the bytes-copy gotcha
 
-Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not* use `Doc.load`): `Doc.empty()` → replay the decrypted snapshot (a bare Loro snapshot, not a `save()` envelope) and every surviving row (`bootRows`, in `local_seq` order — no cutoff filter; pruning already dropped what the snapshot contains) through `replayOplogUpdate` → call `finishOplogReplay()` once to build disposable indexes and clear historical events → `markPushed()` so the engine doesn't re-capture replayed ops. Rebuilding after every row is forbidden: with N items and R replay rows it turns refresh into O(N×R). Keeping R small is the whole reason the prune keys on `server_seq`: a server bootstrap snapshot must delete the confirmed rows it contains, or R grows to the full history and refresh freezes. The resume cursor comes from `IdbStorage.bootRows().lastAckedSeq` — the engine-persisted `docs.lastAckedServerSeq` in the engine stores of the `airday-web` DB (written via `writeAckedSeq`), **not** the `device` row (which now holds only identity + the `lastSyncAt` observability stamp) and **not** derived from the compacted op log.
+Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not* use `Doc.load`): `Doc.empty()` → replay the decrypted snapshot and every surviving WAL row (`bootRows`, in `local_seq` order) through `replayOplogUpdate` → call `finishOplogReplay()` once → `markPersisted()` so the capture cursor covers the replayed ops. Rebuilding after every row is forbidden: with N items and R replay rows it turns refresh into O(N×R); keeping R small is the fold threshold's job. The host then seeds the engine from `bootRows`: `setLastLocalSeq`, `seedWalStats`, `seedServerKnownVv`, and `seedInFlightPush` (if present). The resume cursor comes from `bootRows().lastAckedSeq` — the engine-persisted `docs.lastAckedServerSeq` (written via `writeAckedSeq`), **not** the `device` row and **not** derived from the WAL.
 
-Initial attachment is not a live mutation stream and does not trigger compaction. The web store materializes once from `workspaceSnapshotJson`; live bulk/opaque changes emit one `FullResync` control event and use the same one-shot materialization path. Search indexing follows materialization. Normal snapshot compaction is gated on the sync engine reaching steady-state `Idle`.
+Initial attachment is not a live mutation stream. The web store materializes once from `workspaceSnapshotJson`; live bulk/opaque changes emit one `FullResync` control event and use the same one-shot materialization path.
 
-⚠️ Any JS-side `EngineStorage` impl that **retains** wasm-passed `&[u8]` bytes must copy them on entry (`.slice()`). wasm-bindgen hands `&[u8]` as a `Uint8Array` view into wasm linear memory valid only for that synchronous call; `IdbStorage` defers the IDB write, so without a copy it persists reused/garbage memory and the next boot fails to decrypt. This cost a real bug and is invisible to synchronous mock tests — only a real browser reload catches it. (`idb-storage.ts` documents this inline; `roadmap.md` tracks a proposal to enforce the copy Rust-side.)
+⚠️ Any JS-side `EngineStorage` impl that **retains** wasm-passed `&[u8]` bytes must copy them on entry (`.slice()`). wasm-bindgen hands `&[u8]` as a `Uint8Array` view into wasm linear memory valid only for that synchronous call; `IdbStorage` defers the IDB write, so without a copy it persists reused/garbage memory and the next boot fails to decrypt. This cost a real bug and is invisible to synchronous mock tests — only a real browser reload catches it. This applies to payloads, VV encodings, and `pushId` bytes alike.
 
 ## Migration
 
-Pre-release: **no data was migrated from the old layouts** — both clients start fresh under this schema. This is deliberate (pre-release, single-user, no production data to preserve) and is the standing migration rule (see `AGENTS.md`).
+Pre-release rule (see `AGENTS.md`): exactly one migration file per database, edited in place — never incremental migrations, never legacy bridges. Old-layout data is abandoned, not drained.
 
-- **CLI**: the schema ships as a single migration file (`cli/migrations/001_init.sql`); there is no incremental migration and no legacy-bridge table. The old single-row `docs(payload)` blob is not drained.
-- **Web**: the engine op log lives in the `docs` / `ops` / `snapshots` stores of the single `airday-web` IDB database, alongside the config stores (`vault` / `device` / `prefs`). The old oplog/OPFS op data was abandoned, not drained; the v8 `web-db.ts` upgrade drops the dead pre-v7 `ops` / `snapshot_meta` stores (re-creating `ops` with the engine schema) and best-effort deletes the short-lived separate `airday-engine` database from the v7 era.
+- **CLI**: `crates/storage-sqlite/migrations/001_init.sql` (+ the CLI's `001_cli` account table). The old outbox-era `ops` schema was replaced in place.
+- **Web**: the engine stores live in the single `airday-web` IDB database (`docs` / `ops` / `snapshots` / `inflight`) alongside the config stores. The v9 upgrade recreates `ops` as the WAL (v8's outbox-era rows are abandoned; authed devices re-pull and the snapshot baseline carries anonymous docs) and adds the `inflight` store.
 
 ## Testing
 
-Required cases:
-
-1. Fresh account boots with no snapshot row and an empty ops table.
-2. Pure-ops replay restores state before the first snapshot exists.
-3. Snapshot + trailing ops replay restores state correctly post-snapshot.
-4. Crash mid-append leaves no partial row; outbox drain re-sends on reconnect.
-5. Crash between send and ack: re-send maps to original `server_seq` via dedupe, ack updates the row.
-6. Multiple snapshot cycles preserve replay correctness; pending rows survive across snapshots and remain in the outbox.
-7. Re-upload after the WS layer drops mid-frame works without producing duplicate server rows.
-8. Local snapshot + tail hydration builds indexes once and emits no live events.
-9. A server bootstrap snapshot (`ServerFrontier(up_to_seq)`) prunes every confirmed row it covers and keeps pending rows; refresh replays the baseline plus only the pending + above-frontier tail, never the full history.
+The authoritative test list is `spec/vv-wal-separation.md` §Tests. Coverage lives in `core/src/sync.rs` (engine semantics: VV-derived export after folding, in-flight retry, duplicate-delivery proof, mixed-history deltas, server-frontier snapshots), `crates/storage-sqlite/tests/wal.rs` (bounded WAL over thousands of offline mutations, exact restart, fold/reopen consistency, idempotent remote append, scoped `complete_push`), `server/tests/sync.rs` (push_id dedup end-to-end), and `js/core/test/*` (the same contract over the `EngineStorage` mirror plus a live browser-stack e2e).
 
 ## Out of scope
 
-- **Multi-tab coherence on web.** One engine, one tab; the `navigator.locks` single-tab gate stays. Making tabs coherent is a separate effort.
+- **Multi-tab coherence on web.** One engine, one tab; the `navigator.locks` single-tab gate stays.
 - **Engine in a Worker.** Stays on the main thread — see *Why IDB on web* §3.
-- **Argon2id off the main thread.** It blocks the UI for ~hundreds of ms on login. Acceptable for now; solvable later with a dedicated Worker *just* for the KDF, without disturbing the engine.
+- **Argon2id off the main thread.** Solvable later with a dedicated Worker just for the KDF.
 - **sqlite on web.** Not happening unless the OPFS-SAH spec changes — see *Why IDB on web* §1.
-
-## Open questions
-
-- Exact dedupe-window TTL on the server side (minutes? hours?). Trade-off: longer window costs server memory but tolerates longer client gaps between send-attempt and retry.
-- Whether to expose a `VACUUM`-style maintenance step for the local DB after large compactions (sqlite's auto_vacuum may suffice; needs measurement).
-- Migration ordering when the wire ack format itself changes — assumed to land in lockstep with this spec, but the CLI may briefly run against an older server during a self-hosted upgrade. Out of scope for v1 (`spec/saas.md` covers the broader self-hosted upgrade story).
+- **Shallow snapshots / peer-ID lifetime changes.** Explicit non-goals of the WAL/VV refactor (`spec/vv-wal-separation.md`).

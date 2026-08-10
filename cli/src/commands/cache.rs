@@ -2,7 +2,6 @@
 
 use std::io::IsTerminal;
 
-use airday_core::LocalStorage;
 use clap::{Parser, Subcommand};
 use dialoguer::Confirm;
 use serde::Serialize;
@@ -81,11 +80,12 @@ async fn clear(force: bool) -> anyhow::Result<()> {
     let account = storage.read_account()?;
     let doc_id = account.primary_doc_id;
 
-    // Unacked local ops in the outbox would be lost by a cache wipe.
-    let pending = !storage
-        .outbox(doc_id)
-        .map_err(|e| anyhow::anyhow!("read outbox: {e}"))?
-        .is_empty();
+    // Local operations the server has no proof of would be lost by a
+    // cache wipe.
+    let secrets = profile.read_secrets()?;
+    let dek = crate::keystore::dek_from_hex(&secrets.dek_hex)?;
+    let pending = crate::storage::has_unsynced_ops(&storage, &dek, doc_id)
+        .map_err(|e| anyhow::anyhow!("read pending state: {e}"))?;
 
     if pending && !force {
         if !std::io::stdin().is_terminal() {

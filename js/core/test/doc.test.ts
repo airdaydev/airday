@@ -172,7 +172,7 @@ describe("Op stream round trip via two replicas", () => {
     const itemId = a.addItem(LIST_MAIN, "from A");
     const opBlob = a.pendingExport(dek);
     expect(opBlob).toBeDefined();
-    a.markPushed();
+    a.markPersisted();
 
     // B starts empty and replays the single op stream.
     const b = Doc.empty();

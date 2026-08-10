@@ -35,6 +35,7 @@ Migrations: while pre-release, keep exactly one migration file per database (`00
 | [`spec/sync-protocol.md`](spec/sync-protocol.md) | WS framing, push / pull / ack, frontier, snapshot orchestration |
 | [`spec/storage.md`](spec/storage.md) | Sqlite schema, indexes, compaction policy |
 | [`spec/data-model.md`](spec/data-model.md) | Loro doc layout, Item / ListMeta, lifecycle semantics |
+| [`spec/vv-wal-separation.md`](spec/vv-wal-separation.md) | Local WAL (crash recovery) vs VV-derived sync separation; push_id retry contract |
 | [`spec/board.md`](spec/board.md) | Board view: fixed Backlog / Live / Done lanes driven by item lifecycle |
 | [`spec/focus.md`](spec/focus.md) | Focus lens: curated single-tier list-by-reference, FocusRef grammar, auto-remove-on-Done |
 | [`spec/search.md`](spec/search.md) | Local search index + command palette query contract |

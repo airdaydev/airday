@@ -495,7 +495,7 @@ fn large_synthetic_history_many_peers_lists_moves_undos() {
     let capture = |doc: &mut Doc, rows: &mut Vec<airday_protocol::EncryptedBlob>| {
         if let Some(blob) = doc.pending_export(&dek).unwrap() {
             rows.push(blob);
-            doc.mark_pushed();
+            doc.mark_persisted();
         }
     };
     let boot = |rows: &[airday_protocol::EncryptedBlob]| -> Doc {
@@ -505,7 +505,7 @@ fn large_synthetic_history_many_peers_lists_moves_undos() {
             doc.replay_oplog_update(&plaintext).unwrap();
         }
         doc.finish_oplog_replay();
-        doc.mark_pushed();
+        doc.mark_persisted();
         doc
     };
 

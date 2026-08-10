@@ -30,6 +30,14 @@ use crate::storage::SqliteStorage;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 
+/// WAL fold thresholds (spec/vv-wal-separation.md). Evaluated after
+/// every command's WAL append and once at boot (so an interrupted
+/// snapshot attempt self-heals). 100 rows bounds boot replay; the byte
+/// cap is a safety net against a few huge rows (e.g. bulk imports) —
+/// initial value pending real measurement.
+const SNAPSHOT_MAX_WAL_ROWS: u64 = 100;
+const SNAPSHOT_MAX_WAL_BYTES: u64 = 4 * 1024 * 1024;
+
 #[derive(Debug, thiserror::Error)]
 pub enum SyncError {
     #[error(transparent)]
@@ -96,7 +104,7 @@ impl Session {
         let storage = crate::storage::open_storage(&profile)?;
         let account = storage.read_account()?;
         let doc_id = account.primary_doc_id;
-        let (doc, last_local, last_acked) = crate::storage::boot_doc(&storage, &dek, doc_id)?;
+        let (doc, boot_meta) = crate::storage::boot_doc(&storage, &dek, doc_id)?;
         // `store` shares the engine's connection (see `SqliteStorage`'s
         // `Clone`) — used only for the `last_sync_at` stamp; the engine
         // persists the resume cursor itself.
@@ -106,14 +114,18 @@ impl Session {
             doc,
             doc_id,
             dek,
-            last_acked.0,
+            boot_meta.last_acked_server_seq.0,
             EngineOptions {
                 client_name: "airday-cli".into(),
                 client_version: env!("CARGO_PKG_VERSION").into(),
             },
             Box::new(storage),
         );
-        engine.set_last_local_seq(last_local);
+        engine.seed_boot(&boot_meta);
+        // Boot-time threshold check: if a previous run crashed after
+        // filling the WAL but before folding it, self-heal now instead
+        // of replaying an ever-growing log on every boot.
+        engine.snapshot_if_wal_exceeds(SNAPSHOT_MAX_WAL_ROWS, SNAPSHOT_MAX_WAL_BYTES)?;
 
         let mut session = Session {
             profile,
@@ -205,19 +217,19 @@ impl Session {
     }
 
     async fn persist_engine_state(&mut self) -> Result<(), SyncError> {
-        // Capture any locally-committed mutations into a durable op-log
-        // row first — this is what `try_start_push` ships, and it's on
-        // disk before any Ack leaves the wire. Then compact: once every
-        // captured op is acked (outbox empty), fold the log into a fresh
-        // snapshot. `SqliteStorage` is synchronously durable, so by the
-        // time these return every applied seq is on disk and we can tell
-        // the engine "everything up to `last_contiguous_seq` is durable"
-        // — which advances the durable cursor and queues an Ack. Callers
-        // needing the ack on the wire (`flush`) must `send_outbox` next.
+        // Capture any locally-committed mutations into a durable WAL
+        // row first — on disk before any Ack leaves the wire. Then fold
+        // the WAL into a snapshot if it crossed the threshold; this is
+        // independent of sync state (unsent ops survive folding — the
+        // push derives them from `server_known_vv`). `SqliteStorage` is
+        // synchronously durable, so by the time these return every
+        // applied seq is on disk and we can tell the engine "everything
+        // up to `last_contiguous_seq` is durable" — which advances the
+        // durable cursor and queues an Ack. Callers needing the ack on
+        // the wire (`flush`) must `send_outbox` next.
         self.engine.capture_local_ops()?;
-        // CLI runs are one-shot: always fold the log when synced (the
-        // web host thresholds this instead — see `snapshot_if_fully_synced`).
-        self.engine.snapshot_if_fully_synced(1)?;
+        self.engine
+            .snapshot_if_wal_exceeds(SNAPSHOT_MAX_WAL_ROWS, SNAPSHOT_MAX_WAL_BYTES)?;
         let contiguous = self.engine.last_contiguous_seq();
         // `notify_oplog_durable` advances the engine's durable frontier and
         // persists the resume cursor itself (via the `LocalStorage`
