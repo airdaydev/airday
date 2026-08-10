@@ -174,6 +174,8 @@ type Messages = {
   due: {
     /** Section label / accessible name for the due-date control. */
     label: string;
+    /** Task-dialog badge label when no due date is set. */
+    unset: string;
     /** Badge label when the due date is before today. */
     overdue: string;
     /** Badge + quick-action label for today's date. */
@@ -215,6 +217,8 @@ type Messages = {
     bin: string;
     switchList: string;
     switchLane: string;
+    /** The 1–4 digit jumps to the fixed nav views. */
+    goToView: string;
     find: string;
     showShortcuts: string;
   };
@@ -388,6 +392,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     },
     due: {
       label: "Fecha de vencimiento",
+      unset: "Fecha límite",
       overdue: "Vencido",
       today: "Hoy",
       tomorrow: "Mañana",
@@ -417,6 +422,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       bin: "Mover a la papelera",
       switchList: "Cambiar de vista",
       switchLane: "Cambiar de carril",
+      goToView: "Ir a Enfoque / Entrada / Hecho / Papelera",
       find: "Buscar",
       showShortcuts: "Mostrar atajos",
     },
@@ -584,6 +590,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     },
     due: {
       label: "Due date",
+      unset: "Deadline",
       overdue: "Overdue",
       today: "Today",
       tomorrow: "Tomorrow",
@@ -613,6 +620,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       bin: "Move to bin",
       switchList: "Switch view",
       switchLane: "Switch lane",
+      goToView: "Go to Focus / Inbox / Done / Bin",
       find: "Find",
       showShortcuts: "Show shortcuts",
     },

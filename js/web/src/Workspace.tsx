@@ -36,6 +36,7 @@ import { useAppI18n } from "./i18n.tsx";
 import { ListIconPicker } from "./ListIconPicker.tsx";
 import { restoreCapturedPositions } from "./linger.ts";
 import { EditableNavLabel, Nav, StatusSlot } from "./nav.tsx";
+import { digitNavTarget } from "./navShortcuts.ts";
 import { isOverlayOpen, onGlobalKey } from "./overlay.ts";
 import type { ViewKey } from "./prefs.ts";
 import { Row, DRAFT_ID_PREFIX } from "./Row.tsx";
@@ -1119,6 +1120,18 @@ export function Workspace(props: {
     setView(seq[nextIdx]!);
   };
   onGlobalKey(onBracketNavigate);
+
+  // 1–4: jump straight to the fixed nav views (Focus / Inbox / Done / Bin).
+  // Bin only counts while non-empty, matching its nav visibility. Mapping
+  // and modifier guard live in digitNavTarget (pure, unit-tested);
+  // onGlobalKey supplies the overlay / editable-surface guards.
+  const onDigitNavigate = (e: KeyboardEvent) => {
+    const target = digitNavTarget(e, state.binCount);
+    if (!target) return;
+    e.preventDefault();
+    setView(target);
+  };
+  onGlobalKey(onDigitNavigate);
 
   // Drag items into a list nav button to move them to that list as the
   // first items, onto Bin to bin them, or onto Focus to pin them into the

@@ -1,11 +1,16 @@
-// The task dialog's due-date control: a read-only badge (or a faint "add"
-// affordance when unset) that opens the shared centered calendar modal.
-// Opening is exposed via `registerOpen` so the header ⋮ menu's "Set date"
-// item can drive it, matching the EditableNavLabel `registerStart` pattern.
+// The task dialog's due-date control: an always-visible badge (clock icon +
+// "Deadline" when unset) that opens a small popover with the same quick
+// actions as the header ⋮ menu's due submenu — Set date… (calendar modal),
+// Tomorrow, and Remove date when one is set. Opening the calendar is also
+// exposed via `registerOpen` so the header ⋮ menu's "Set date" item can
+// drive it, matching the EditableNavLabel `registerStart` pattern.
 
+import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { onMount, Show } from "solid-js";
 import { DueBadge } from "./DueBadge.tsx";
 import { DueCalendarDialog } from "./DueCalendarDialog.tsx";
+import { addDaysToStamp, nowMs, todayStamp } from "./format.tsx";
+import timerSvg from "./icons/timer.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
 
 export function DueField(props: {
@@ -26,18 +31,55 @@ export function DueField(props: {
 
   return (
     <>
-      {/* No affordance when unset — the badge only appears once a due date
-          exists; setting one from scratch goes through the ⋮ menu. */}
-      <Show when={props.dueOn()}>
-        <button
-          type="button"
+      <DropdownMenu gutter={4}>
+        <DropdownMenu.Trigger
           class="task-dialog-due-trigger"
           aria-label={m().due.label}
-          onClick={() => props.setOpen(true)}
         >
-          <DueBadge dueOn={props.dueOn()!} muted={props.muted()} />
-        </button>
-      </Show>
+          <Show
+            when={props.dueOn()}
+            fallback={
+              <span class="due-badge" data-tone="muted">
+                <span class="due-badge-icon" innerHTML={timerSvg} />
+                {m().due.unset}
+              </span>
+            }
+          >
+            {(d) => <DueBadge dueOn={d()} muted={props.muted()} />}
+          </Show>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content class="dropdown-menu-content task-dialog-menu-content">
+            <Show when={props.dueOn()}>
+              <DropdownMenu.Item
+                class="dropdown-menu-item"
+                onSelect={() => props.onChange(null)}
+              >
+                <span>{m().due.remove}</span>
+              </DropdownMenu.Item>
+            </Show>
+            <DropdownMenu.Item
+              class="dropdown-menu-item"
+              onSelect={() => {
+                // The calendar is a modal dialog, so it won't self-dismiss
+                // on the menu's focus-restore; rAF just defers the open past
+                // the menu teardown.
+                requestAnimationFrame(() => props.setOpen(true));
+              }}
+            >
+              <span>{m().due.setDate}</span>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              class="dropdown-menu-item"
+              onSelect={() =>
+                props.onChange(addDaysToStamp(todayStamp(nowMs()), 1))
+              }
+            >
+              <span>{m().due.tomorrow}</span>
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu>
       <DueCalendarDialog
         open={props.open}
         setOpen={props.setOpen}

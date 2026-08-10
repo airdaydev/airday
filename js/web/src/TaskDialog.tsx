@@ -150,6 +150,9 @@ export function TaskDialog(props: {
 
   const [text, setText] = createSignal("");
   const [notes, setNotes] = createSignal("");
+  // New-item mode's due-date buffer: nothing exists to write to until the
+  // capture commits, so picks are held here and applied after creation.
+  const [newDueOn, setNewDueOn] = createSignal<string | null>(null);
   // Due-date calendar popover open state, plus a handle the header ⋮ menu's
   // "Set date" item calls to open it (registered by DueField on mount).
   const [dueCalOpen, setDueCalOpen] = createSignal(false);
@@ -205,6 +208,7 @@ export function TaskDialog(props: {
     const n = it?.notes ?? "";
     setText(t);
     setNotes(n);
+    setNewDueOn(null);
     loadedId = key;
     // The editors mount when the dialog opens; defer so their refs exist,
     // then push — but only if this target is still the one showing.
@@ -238,6 +242,8 @@ export function TaskDialog(props: {
           : props.app.addItemAt(nw.listId, t, at);
         const n = editorText(notesRef);
         if (n.trim()) props.app.editItemNotes(id, n);
+        const d = newDueOn();
+        if (d) props.app.setItemDueOn(id, d);
         // Logged-as-done capture: create open, then mark done in a second op
         // (mirrors a drag-into-Done). Stamps doneAt = now.
         if (nw.done) props.app.setDone(id, true);
@@ -453,6 +459,15 @@ export function TaskDialog(props: {
                     onPaste={pasteAsPlainText}
                     onClick={(e) => openLinkOnClick(e, notesRef)}
                   />
+                  {/* Due-date badge for the capture; picks land in the
+                      local buffer and are written after the item commits. */}
+                  <DueField
+                    dueOn={newDueOn}
+                    muted={() => newItemTarget()?.done ?? false}
+                    onChange={setNewDueOn}
+                    open={dueCalOpen}
+                    setOpen={setDueCalOpen}
+                  />
                 </div>
               </div>
             </Show>
@@ -607,9 +622,9 @@ export function TaskDialog(props: {
                     onClick={(e) => openLinkOnClick(e, notesRef)}
                   />
 
-                  {/* Due-date badge that opens the calendar modal; the
-                      header ⋮ menu's "Set date" also drives it. Renders
-                      nothing (no phantom gap) until a due date is set. */}
+                  {/* Always-visible due-date badge; clicking opens a quick
+                      popover (Set date… / Tomorrow / Remove date). The
+                      header ⋮ menu's "Set date" also drives the calendar. */}
                   <DueField
                     dueOn={() => it().dueOn ?? null}
                     muted={() => isDone(it()) || isBinned(it())}

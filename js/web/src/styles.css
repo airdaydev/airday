@@ -280,14 +280,14 @@ body {
 }
 
 .nav-item-icon svg {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
 }
 
 /* Emoji list icon in the nav: color is intrinsic to the glyph, so drop
    the muted currentColor and size it to sit on the row's cap height. */
 .nav-item-icon-emoji {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1;
   color: inherit;
 }
@@ -346,6 +346,30 @@ body {
   color: var(--text-faint);
   font-size: 0.9em;
   font-variant-numeric: tabular-nums;
+}
+
+/* 1–4 digit hint on the fixed nav rows (Focus / Inbox / Done / Bin).
+   Occupies its slot permanently but only fades in on hover / keyboard
+   focus, so the nav stays quiet. Rows without a count need the auto
+   margin here to reach the trailing edge; after a count, don't repeat
+   it — two auto margins would split the free space between them. */
+.nav-item-shortcut {
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 0.85em;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.nav-item-count ~ .nav-item-shortcut {
+  margin-left: 0;
+}
+
+.nav-item:hover .nav-item-shortcut,
+.nav-item:focus-visible .nav-item-shortcut {
+  opacity: 1;
 }
 
 .nav-item-input {
@@ -2044,10 +2068,9 @@ body {
 
 /* Due-date control row: a label above the native date picker + its
    Today / Tomorrow / Clear quick actions. */
-/* The badge that opens the calendar modal. Only rendered once a due date
-   is set (setting one from scratch goes through the ⋮ menu), so the margin
-   lives here rather than on a wrapper that would leave a phantom gap when
-   unset. Button reset so the DueBadge inside keeps its own look. */
+/* The always-visible badge that opens the due-date quick popover (a faint
+   "Deadline" placeholder when unset). Button reset so the DueBadge inside
+   keeps its own look. */
 .task-dialog-due-trigger {
   display: inline-flex;
   align-items: center;

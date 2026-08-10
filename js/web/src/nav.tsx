@@ -490,6 +490,9 @@ export function Nav(props: {
           <Show when={props.focusCount > 0}>
             <span class="nav-item-count">{props.focusCount}</span>
           </Show>
+          <kbd class="nav-item-shortcut" aria-hidden="true">
+            1
+          </kbd>
         </button>
         {/* Inbox is reserved: it has no `ListMeta` row and carries the
             localized built-in label, so — like Focus / Done / Bin — it's a
@@ -512,6 +515,9 @@ export function Nav(props: {
               ? props.openCountsByList["inbox"]
               : "-"}
           </span>
+          <kbd class="nav-item-shortcut" aria-hidden="true">
+            2
+          </kbd>
         </button>
         <button
           type="button"
@@ -521,6 +527,9 @@ export function Nav(props: {
         >
           <span class="nav-item-icon" innerHTML={checkSvg} />
           {m().nav.done}
+          <kbd class="nav-item-shortcut" aria-hidden="true">
+            3
+          </kbd>
         </button>
         <Show when={props.binCount > 0}>
           <ContextMenu>
@@ -535,6 +544,9 @@ export function Nav(props: {
               <span class="nav-item-icon" innerHTML={crumpledPaperSvg} />
               {m().nav.bin}
               <span class="nav-item-count">{props.binCount}</span>
+              <kbd class="nav-item-shortcut" aria-hidden="true">
+                4
+              </kbd>
             </ContextMenu.Trigger>
             <ContextMenu.Portal>
               <ContextMenu.Content class="context-menu-content">
