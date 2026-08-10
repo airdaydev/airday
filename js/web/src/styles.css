@@ -347,31 +347,6 @@ body {
   font-size: 0.9em;
   font-variant-numeric: tabular-nums;
 }
-
-/* 1–4 digit hint on the fixed nav rows (Focus / Inbox / Done / Bin).
-   Occupies its slot permanently but only fades in on hover / keyboard
-   focus, so the nav stays quiet. Rows without a count need the auto
-   margin here to reach the trailing edge; after a count, don't repeat
-   it — two auto margins would split the free space between them. */
-.nav-item-shortcut {
-  margin-left: auto;
-  padding-left: 8px;
-  color: var(--text-faint);
-  font: inherit;
-  font-size: 0.85em;
-  opacity: 0;
-  transition: opacity 0.1s ease;
-}
-
-.nav-item-count ~ .nav-item-shortcut {
-  margin-left: 0;
-}
-
-.nav-item:hover .nav-item-shortcut,
-.nav-item:focus-visible .nav-item-shortcut {
-  opacity: 1;
-}
-
 .nav-item-input {
   border: 0;
   outline: none;
