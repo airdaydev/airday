@@ -9,6 +9,7 @@
   --bg-nav: #f7f7f7;
   --bg-hover: rgba(0, 0, 0, 0.04);
   --bg-active: #e5e7eb;
+  --bg-badge: rgba(0, 0, 0, 0.05);
   --text: #1a1a1a;
   --text-muted: #555;
   --text-faint: #888;
@@ -38,6 +39,7 @@ body > div[style*="z-index: 9999"] > div[style*="overflow: hidden"] {
   --bg-nav: #0b0b0b;
   --bg-hover: rgba(255, 255, 255, 0.05);
   --bg-active: #2a2a2e;
+  --bg-badge: rgba(255, 255, 255, 0.06);
   --text: #e5e5e5;
   --text-muted: #aaa;
   --text-faint: #777;
@@ -681,7 +683,8 @@ body {
   white-space: nowrap;
   line-height: 1.3em;
   padding: 1px 6px;
-  border: 1px solid var(--border-row);
+  background: var(--bg-badge);
+  border: 1px solid transparent;
   border-radius: 4px;
 }
 
@@ -698,7 +701,8 @@ body {
   font-size: 12px;
   line-height: 1.3em;
   padding: 1px 6px;
-  border: 1px solid var(--border-row);
+  background: var(--bg-badge);
+  border: 1px solid transparent;
   border-radius: 4px;
 }
 
@@ -2870,8 +2874,8 @@ body {
   border-radius: 4px;
   white-space: nowrap;
   color: var(--text-muted);
-  background: transparent;
-  border: 1px solid var(--border-row);
+  background: var(--bg-badge);
+  border: 1px solid transparent;
 }
 
 .due-badge-icon {

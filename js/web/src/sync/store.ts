@@ -256,6 +256,7 @@ export interface ImportSummary {
   listsAdded: number;
   itemsAdded: number;
   itemsSkipped: number;
+  focusAdded: number;
 }
 
 const COARSE_BATCH_THRESHOLD = 64;

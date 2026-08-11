@@ -323,6 +323,12 @@ pub struct JsonExport {
     pub settings: ExportSettings,
     pub lists: Vec<ExportList>,
     pub items: Vec<ExportItem>,
+    /// Focus lens membership (`spec/focus.md`): item ids in Focus order.
+    /// Only visible refs are exported (bare local form — the cross-doc
+    /// `doc_id:item_id` form never rides an export today). Skipped when
+    /// empty so pre-focus dumps stay byte-identical.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub focus: Vec<String>,
 }
 
 /// Counts surfaced to the UI after a successful `import_json`.
@@ -335,6 +341,8 @@ pub struct ImportSummary {
     pub lists_added: usize,
     pub items_added: usize,
     pub items_skipped: usize,
+    /// Focus refs re-established for imported items (`spec/focus.md`).
+    pub focus_added: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -2621,6 +2629,9 @@ impl Doc {
             },
             lists,
             items,
+            // Visible refs only, in Focus order — dead garbage (foreign,
+            // missing, non-open, duplicate) never rides an export.
+            focus: self.scan_focus().visible_item_ids,
         }
     }
 
@@ -2642,6 +2653,11 @@ impl Doc {
     /// the local `inbox`, builtin entries are not duplicated, and items
     /// whose `list_id` references a list not present in the export fall
     /// back to `inbox` (same orphan handling as `delete_list`).
+    /// Focus membership (`spec/focus.md`) rides `export.focus`: refs are
+    /// remapped onto the fresh item ids and **appended** after any
+    /// existing local Focus (additive import doesn't disturb local
+    /// curation); refs to items that weren't imported or aren't Open are
+    /// dropped silently, like malformed `dueOn` values.
     /// Existing local content is untouched. All writes land in a
     /// single Loro commit; UI events are emitted via the standard
     /// pre/post state-diff.
@@ -2703,6 +2719,9 @@ impl Doc {
         let items = self.items();
         let mut items_added: usize = 0;
         let mut items_skipped: usize = 0;
+        // Source item id → (fresh id, was-Open) — feeds the focus remap
+        // below. Skipped items never enter it, so their refs drop out.
+        let mut item_id_map: HashMap<String, (String, bool)> = HashMap::new();
         for src_item in &export.items {
             let text = src_item.text.trim();
             if text.is_empty() {
@@ -2755,23 +2774,53 @@ impl Doc {
             }
             self.order_list(&target_list_id).push(
                 OrderEntry {
-                    item_id: new_item_id,
+                    item_id: new_item_id.clone(),
                     placement_id: placement,
                 }
                 .encode()
                 .as_str(),
             )?;
+            let open = src_item.done_at.is_none() && src_item.binned_at.is_none();
+            item_id_map.insert(src_item.id.clone(), (new_item_id, open));
             items_added += 1;
+        }
+
+        // Re-establish Focus membership over the fresh ids, appended after
+        // any existing local refs. Imported ids are freshly minted, so
+        // they can't collide with local Focus — only in-export dedup is
+        // needed. Foreign-doc refs (never emitted, but a hand-edited file
+        // could carry one) and refs to skipped / non-Open items drop out.
+        let mut focus_added: usize = 0;
+        let focus = self.focus_list();
+        let mut focus_seen: HashSet<String> = HashSet::new();
+        for raw in &export.focus {
+            let Some(r) = FocusRef::parse(raw).filter(FocusRef::is_local) else {
+                continue;
+            };
+            let Some((new_item_id, true)) = item_id_map.get(&r.item_id) else {
+                continue;
+            };
+            if !focus_seen.insert(new_item_id.clone()) {
+                continue;
+            }
+            focus.push(FocusRef::local(new_item_id).encode().as_str())?;
+            focus_added += 1;
         }
 
         self.inner.commit();
         self.rebuild_index();
         self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
+        // Focus isn't covered by the state diff; mirror the mutators'
+        // manual signal so the lens re-renders after an import.
+        if focus_added > 0 {
+            self.push_event(AppEvent::FocusChanged);
+        }
 
         Ok(ImportSummary {
             lists_added,
             items_added,
             items_skipped,
+            focus_added,
         })
     }
 
@@ -4910,6 +4959,7 @@ mod tests {
                 builtin: false,
             }],
             items: vec![],
+            focus: vec![],
         };
         let dst = Doc::new().unwrap();
         dst.import_json(&export).unwrap();
@@ -6711,6 +6761,105 @@ mod tests {
     }
 
     #[test]
+    fn export_json_omits_focus_when_empty_and_carries_it_in_order() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+
+        // No focus refs → the key is absent (pre-focus dump byte-compat).
+        assert!(!doc.export_json_string().contains("\"focus\""));
+
+        doc.add_to_focus(&b, usize::MAX).unwrap();
+        doc.add_to_focus(&a, usize::MAX).unwrap();
+        let export = doc.export_json();
+        assert_eq!(export.focus, vec![b.clone(), a.clone()]);
+    }
+
+    #[test]
+    fn import_json_round_trips_focus_order_onto_fresh_ids() {
+        let src = Doc::new().unwrap();
+        let a = src.add_item(LIST_INBOX, "alpha").unwrap();
+        let b = src.add_item(LIST_INBOX, "beta").unwrap();
+        let _ = src.add_item(LIST_INBOX, "gamma").unwrap();
+        src.add_to_focus(&b, usize::MAX).unwrap();
+        src.add_to_focus(&a, usize::MAX).unwrap();
+        let export = src.export_json();
+
+        // The destination already curates its own Focus — imported refs
+        // append after it rather than disturbing local order.
+        let dst = Doc::new().unwrap();
+        let local = dst.add_item(LIST_INBOX, "local").unwrap();
+        dst.add_to_focus(&local, usize::MAX).unwrap();
+
+        let summary = dst.import_json(&export).unwrap();
+        assert_eq!(summary.focus_added, 2);
+
+        let focus_texts: Vec<String> = dst.focus_view().into_iter().map(|i| i.text).collect();
+        assert_eq!(focus_texts, vec!["local", "beta", "alpha"]);
+        // Refs were remapped — none of the source ids appear verbatim.
+        for item in dst.focus_view() {
+            assert_ne!(item.id, a);
+            assert_ne!(item.id, b);
+        }
+    }
+
+    #[test]
+    fn import_json_drops_unresolvable_focus_refs() {
+        let src = Doc::new().unwrap();
+        let a = src.add_item(LIST_INBOX, "kept").unwrap();
+        let mut export = src.export_json();
+        // Hand-edited garbage: unknown id, foreign-doc ref, a ref to a
+        // skipped (empty-text) item, and a duplicate of a valid ref.
+        export.items.push(ExportItem {
+            id: "skipped".to_string(),
+            text: "   ".to_string(),
+            notes: String::new(),
+            list_id: LIST_INBOX.to_string(),
+            live: false,
+            due_on: None,
+            created_at: 1,
+            done_at: None,
+            binned_at: None,
+        });
+        export.focus = vec![
+            a.clone(),
+            "missing".to_string(),
+            format!("deadbeef:{a}"),
+            "skipped".to_string(),
+            a.clone(),
+        ];
+
+        let dst = Doc::new().unwrap();
+        let summary = dst.import_json(&export).unwrap();
+        assert_eq!(summary.focus_added, 1);
+        let focus_texts: Vec<String> = dst.focus_view().into_iter().map(|i| i.text).collect();
+        assert_eq!(focus_texts, vec!["kept"]);
+    }
+
+    #[test]
+    fn import_json_drops_focus_refs_to_non_open_items() {
+        let src = Doc::new().unwrap();
+        let open = src.add_item(LIST_INBOX, "open").unwrap();
+        let done = src.add_item(LIST_INBOX, "done-later").unwrap();
+        src.add_to_focus(&done, usize::MAX).unwrap();
+        src.add_to_focus(&open, usize::MAX).unwrap();
+        let mut export = src.export_json();
+        // Simulate a hand-edited dump where a focus ref points at a Done
+        // item (a live doc self-compacts these, so force it in the JSON).
+        for item in &mut export.items {
+            if item.text == "done-later" {
+                item.done_at = Some(42);
+            }
+        }
+
+        let dst = Doc::new().unwrap();
+        let summary = dst.import_json(&export).unwrap();
+        assert_eq!(summary.focus_added, 1);
+        let focus_texts: Vec<String> = dst.focus_view().into_iter().map(|i| i.text).collect();
+        assert_eq!(focus_texts, vec!["open"]);
+    }
+
+    #[test]
     fn import_json_preserves_timestamps_done_binned_and_notes() {
         let src = Doc::new().unwrap();
         let a = src.add_item(LIST_INBOX, "alpha").unwrap();
@@ -6970,6 +7119,7 @@ mod tests {
                 done_at: None,
                 binned_at: None,
             }],
+            focus: vec![],
         };
 
         let dst = Doc::new().unwrap();
@@ -7006,6 +7156,7 @@ mod tests {
             },
             lists: vec![],
             items: vec![],
+            focus: vec![],
         };
         let dst = Doc::new().unwrap();
         let err = dst.import_json(&export).unwrap_err();

@@ -496,8 +496,8 @@ impl Doc {
     /// Additive JSON import — counterpart to `exportJson`. Source lists
     /// become fresh local lists; `inbox`-bound items land in the local
     /// `inbox`; existing local content is untouched. Returns a JSON
-    /// string of `{ listsAdded, itemsAdded, itemsSkipped }` for UI
-    /// summary.
+    /// string of `{ listsAdded, itemsAdded, itemsSkipped, focusAdded }`
+    /// for UI summary.
     #[wasm_bindgen(js_name = importJson)]
     pub fn import_json(&self, json: &str) -> Result<String, JsError> {
         let summary = self.inner.import_json_str(json).map_err(js_err)?;
@@ -1338,7 +1338,7 @@ impl SyncEngine {
 
     /// Additive JSON import — counterpart of `exportJson` on the engine
     /// surface. Returns a JSON string of `{ listsAdded, itemsAdded,
-    /// itemsSkipped }`. Doesn't push or flush — caller's normal
+    /// itemsSkipped, focusAdded }`. Doesn't push or flush — caller's normal
     /// post-mutation flow (oplog append, sync push) handles the new ops
     /// like any other local commit.
     #[wasm_bindgen(js_name = importJson)]
@@ -2208,8 +2208,8 @@ fn workspace_snapshot_json(doc: &CoreDoc) -> String {
 
 fn summary_to_json(s: &CoreImportSummary) -> String {
     format!(
-        "{{\"listsAdded\":{},\"itemsAdded\":{},\"itemsSkipped\":{}}}",
-        s.lists_added, s.items_added, s.items_skipped,
+        "{{\"listsAdded\":{},\"itemsAdded\":{},\"itemsSkipped\":{},\"focusAdded\":{}}}",
+        s.lists_added, s.items_added, s.items_skipped, s.focus_added,
     )
 }
 

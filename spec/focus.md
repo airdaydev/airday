@@ -219,6 +219,25 @@ event — so the web store must re-derive `focus_view` on **item events too**
 **No change.** Focus mutations are ordinary Loro ops in the same doc — opaque
 blobs to the server. No wire-version bump, no server work.
 
+## JSON export / import
+
+Focus rides the export as a top-level `"focus"` array: item ids in Focus order.
+It is a list, not a per-item flag, for the same reason the container exists at
+all: Focus membership is ordered, curated reference data, not item state, and
+the export format mirrors the doc layout.
+
+- **Export** emits only *visible* refs (parseable, local, Open, first
+  occurrence), in container order, in the bare `<item_id>` form. Dead garbage
+  never rides an export. The key is skipped when empty, so pre-focus dumps stay
+  byte-identical.
+- **Import** remaps each ref through the fresh item ids minted for the imported
+  items, then **appends** them after any existing local Focus refs: additive
+  import does not disturb local curation. Refs that don't resolve (unknown id,
+  foreign-doc form, skipped empty-text item, non-Open item, duplicate) are
+  dropped silently, matching the malformed-`dueOn` handling. The count of
+  re-established refs surfaces as `focus_added` / `focusAdded` on the import
+  summary.
+
 ## Future
 
 Cross-doc Focus refs (`<doc_id>:<item_id>`) are the forward hook for sharing

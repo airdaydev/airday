@@ -77,8 +77,14 @@ describe("Doc JSON import (additive)", () => {
       listsAdded: number;
       itemsAdded: number;
       itemsSkipped: number;
+      focusAdded: number;
     };
-    expect(summary).toEqual({ listsAdded: 1, itemsAdded: 3, itemsSkipped: 0 });
+    expect(summary).toEqual({
+      listsAdded: 1,
+      itemsAdded: 3,
+      itemsSkipped: 0,
+      focusAdded: 0,
+    });
 
     // One fresh user list with a NEW id but the same name.
     const dstLists = JSON.parse(dst.allListsJson()) as Array<{
