@@ -111,6 +111,11 @@ const KEY_VIEW: &str = "view";
 const KEY_CREATED_AT: &str = "created_at";
 const KEY_DONE_AT: &str = "done_at";
 const KEY_BINNED_AT: &str = "binned_at";
+/// ListMeta archive timestamp (`spec/data-model.md` "Archived lists").
+/// Absent ≡ active; present ≡ archived. Written by `set_list_archived`;
+/// unarchiving deletes the key. Metadata-only — archiving never touches
+/// items, order containers, lifecycle, or Focus.
+const KEY_ARCHIVED_AT: &str = "archived_at";
 /// Global "show counts on non-Inbox lists" flag. Lives on the doc-level
 /// settings map; Inbox's own count is always visible (when non-zero) and
 /// is not gated by this. Absent ≡ false — written only when toggled on
@@ -301,6 +306,10 @@ pub struct ListView {
     /// saved one. Reserved `inbox` has no ListMeta row — its default
     /// lives on [`SettingsView::inbox_view`].
     pub default_view: Option<DefaultView>,
+    /// Archive timestamp (`spec/data-model.md` "Archived lists"):
+    /// `None` ≡ active, `Some(ts)` ≡ archived. Pure ListMeta metadata —
+    /// items, ordering, and Focus are untouched by archiving.
+    pub archived_at: Option<i64>,
     pub created_at: i64,
 }
 
@@ -373,6 +382,11 @@ pub struct ExportList {
     /// [`ExportSettings::inbox_view`].
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub view: Option<String>,
+    /// Archive timestamp (`spec/data-model.md` "Archived lists").
+    /// Skipped when unset so pre-archive dumps stay byte-identical;
+    /// old exports without the field import as active.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub archived_at: Option<i64>,
     pub created_at: Option<i64>,
     pub builtin: bool,
 }
@@ -2208,6 +2222,7 @@ impl Doc {
             id: id.clone(),
             name: name.to_string(),
             created_at: now,
+            archived_at: None,
             index,
         });
         Ok(id)
@@ -2342,14 +2357,55 @@ impl Doc {
         Ok(())
     }
 
+    /// Archive (`true`) or unarchive (`false`) a user-created list —
+    /// the user-facing removal from the active workspace
+    /// (`spec/data-model.md` "Archived lists"). Metadata-only: writes or
+    /// deletes the ListMeta `archived_at` register and touches nothing
+    /// else — no item, order, lifecycle, or Focus mutation. Re-applying
+    /// the current state is a no-op (no commit, no event). Refuses for
+    /// the reserved `inbox`.
+    pub fn set_list_archived(&self, list_id: &str, archived: bool) -> Result<(), DocError> {
+        if list_id == LIST_INBOX {
+            return Err(DocError::CannotDeleteBuiltin(LIST_INBOX.into()));
+        }
+        let (_, map) = self.find_list(list_id)?;
+        let current = read_i64(&map, KEY_ARCHIVED_AT);
+        if current.is_some() == archived {
+            return Ok(());
+        }
+        let next = if archived {
+            let now = now_millis();
+            map.insert(KEY_ARCHIVED_AT, now)?;
+            Some(now)
+        } else {
+            map.delete(KEY_ARCHIVED_AT)?;
+            None
+        };
+        self.inner.commit();
+        self.push_event(AppEvent::ListArchivedChanged {
+            id: list_id.to_string(),
+            archived_at: next,
+        });
+        Ok(())
+    }
+
+    /// For an **active** list, `target_index` addresses the active-list
+    /// projection (archived rows excluded — the index space clients'
+    /// draggable navs actually render); it is resolved to the raw CRDT
+    /// index here. Moving an archived list keeps raw-index semantics
+    /// (no client UI reorders archived lists).
     pub fn move_list(&self, list_id: &str, target_index: usize) -> Result<(), DocError> {
         if list_id == LIST_INBOX {
             return Err(DocError::CannotMoveBuiltin(LIST_INBOX.into()));
         }
         let lists = self.lists();
-        let (from, _) = self.find_list(list_id)?;
+        let (from, map) = self.find_list(list_id)?;
         let len = lists.len();
-        let to = target_index.min(len.saturating_sub(1));
+        let to = if read_i64(&map, KEY_ARCHIVED_AT).is_none() {
+            self.resolve_active_move_target(list_id, target_index)?
+        } else {
+            target_index.min(len.saturating_sub(1))
+        };
         if from == to {
             return Ok(());
         }
@@ -2563,6 +2619,10 @@ impl Doc {
         self.iter_items().filter(|i| i.is_binned()).collect()
     }
 
+    /// Every ListMeta row in CRDT order — the canonical projection.
+    /// Includes archived lists; archiving never removes a list from
+    /// here (`spec/data-model.md` "Archived lists"). Use
+    /// [`Self::active_lists`] for the active-workspace view.
     pub fn all_lists(&self) -> Vec<ListView> {
         let lists = self.lists();
         let mut out = Vec::with_capacity(lists.len());
@@ -2574,6 +2634,15 @@ impl Doc {
             }
         }
         out
+    }
+
+    /// [`Self::all_lists`] filtered to active (non-archived) lists, in
+    /// the same CRDT order.
+    pub fn active_lists(&self) -> Vec<ListView> {
+        self.all_lists()
+            .into_iter()
+            .filter(|l| l.archived_at.is_none())
+            .collect()
     }
 
     pub fn get_settings(&self) -> SettingsView {
@@ -2594,6 +2663,7 @@ impl Doc {
             // Inbox's default view rides on `settings.inbox_view`, not
             // on its (nonexistent) ListMeta row.
             view: None,
+            archived_at: None,
             created_at: None,
             builtin: true,
         });
@@ -2602,6 +2672,7 @@ impl Doc {
             name: list.name,
             icon: list.icon,
             view: list.default_view.map(|v| v.encode().to_string()),
+            archived_at: list.archived_at,
             created_at: Some(list.created_at),
             builtin: false,
         }));
@@ -2711,6 +2782,11 @@ impl Doc {
             // the doc never holds a view string this build can't read.
             if let Some(view) = src_list.view.as_deref().and_then(DefaultView::parse) {
                 map.insert(KEY_VIEW, view.encode())?;
+            }
+            // Archive state round-trips; exports written before the field
+            // existed carry no `archivedAt` and import as active.
+            if let Some(t) = src_list.archived_at {
+                map.insert(KEY_ARCHIVED_AT, t)?;
             }
             id_map.insert(src_list.id.clone(), new_list_id);
             lists_added += 1;
@@ -3747,6 +3823,7 @@ impl Doc {
                 id: list.id.clone(),
                 name: list.name.clone(),
                 created_at: list.created_at,
+                archived_at: list.archived_at,
                 index: idx,
             });
         }
@@ -3846,6 +3923,10 @@ impl Doc {
         for l in &lists {
             hash_str(&mut hasher, &l.id);
             hash_str(&mut hasher, &l.name);
+            // Archive state is logical state (`spec/data-model.md`
+            // "Archived lists") — replicas diverging on it must not
+            // fingerprint equal.
+            hash_opt_i64(&mut hasher, l.archived_at);
             hasher.update(l.created_at.to_be_bytes());
         }
         // Items: canonical grouped walk order.
@@ -4004,6 +4085,46 @@ impl Doc {
 
     fn visible_list_index(&self, list_id: &str) -> Option<usize> {
         self.all_lists().iter().position(|l| l.id == list_id)
+    }
+
+    /// Resolve an active-projection `target_index` for the active list
+    /// `list_id` to the raw index in the `lists` container. The mover is
+    /// removed from the sequence, the slot is found among the remaining
+    /// **active** rows, and the mover lands immediately before the row
+    /// at that active position (or right after the last active row when
+    /// past-end) — so archived rows interspersed in the container never
+    /// skew a drop position computed against the active-only nav.
+    fn resolve_active_move_target(
+        &self,
+        list_id: &str,
+        target_index: usize,
+    ) -> Result<usize, DocError> {
+        let lists = self.lists();
+        // Active flag per remaining row (mover excluded), in raw order.
+        // Unparseable rows count as occupied-but-inactive slots.
+        let mut rest: Vec<bool> = Vec::new();
+        for i in 0..lists.len() {
+            let Some(map) = list_map_at(&lists, i) else {
+                rest.push(false);
+                continue;
+            };
+            if read_string(&map, KEY_ID).as_deref() == Some(list_id) {
+                continue;
+            }
+            rest.push(read_i64(&map, KEY_ARCHIVED_AT).is_none());
+        }
+        let mut active_seen = 0usize;
+        let mut after_last_active = 0usize;
+        for (pos, active) in rest.iter().enumerate() {
+            if *active {
+                if active_seen == target_index {
+                    return Ok(pos);
+                }
+                active_seen += 1;
+                after_last_active = pos + 1;
+            }
+        }
+        Ok(after_last_active)
     }
 
     fn assert_list_exists(&self, list_id: &str) -> Result<(), DocError> {
@@ -4249,6 +4370,7 @@ fn list_view(map: &LoroMap) -> Option<ListView> {
         name: read_string(map, KEY_NAME)?,
         icon: read_string(map, KEY_ICON).filter(|s| !s.is_empty()),
         default_view: read_default_view(map, KEY_VIEW),
+        archived_at: read_i64(map, KEY_ARCHIVED_AT),
         created_at: read_i64(map, KEY_CREATED_AT)?,
     })
 }
@@ -4495,6 +4617,7 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
                     id: post_l.id.clone(),
                     name: post_l.name.clone(),
                     created_at: post_l.created_at,
+                    archived_at: post_l.archived_at,
                     index: post_idx,
                 });
             }
@@ -4515,6 +4638,12 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
                     out.push(AppEvent::ListDefaultViewChanged {
                         id: post_l.id.clone(),
                         view: post_l.default_view,
+                    });
+                }
+                if pre_l.archived_at != post_l.archived_at {
+                    out.push(AppEvent::ListArchivedChanged {
+                        id: post_l.id.clone(),
+                        archived_at: post_l.archived_at,
                     });
                 }
                 if pre_idx != post_idx {
@@ -4955,6 +5084,7 @@ mod tests {
                 name: "Work".to_string(),
                 icon: None,
                 view: Some("hologram".to_string()),
+                archived_at: None,
                 created_at: Some(1),
                 builtin: false,
             }],
@@ -4969,6 +5099,313 @@ mod tests {
             .find(|l| l.name == "Work")
             .expect("user list imported");
         assert_eq!(imported.default_view, None);
+    }
+
+    // ---------- archive (`spec/data-model.md` "Archived lists") ----------
+
+    #[test]
+    fn archive_round_trips_and_is_noop_when_unchanged() {
+        let doc = Doc::new().unwrap();
+        let list = doc.add_list("Work").unwrap();
+        let _ = doc.drain_events();
+
+        // Archive → timestamp stored, exactly one archive event.
+        doc.set_list_archived(&list, true).unwrap();
+        let archived_at = doc.get_list_meta(&list).unwrap().archived_at;
+        assert!(archived_at.is_some());
+        let evs = doc.drain_events();
+        assert_eq!(evs.len(), 1, "exactly one event expected: {evs:?}");
+        assert!(matches!(
+            &evs[0],
+            AppEvent::ListArchivedChanged { id, archived_at: at }
+                if id == &list && *at == archived_at
+        ));
+
+        // Re-archiving is a no-op: no commit, no event, timestamp kept.
+        doc.set_list_archived(&list, true).unwrap();
+        assert!(doc.drain_events().is_empty());
+        assert_eq!(doc.get_list_meta(&list).unwrap().archived_at, archived_at);
+
+        // Unarchive → key deleted, exactly the inverse event.
+        doc.set_list_archived(&list, false).unwrap();
+        assert_eq!(doc.get_list_meta(&list).unwrap().archived_at, None);
+        let evs = doc.drain_events();
+        assert_eq!(evs.len(), 1, "exactly one event expected: {evs:?}");
+        assert!(matches!(
+            &evs[0],
+            AppEvent::ListArchivedChanged {
+                id,
+                archived_at: None
+            } if id == &list
+        ));
+
+        // Re-unarchiving is a no-op too.
+        doc.set_list_archived(&list, false).unwrap();
+        assert!(doc.drain_events().is_empty());
+    }
+
+    #[test]
+    fn archive_refuses_inbox() {
+        let doc = Doc::new().unwrap();
+        assert!(matches!(
+            doc.set_list_archived(LIST_INBOX, true).unwrap_err(),
+            DocError::CannotDeleteBuiltin(_)
+        ));
+        assert!(matches!(
+            doc.set_list_archived(LIST_INBOX, false).unwrap_err(),
+            DocError::CannotDeleteBuiltin(_)
+        ));
+    }
+
+    #[test]
+    fn archive_preserves_items_metadata_and_focus() {
+        let doc = Doc::new().unwrap();
+        let list = doc.add_list("Work").unwrap();
+        doc.set_list_icon(&list, "🎯").unwrap();
+        doc.set_default_view(&list, Some(DefaultView::BOARD))
+            .unwrap();
+
+        // A list with every lifecycle represented, notes, a due date, a
+        // manual reorder, and a Focus ref.
+        let a = doc.add_item(&list, "a").unwrap();
+        let b = doc.add_item(&list, "b").unwrap();
+        let c = doc.add_item(&list, "c").unwrap();
+        let d = doc.add_item(&list, "d").unwrap();
+        doc.edit_item_notes(&a, "some notes").unwrap();
+        doc.set_item_due_on(&a, Some("2026-09-01")).unwrap();
+        doc.set_item_lifecycle(&b, ItemLifecycle::Live).unwrap();
+        doc.set_item_done(&c, true).unwrap();
+        doc.set_item_binned(&d, true).unwrap();
+        doc.move_item(&a, &list, 1).unwrap();
+        doc.add_to_focus(&a, 0).unwrap();
+
+        let pre_meta = doc.get_list_meta(&list).unwrap();
+        let pre_items: Vec<ItemView> = doc.items_in_list(&list, true);
+        let pre_resolved: Vec<String> = pre_items.iter().map(|i| i.id.clone()).collect();
+        let pre_focus = doc.focus_refs();
+        let pre_locations: Vec<String> = pre_resolved
+            .iter()
+            .map(|id| read_string(&doc.find_item(id).unwrap(), KEY_LOCATION).unwrap())
+            .collect();
+        let _ = doc.drain_events();
+
+        doc.set_list_archived(&list, true).unwrap();
+
+        // Exactly one event — no item / order / lifecycle / focus events.
+        let evs = doc.drain_events();
+        assert_eq!(evs.len(), 1, "archive must be metadata-only: {evs:?}");
+        assert!(matches!(&evs[0], AppEvent::ListArchivedChanged { .. }));
+
+        // Every item field, location (list + placement), and the
+        // resolved order survive untouched.
+        let post_items: Vec<ItemView> = doc.items_in_list(&list, true);
+        assert_eq!(post_items, pre_items);
+        let post_locations: Vec<String> = pre_resolved
+            .iter()
+            .map(|id| read_string(&doc.find_item(id).unwrap(), KEY_LOCATION).unwrap())
+            .collect();
+        assert_eq!(post_locations, pre_locations);
+        assert_eq!(doc.focus_refs(), pre_focus);
+
+        // List metadata survives; only `archived_at` changed.
+        let post_meta = doc.get_list_meta(&list).unwrap();
+        assert_eq!(post_meta.name, pre_meta.name);
+        assert_eq!(post_meta.icon, pre_meta.icon);
+        assert_eq!(post_meta.default_view, pre_meta.default_view);
+        assert_eq!(post_meta.created_at, pre_meta.created_at);
+        assert!(post_meta.archived_at.is_some());
+
+        // The canonical projection still contains the archived list.
+        assert!(doc.all_lists().iter().any(|l| l.id == list));
+        assert!(doc.active_lists().iter().all(|l| l.id != list));
+
+        // Unarchive restores the exact pre-archive metadata.
+        doc.set_list_archived(&list, false).unwrap();
+        assert_eq!(doc.get_list_meta(&list).unwrap(), pre_meta);
+        assert_eq!(doc.items_in_list(&list, true), pre_items);
+        assert_eq!(doc.focus_refs(), pre_focus);
+    }
+
+    #[test]
+    fn archive_undo_redo_round_trips() {
+        let doc = Doc::new().unwrap();
+        let list = doc.add_list("Work").unwrap();
+        doc.set_list_archived(&list, true).unwrap();
+        let archived_at = doc.get_list_meta(&list).unwrap().archived_at;
+        let _ = doc.drain_events();
+
+        assert!(doc.undo().unwrap());
+        assert_eq!(doc.get_list_meta(&list).unwrap().archived_at, None);
+        assert!(doc.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::ListArchivedChanged {
+                id,
+                archived_at: None
+            } if id == &list
+        )));
+
+        assert!(doc.redo().unwrap());
+        assert_eq!(doc.get_list_meta(&list).unwrap().archived_at, archived_at);
+        assert!(doc.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::ListArchivedChanged { id, archived_at: at }
+                if id == &list && *at == archived_at
+        )));
+    }
+
+    #[test]
+    fn remote_archive_change_emits_event() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let list = a.add_list("Work").unwrap();
+        let seed = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_persisted();
+        let mut b = Doc::empty();
+        b.apply_remote(&dek, &seed).unwrap();
+        let _ = b.drain_events();
+
+        a.set_list_archived(&list, true).unwrap();
+        let expected = a.get_list_meta(&list).unwrap().archived_at;
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &blob).unwrap();
+        assert_eq!(b.get_list_meta(&list).unwrap().archived_at, expected);
+        assert!(b.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::ListArchivedChanged { id, archived_at: at }
+                if id == &list && *at == expected
+        )));
+    }
+
+    #[test]
+    fn snapshot_events_carry_archive_state() {
+        let doc = Doc::new().unwrap();
+        let active = doc.add_list("Active").unwrap();
+        let archived = doc.add_list("Old").unwrap();
+        doc.set_list_archived(&archived, true).unwrap();
+        let expected = doc.get_list_meta(&archived).unwrap().archived_at;
+
+        let evs = doc.snapshot_events();
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            AppEvent::ListAdded {
+                id,
+                archived_at: None,
+                ..
+            } if id == &active
+        )));
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            AppEvent::ListAdded { id, archived_at: at, .. }
+                if id == &archived && *at == expected
+        )));
+    }
+
+    #[test]
+    fn export_import_round_trips_archived_at() {
+        let src = Doc::new().unwrap();
+        let list = src.add_list("Old").unwrap();
+        src.set_list_archived(&list, true).unwrap();
+        let expected = src.get_list_meta(&list).unwrap().archived_at;
+
+        let export = src.export_json();
+        let exported = export
+            .lists
+            .iter()
+            .find(|l| l.id == list)
+            .expect("user list exported");
+        assert_eq!(exported.archived_at, expected);
+
+        let dst = Doc::new().unwrap();
+        dst.import_json(&export).unwrap();
+        let imported = dst
+            .all_lists()
+            .into_iter()
+            .find(|l| l.name == "Old")
+            .expect("user list imported");
+        assert_eq!(imported.archived_at, expected);
+    }
+
+    #[test]
+    fn old_exports_without_archived_at_import_as_active() {
+        // A pre-archive export (no `archivedAt` on any list) must parse
+        // and import every list as active.
+        let json = r#"{
+            "version": 1,
+            "settings": { "showListCounts": false },
+            "lists": [
+                { "id": "inbox", "name": "Inbox", "createdAt": null, "builtin": true },
+                { "id": "src", "name": "Work", "createdAt": 1, "builtin": false }
+            ],
+            "items": []
+        }"#;
+        let doc = Doc::new().unwrap();
+        doc.import_json_str(json).unwrap();
+        let imported = doc
+            .all_lists()
+            .into_iter()
+            .find(|l| l.name == "Work")
+            .expect("user list imported");
+        assert_eq!(imported.archived_at, None);
+    }
+
+    #[test]
+    fn fingerprint_includes_archive_state() {
+        let doc = Doc::new().unwrap();
+        let list = doc.add_list("Work").unwrap();
+        let before = doc.fingerprint();
+        doc.set_list_archived(&list, true).unwrap();
+        assert_ne!(doc.fingerprint(), before, "archive must change the hash");
+        doc.set_list_archived(&list, false).unwrap();
+        assert_eq!(
+            doc.fingerprint(),
+            before,
+            "unarchive deletes the key, restoring the exact logical state"
+        );
+    }
+
+    #[test]
+    fn move_active_list_addresses_active_projection() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_list("A").unwrap();
+        let b = doc.add_list("B").unwrap();
+        let c = doc.add_list("C").unwrap();
+        let d = doc.add_list("D").unwrap();
+        // Archive B so the raw container holds an archived row *between*
+        // active rows: raw [A, B✕, C, D], active [A, C, D].
+        doc.set_list_archived(&b, true).unwrap();
+        let _ = doc.drain_events();
+
+        let active_ids =
+            |doc: &Doc| -> Vec<String> { doc.active_lists().into_iter().map(|l| l.id).collect() };
+        assert_eq!(active_ids(&doc), vec![a.clone(), c.clone(), d.clone()]);
+
+        // Active index 0 for D must land it before A, not at raw slot 0
+        // of some archived-aware miscount.
+        doc.move_list(&d, 0).unwrap();
+        assert_eq!(active_ids(&doc), vec![d.clone(), a.clone(), c.clone()]);
+        // The archived row keeps its relative place in the raw order.
+        let raw: Vec<String> = doc.all_lists().into_iter().map(|l| l.id).collect();
+        assert_eq!(raw, vec![d.clone(), a.clone(), b.clone(), c.clone()]);
+        // The emitted index addresses the full `all_lists` projection.
+        let evs = doc.drain_events();
+        assert!(matches!(
+            &evs[..],
+            [AppEvent::ListMoved { id, index: 0 }] if id == &d
+        ));
+
+        // Move D to the middle of the actives (active index 1: between A
+        // and C, which straddles the archived B in raw order).
+        doc.move_list(&d, 1).unwrap();
+        assert_eq!(active_ids(&doc), vec![a.clone(), d.clone(), c.clone()]);
+
+        // Past-end lands after the last active list.
+        doc.move_list(&a, 99).unwrap();
+        assert_eq!(active_ids(&doc), vec![d.clone(), c.clone(), a.clone()]);
+
+        // Moving to the slot it already occupies is a no-op.
+        let _ = doc.drain_events();
+        doc.move_list(&a, 2).unwrap();
+        assert!(doc.drain_events().is_empty());
     }
 
     #[test]
@@ -5441,6 +5878,7 @@ mod tests {
                 name: INBOX_NAME.to_string(),
                 icon: None,
                 view: None,
+                archived_at: None,
                 created_at: None,
                 builtin: true,
             }
@@ -7105,6 +7543,7 @@ mod tests {
                 name: INBOX_NAME.to_string(),
                 icon: None,
                 view: None,
+                archived_at: None,
                 created_at: None,
                 builtin: true,
             }],

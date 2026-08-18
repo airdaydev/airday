@@ -241,6 +241,19 @@ impl Doc {
         self.inner.move_list(list_id, target_index).map_err(js_err)
     }
 
+    /// Archive (`true`) or unarchive (`false`) a user-created list.
+    /// Metadata-only; refuses for `inbox`. See
+    /// `airday_core::Doc::set_list_archived`.
+    #[wasm_bindgen(js_name = setListArchived)]
+    pub fn set_list_archived(&self, list_id: &str, archived: bool) -> Result<(), JsError> {
+        self.inner
+            .set_list_archived(list_id, archived)
+            .map_err(js_err)
+    }
+
+    /// Internal destructive primitive — not wired to any user-facing UI
+    /// (archive is the user-facing removal). Kept for tests and future
+    /// permanent-deletion work.
     #[wasm_bindgen(js_name = deleteList)]
     pub fn delete_list(&self, list_id: &str) -> Result<(), JsError> {
         self.inner.delete_list(list_id).map_err(js_err)
@@ -1514,6 +1527,20 @@ impl SyncEngine {
             .map_err(js_err)
     }
 
+    /// Archive (`true`) or unarchive (`false`) a user-created list.
+    /// Metadata-only; refuses for `inbox`. See
+    /// `airday_core::Doc::set_list_archived`.
+    #[wasm_bindgen(js_name = setListArchived)]
+    pub fn set_list_archived(&self, list_id: &str, archived: bool) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .set_list_archived(list_id, archived)
+            .map_err(js_err)
+    }
+
+    /// Internal destructive primitive — not wired to any user-facing UI
+    /// (archive is the user-facing removal). Kept for tests and future
+    /// permanent-deletion work.
     #[wasm_bindgen(js_name = deleteList)]
     pub fn delete_list(&self, list_id: &str) -> Result<(), JsError> {
         self.inner.doc().delete_list(list_id).map_err(js_err)
@@ -1804,12 +1831,13 @@ impl From<CoreEvent> for EngineEvent {
 /// - `itemDueChanged` — id, dueOn? (undefined = no due date)
 /// - `itemLifecycleChanged` — id, live, doneAt?, binnedAt?, openIndex?
 /// - `itemListChanged` — id, listId, openIndex?
-/// - `listAdded` — id, name, createdAt, index
+/// - `listAdded` — id, name, createdAt, archivedAt?, index
 /// - `listRemoved` — id
 /// - `listMoved` — id, index
 /// - `listRenamed` — id, name
 /// - `listIconChanged` — id, icon? (undefined = icon removed)
 /// - `listDefaultViewChanged` — id, defaultView? (undefined = cleared)
+/// - `listArchivedChanged` — id, archivedAt? (undefined = unarchived)
 /// - `settingsChanged` — showListCounts, inboxView?
 /// - `focusChanged` — no fields; re-derive the Focus projection
 #[wasm_bindgen]
@@ -1837,6 +1865,10 @@ pub struct AppEventJs {
     created_at: Option<i64>,
     done_at: Option<i64>,
     binned_at: Option<i64>,
+    /// List archive timestamp (`listAdded` / `listArchivedChanged`):
+    /// `Some(ts)` when the list is archived, `None` when active or on
+    /// events that don't carry archive state.
+    archived_at: Option<i64>,
     show_list_counts: Option<bool>,
     /// Settings (`settingsChanged`): Inbox's saved default view in
     /// encoded form, or `None` when none is saved.
@@ -1894,6 +1926,10 @@ impl AppEventJs {
     pub fn binned_at(&self) -> Option<i64> {
         self.binned_at
     }
+    #[wasm_bindgen(getter, js_name = archivedAt)]
+    pub fn archived_at(&self) -> Option<i64> {
+        self.archived_at
+    }
     #[wasm_bindgen(getter)]
     pub fn index(&self) -> Option<usize> {
         self.index
@@ -1940,6 +1976,7 @@ impl From<CoreAppEvent> for AppEventJs {
             created_at: None,
             done_at: None,
             binned_at: None,
+            archived_at: None,
             show_list_counts: None,
             inbox_view: None,
             index: None,
@@ -2038,12 +2075,14 @@ impl From<CoreAppEvent> for AppEventJs {
                 id,
                 name,
                 created_at,
+                archived_at,
                 index,
             } => AppEventJs {
                 kind: "listAdded",
                 id,
                 name: Some(name),
                 created_at: Some(created_at),
+                archived_at,
                 index: Some(index),
                 ..blank
             },
@@ -2074,6 +2113,12 @@ impl From<CoreAppEvent> for AppEventJs {
                 kind: "listDefaultViewChanged",
                 id,
                 default_view: view.map(|v| v.encode().to_string()),
+                ..blank
+            },
+            CoreAppEvent::ListArchivedChanged { id, archived_at } => AppEventJs {
+                kind: "listArchivedChanged",
+                id,
+                archived_at,
                 ..blank
             },
             CoreAppEvent::SettingsChanged {
@@ -2117,6 +2162,9 @@ fn list_to_json(l: &airday_core::ListView) -> String {
     if let Some(v) = &l.default_view {
         s.push_str(",\"defaultView\":");
         s.push_str(&json_string(v.encode()));
+    }
+    if let Some(t) = l.archived_at {
+        s.push_str(&format!(",\"archivedAt\":{t}"));
     }
     s.push_str(&format!(",\"createdAt\":{}}}", l.created_at));
     s

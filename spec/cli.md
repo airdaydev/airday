@@ -41,10 +41,15 @@ The curated single-tier Focus lens (`spec/focus.md`). References items across li
 Marking a focused item `done` removes it from Focus automatically; binning/deleting drops it from the view.
 
 ### Lists
-- `airday lists ls`
+- `airday lists ls` — active lists only by default; `--archived` shows only archived lists, `--all` shows both. `--json` output includes `archived_at` (null for active lists).
 - `airday lists add <name>`
 - `airday lists rename <list> <name>`
-- `airday lists rm <list>`
+- `airday lists archive <list>` — remove a list from the active workspace without touching its items, ordering, or metadata (`spec/data-model.md` "Archived lists"). Refuses for `inbox`.
+- `airday lists unarchive <list>` — restore an archived list to the active workspace.
+
+There is deliberately **no user-facing list delete**: archive is the only way to
+remove a list from the workspace. The core's `delete_list` stays internal
+(tests / future permanent deletion).
 
 ### Bin
 - `airday bin show`

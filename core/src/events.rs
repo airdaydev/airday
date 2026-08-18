@@ -112,6 +112,11 @@ pub enum AppEvent {
         id: String,
         name: String,
         created_at: i64,
+        /// Archive timestamp (`spec/data-model.md` "Archived lists"):
+        /// `Some` when the list is archived. Carried here — not just on
+        /// `ListArchivedChanged` — because snapshot/backfill consumers
+        /// must materialize archived lists correctly from the add burst.
+        archived_at: Option<i64>,
         index: usize,
     },
     ListRemoved {
@@ -142,6 +147,15 @@ pub enum AppEvent {
     ListDefaultViewChanged {
         id: String,
         view: Option<DefaultView>,
+    },
+    /// A user-created list was archived or unarchived
+    /// (`spec/data-model.md` "Archived lists"). `archived_at` is the
+    /// value after the change — `Some(ts)` when archived, `None` when
+    /// restored to the active workspace. Metadata-only: no item, order,
+    /// lifecycle, or Focus events accompany it.
+    ListArchivedChanged {
+        id: String,
+        archived_at: Option<i64>,
     },
 
     // ---------- focus ----------

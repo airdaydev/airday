@@ -63,8 +63,15 @@ type Messages = {
     focus: string;
     done: string;
     bin: string;
-    deleteList: string;
-    deleteListConfirm: (name: string) => string;
+    /** Context-menu action that archives a list (the user-facing removal
+     *  from the active workspace — there is no Delete). */
+    archiveList: string;
+    /** Header/section indicator for an archived list. */
+    archived: string;
+    /** Context-menu / header action that restores an archived list. */
+    unarchiveList: string;
+    /** Collapsible nav section holding the archived lists. */
+    archivedLists: string;
     renameList: string;
     newList: string;
     connected: string;
@@ -311,9 +318,10 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       focus: "Enfoque",
       done: "Hecho",
       bin: "Papelera",
-      deleteList: "Eliminar",
-      deleteListConfirm: (name) =>
-        `¿Eliminar «${name}»? Sus elementos se moverán a la papelera.`,
+      archiveList: "Archivar",
+      archived: "Archivada",
+      unarchiveList: "Restaurar",
+      archivedLists: "Listas archivadas",
       renameList: "Renombrar",
       newList: "+ Nueva lista",
       connected: "Conectado",
@@ -511,9 +519,10 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       focus: "Focus",
       done: "Done",
       bin: "Bin",
-      deleteList: "Delete",
-      deleteListConfirm: (name) =>
-        `Delete “${name}”? Its items will be moved to the bin.`,
+      archiveList: "Archive",
+      archived: "Archived",
+      unarchiveList: "Unarchive",
+      archivedLists: "Archived lists",
       renameList: "Rename",
       newList: "+ Add list",
       connected: "Connected",

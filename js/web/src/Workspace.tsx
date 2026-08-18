@@ -452,10 +452,20 @@ export function Workspace(props: {
       .sort((a, b) => (b.binnedAt ?? 0) - (a.binnedAt ?? 0));
   });
 
-  const lists = createMemo((): ListView[] =>
+  // Every user list in CRDT order — archived included. Use this for
+  // name/title resolution, search provenance, and archived-list views;
+  // the active/archived splits below feed the nav and destination
+  // pickers (`spec/data-model.md` "Archived lists").
+  const allLists = createMemo((): ListView[] =>
     state.listsOrder
       .map((id) => state.listsById[id])
       .filter((l): l is ListView => l !== undefined),
+  );
+  const activeLists = createMemo((): ListView[] =>
+    allLists().filter((l) => l.archivedAt == null),
+  );
+  const archivedLists = createMemo((): ListView[] =>
+    allLists().filter((l) => l.archivedAt != null),
   );
 
   // Per-list open-item counts (Backlog + Live) for the nav badge, read
@@ -482,6 +492,15 @@ export function Workspace(props: {
   const editableListId = createMemo(() => {
     const v = view();
     return v.kind === "list" && v.id !== "inbox" ? v.id : null;
+  });
+
+  // The currently-viewed list's id iff that list is archived — drives
+  // the header's Archived indicator + Unarchive action, which keep
+  // restoration discoverable even with the sidebar collapsed.
+  const archivedViewListId = createMemo((): string | null => {
+    const v = view();
+    if (v.kind !== "list") return null;
+    return state.listsById[v.id]?.archivedAt != null ? v.id : null;
   });
 
   // Display label for any list id, matching the header/nav rules:
@@ -1119,7 +1138,7 @@ export function Workspace(props: {
       { kind: "list", id: "inbox" },
       { kind: "done" },
       ...(state.binCount > 0 ? [{ kind: "bin" } as ViewKey] : []),
-      ...lists().map((l): ViewKey => ({ kind: "list", id: l.id })),
+      ...activeLists().map((l): ViewKey => ({ kind: "list", id: l.id })),
     ];
     const idx = seq.findIndex((s) => viewKey(s) === viewKey(view()));
     const step = e.key === "]" ? 1 : -1;
@@ -1379,7 +1398,8 @@ export function Workspace(props: {
     >
       <Nav
         app={app}
-        lists={lists()}
+        lists={activeLists()}
+        archivedLists={archivedLists()}
         binCount={state.binCount}
         focusCount={state.focusOrder.length}
         openCountsByList={openCountsByList()}
@@ -1449,7 +1469,7 @@ export function Workspace(props: {
         newItem={newItemTarget}
         setNewItem={setNewItemTarget}
         app={app}
-        lists={lists}
+        lists={activeLists}
         focusField={openFocus}
         caret={openCaret}
         onClosed={restoreItemsFocus}
@@ -1519,19 +1539,33 @@ export function Workspace(props: {
             <Show
               keyed
               when={editableListId()}
-              fallback={viewTitle(view(), lists(), m())}
+              fallback={viewTitle(view(), allLists(), m())}
             >
               {(listId) => (
                 <EditableNavLabel
                   class="editable-title"
-                  name={lists().find((l) => l.id === listId)?.name ?? listId}
+                  name={allLists().find((l) => l.id === listId)?.name ?? listId}
                   onSave={(name) => app.renameList(listId, name)}
                 />
               )}
             </Show>
           </h1>
+            <Show when={archivedViewListId()}>
+              <span class="archived-badge">{m().nav.archived}</span>
+            </Show>
           </div>
           <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
+            <Show when={archivedViewListId()}>
+              {(listId) => (
+                <button
+                  type="button"
+                  class="add-button"
+                  onClick={() => app.setListArchived(listId(), false)}
+                >
+                  {m().nav.unarchiveList}
+                </button>
+              )}
+            </Show>
             <Show
               when={
                 view().kind === "bin" &&

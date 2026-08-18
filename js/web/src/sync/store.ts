@@ -83,6 +83,11 @@ export interface ListView {
    *  has never saved one. Synced doc state; a client with a local
    *  override of its own ignores it. See `spec/board.md`. */
   defaultView?: string;
+  /** Archive timestamp (`spec/data-model.md` "Archived lists"): absent ≡
+   *  active, present ≡ archived. Archived lists stay in `listsOrder` /
+   *  `listsById` (name resolution, search, archived-list views); the UI
+   *  derives its active/archived projections from this field. */
+  archivedAt?: number;
   createdAt: number;
 }
 
@@ -216,8 +221,17 @@ export interface DocApp {
    *  have no local override. Accepts the reserved `inbox`, whose default
    *  lands in the doc-level settings map. See `spec/board.md`. */
   setDefaultView(id: string, view: string | null): void;
+  /** Reorder an active list to `index` in the **active-list** projection
+   *  (the index space the nav's draggable section renders); the core
+   *  resolves it to the raw CRDT index across any interspersed archived
+   *  rows. */
   moveList(id: string, index: number): void;
-  deleteList(id: string): void;
+  /** Archive (`true`) or unarchive (`false`) a user-created list — the
+   *  user-facing removal from the active workspace. Metadata-only: items,
+   *  ordering, lifecycle, and Focus are untouched, and the list stays in
+   *  `listsOrder` / `listsById` (`spec/data-model.md` "Archived lists").
+   *  There is deliberately no user-facing list delete. */
+  setListArchived(id: string, archived: boolean): void;
   /** Toggle the global "show counts on non-Queue lists" setting.
    *  Queue's own count is always visible (subject to count > 0) and is
    *  not gated by this flag. */
@@ -297,6 +311,9 @@ function materializeEngineSnapshot(engine: SyncEngine): WorkspaceState {
       // through or a boot / coarse resync silently drops the saved view
       // and the client falls back to the built-in list lens.
       defaultView: list.defaultView,
+      // Same carry-through for archive state: dropping it would resurrect
+      // archived lists into the active nav on every boot / resync.
+      archivedAt: list.archivedAt,
       createdAt: list.createdAt,
     };
   }
@@ -515,6 +532,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         setState("listsById", ev.id, {
           id: ev.id,
           name: ev.name ?? "",
+          archivedAt: ev.archivedAt != null ? Number(ev.archivedAt) : undefined,
           createdAt: Number(ev.createdAt ?? 0),
         });
         const targetIndex = ev.index ?? state.listsOrder.length;
@@ -580,6 +598,19 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           // `ev.defaultView` is undefined when the default was cleared —
           // mirror that so this client falls back to its own default.
           setState("listsById", ev.id, "defaultView", ev.defaultView ?? undefined);
+        }
+        break;
+      }
+      case "listArchivedChanged": {
+        if (state.listsById[ev.id]) {
+          // `ev.archivedAt` is undefined when the list was unarchived —
+          // mirror that so the list re-enters the active projection.
+          setState(
+            "listsById",
+            ev.id,
+            "archivedAt",
+            ev.archivedAt != null ? Number(ev.archivedAt) : undefined,
+          );
         }
         break;
       }
@@ -775,8 +806,8 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     moveList(id, index) {
       mutate(() => engine.moveList(id, index));
     },
-    deleteList(id) {
-      mutate(() => engine.deleteList(id));
+    setListArchived(id, archived) {
+      mutate(() => engine.setListArchived(id, archived));
     },
     setShowListCounts(show) {
       mutate(() => engine.setShowListCounts(show));

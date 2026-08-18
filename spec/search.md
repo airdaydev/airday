@@ -4,7 +4,10 @@ Current search is a **local, client-side, plaintext index** over the already-dec
 
 ## Goals
 
-- Instant search over items and lists in the active account.
+- Instant search over items and lists in the active account. **Archived lists
+  are included**: a list stays indexed (and keeps supplying its name as item
+  context) whether it is active or archived (`spec/data-model.md` "Archived
+  lists").
 - Works offline.
 - Updates incrementally from the same domain event stream that drives UI state.
 - Small and simple enough to ship without introducing a storage engine or external dependency.

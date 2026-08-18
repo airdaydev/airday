@@ -65,6 +65,7 @@ export function TaskDialog(props: {
     } | null,
   ) => void;
   app: DocApp;
+  /** Active (non-archived) user lists — the move/capture destinations. */
   lists: () => ListView[];
   /** Which field to focus on open (default title). */
   focusField?: () => "title" | "notes";
@@ -116,11 +117,25 @@ export function TaskDialog(props: {
     if (props.itemId() !== null && !item()) props.setItemId(null);
   });
 
-  // Move-to-list options: Inbox followed by every user list.
-  const listOptions = createMemo<ListOption[]>(() => [
-    { id: "inbox", name: m().nav.inbox },
-    ...props.lists().map((l) => ({ id: l.id, name: l.name, icon: l.icon })),
-  ]);
+  // Move-to-list options: Inbox followed by every *active* user list —
+  // archived lists are not offered as destinations. If the open item's
+  // home list is itself archived, it is appended so the picker still
+  // renders the current list's name (and moving *out* to an active list
+  // remains possible).
+  const listOptions = createMemo<ListOption[]>(() => {
+    const opts: ListOption[] = [
+      { id: "inbox", name: m().nav.inbox },
+      ...props.lists().map((l) => ({ id: l.id, name: l.name, icon: l.icon })),
+    ];
+    const currentId = item()?.listId;
+    if (currentId && !opts.some((o) => o.id === currentId)) {
+      const current = props.app.state.listsById[currentId];
+      if (current) {
+        opts.push({ id: current.id, name: current.name, icon: current.icon });
+      }
+    }
+    return opts;
+  });
   const moveItemToList = (targetId: string, currentListId: string) => {
     const id = props.itemId();
     if (!id || targetId === currentListId) return;

@@ -275,7 +275,51 @@ sweep folded into each focus mutation.
 | `name` | string | display name |
 | `icon` | string? | user-chosen display icon, stored as the literal emoji grapheme. Absent/empty ≡ no icon; clients render a built-in fallback glyph. |
 | `view` | string? | the list's **saved default view** — an encoded scalar (`"list"` / `"board"` / `"board:nodone"`) written as one register so a concurrent save can't tear the mode apart from the Done-lane flag. Absent (or unparseable, e.g. written by a newer client) ≡ no saved default: clients fall back to their own. Clients may override it locally. See `spec/board.md`. |
+| `archived_at` | i64? | unix millis when the list was archived. **Absent ≡ active; present ≡ archived.** Written by `set_list_archived`; unarchiving deletes the key. Archiving is pure ListMeta metadata — see "Archived lists" below. |
 | `created_at` | i64 | unix millis |
+
+### Archived lists
+
+Archiving is the user-facing way to remove a list from the active workspace
+without destroying anything. It is a single-register write on the ListMeta row
+(`archived_at`), and **nothing else**:
+
+- Item `location` registers, placements, and order containers are untouched.
+- Item lifecycle, timestamps, notes, and due dates are untouched.
+- Focus refs are untouched.
+- The list keeps its id, name, icon, saved view, `created_at`, and its position
+  in the `lists` MovableList.
+
+Unarchiving deletes the key and the list reappears in the active projection
+exactly as it was.
+
+**Projections.** `all_lists()` remains the canonical projection: every ListMeta
+row in CRDT order, archived or not — archived lists never disappear from it.
+Clients derive two views from it: the **active** projection (`archived_at`
+absent — the main nav, capture/move destinations, keyboard nav) and the
+**archived** projection (`archived_at` present — the archived section).
+Archived lists stay searchable, their boards stay intact, and items locating to
+them keep rendering the list's name.
+
+**`set_list_archived(list_id, archived)`** — refuses for the reserved `inbox`.
+Archiving an active list writes `archived_at = now`; unarchiving deletes the
+key. Re-applying the current state is a no-op: no commit, no event. One commit
+otherwise; emits `ListArchivedChanged { id, archived_at }`. `ListAdded` also
+carries `archived_at` so snapshot/backfill consumers materialize archived lists
+correctly.
+
+**Reordering.** Because clients render only active lists in their draggable
+nav while the `lists` MovableList still holds archived rows in place, an
+active-index drop target does not equal the raw CRDT index. `move_list` on an
+**active** list therefore interprets `target_index` as a position within the
+active-list projection and resolves it to the raw index itself (moving an
+archived list — no client UI does today — keeps raw-index semantics). The
+emitted `ListMoved.index` remains the list's position in the full `all_lists`
+projection.
+
+`delete_list` remains an **internal destructive primitive** (tests, future
+permanent-deletion work); it is not exposed as a user-facing action in any
+client UI.
 
 Whether the nav shows an open-item count (Backlog + Live) beside each list is governed by a single doc-level flag — see `WorkspaceSettings.show_list_counts`. There is no per-list override; Inbox's count is always shown regardless.
 
@@ -322,9 +366,13 @@ All mutations go through Loro APIs internally; the core exposes typed helpers:
   commit. Rejects malformed dates with `Invalid`.
 - `add_list(name) -> ListId`
 - `rename_list(list_id, name)`
+- `set_list_archived(list_id, archived)` — archives (`true`) or unarchives
+  (`false`) a user list; refuses for `inbox`. Metadata-only: performs **no**
+  item, order, lifecycle, or Focus mutations. No-op (no commit, no event) when
+  the list is already in the requested state. See "Archived lists" above.
 - `set_show_list_counts(show)` — toggles the doc-level "show counts on non-Inbox lists" flag. Inbox's count is always visible (subject to count > 0) and is not gated by this.
 - `set_default_view(list_id, view)` — saves (`Some`) or clears (`None`) a list's default view as one encoded register; accepts the reserved `inbox`, whose value lands in `settings.inbox_view` and reports via `SettingsChanged` rather than `ListDefaultViewChanged`. One commit; a no-op when unchanged. See `spec/board.md`.
-- `delete_list(list_id)` — refuses for `inbox`; see "Delete list" contract above.
+- `delete_list(list_id)` — refuses for `inbox`; see "Delete list" contract above. **Internal-only**: not surfaced in any client UI (archive is the user-facing removal).
 - `empty_bin()` — hard-deletes all `Binned` items.
 - `delete_binned(item_id)` — hard-deletes one `Binned` item.
 - `add_to_focus(item_id, index)` / `remove_from_focus(item_id)` / `move_in_focus(item_id, index)` — curated Focus lens mutations over the `focus` container (`spec/focus.md`). Each is one commit and sweeps dead focus refs. `add_to_focus` no-ops when the item already has a visible ref.
