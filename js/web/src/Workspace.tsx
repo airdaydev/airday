@@ -18,11 +18,11 @@ import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { Switch } from "@kobalte/core/switch";
 import { Tooltip } from "@kobalte/core/tooltip";
 import archiveSvg from "./icons/archive.svg?raw";
-import arrowRightSvg from "./icons/arrow-right.svg?raw";
 import caretLeftSvg from "./icons/caret-left.svg?raw";
 import cardStackSvg from "./icons/card-stack.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
+import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import listBulletSvg from "./icons/list-bullet.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
 import menuSvg from "./icons/menu.svg?raw";
@@ -1896,7 +1896,7 @@ function viewTitle(
  *  or `null` for user lists (which carry their own `ListIconPicker`). Keep
  *  these in sync with the icons used in `nav.tsx`. */
 function viewIcon(v: ViewKey): string | null {
-  if (v.kind === "focus") return arrowRightSvg;
+  if (v.kind === "focus") return drawingPinSvg;
   if (v.kind === "done") return checkSvg;
   if (v.kind === "bin") return crumpledPaperSvg;
   if (v.kind === "list" && v.id === "inbox") return archiveSvg;

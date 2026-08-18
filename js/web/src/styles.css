@@ -33,7 +33,7 @@ body > div[style*="z-index: 9999"] > div[style*="overflow: hidden"] {
 }
 
 [data-theme="dark"] {
-  --bg: #08080a;
+  --bg: #141418;
   --bg-elevated: #1a1a1c;
   --surface: #0e0e0e;
   --bg-nav: #0b0b0b;
@@ -735,56 +735,30 @@ body {
 /* Remove (×) affordance shown inside the Focus lens, at the row's trailing
    edge; stays hidden until the row is hovered / selected — removing a
    pinned item must be as cheap as adding it (spec/focus.md). */
-/* Static Focus-membership badge on list rows — a non-interactive pill,
-   always visible (not hover-gated) so Focus membership is glanceable while
-   scanning a list. Add / remove happens via the row context menu. */
+/* Static Focus-membership badge on list rows — a non-interactive pin
+   pill, always visible (not hover-gated) so Focus membership is
+   glanceable while scanning a list. Add / remove happens via the row
+   context menu. Styled to match the neutral `.due-badge` pill; being
+   icon-only it has no line box, so min-height pins it to the due badge's
+   text-driven height (1.3em line + 2px padding + 2px border). */
 .row-focus-badge {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   margin-top: -1px;
+  font-size: 12px;
+  min-height: calc(1.3em + 4px);
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 12px;
-  line-height: 1.3em;
-  white-space: nowrap;
-  color: var(--link);
-  background: transparent;
-  border: 1px solid var(--border-row);
-}
-
-/* Add-to-focus toggle in the task dialog header (mirrors the close button
-   box, lit when the item is in Focus). */
-.task-dialog-focus-toggle {
-  appearance: none;
-  -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
   color: var(--text-muted);
-  cursor: pointer;
-  font: inherit;
+  background: var(--bg-badge);
+  border: 1px solid transparent;
 }
 
-.task-dialog-focus-toggle svg {
-  display: block;
-  width: 16px;
-  height: 16px;
-}
-
-.task-dialog-focus-toggle:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.task-dialog-focus-toggle.is-focused {
-  color: var(--link);
+.row-focus-badge svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* `overflow: hidden` on .dnd-item (set by primavera-dnd's inline stylesheet)
@@ -2045,15 +2019,22 @@ body {
   cursor: pointer;
 }
 
-/* Due-date control row: a label above the native date picker + its
-   Today / Tomorrow / Clear quick actions. */
+/* Badge row under the notes editor: the due-date trigger and the
+   pin-to-Focus toggle side by side. Owns the top gap the due trigger used
+   to carry alone. */
+.task-dialog-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 /* The always-visible badge that opens the due-date quick popover (a faint
    "Deadline" placeholder when unset). Button reset so the DueBadge inside
    keeps its own look. */
 .task-dialog-due-trigger {
   display: inline-flex;
   align-items: center;
-  margin-top: 12px;
   padding: 0;
   border: none;
   background: transparent;
@@ -2065,6 +2046,44 @@ body {
 .task-dialog-due-trigger:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: 2px;
+}
+
+/* Pin-to-Focus toggle beside the due-date badge: same pill geometry as
+   `.due-badge` / `.row-focus-badge`. Faint outline pin when unpinned,
+   muted filled pin when pressed (`aria-pressed`); disabled (Done / Binned
+   items — no Focus refs, spec/focus.md) just loses the pointer. */
+.task-dialog-pin-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  min-height: calc(1.3em + 4px);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--text-faint);
+  background: var(--bg-badge);
+  border: 1px solid transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+.task-dialog-pin-toggle[aria-pressed="true"] {
+  color: var(--text-muted);
+}
+
+.task-dialog-pin-toggle:disabled {
+  cursor: default;
+}
+
+.task-dialog-pin-toggle:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.task-dialog-pin-toggle svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* ---------- calendar dialog (@corvu/calendar) ---------- */

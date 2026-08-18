@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import archiveSvg from "./icons/archive.svg?raw";
+import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import fileSvg from "./icons/file.svg?raw";
 import { DndSelection } from "./dnd/solid";
 import { trackOverlay } from "./overlay.ts";
@@ -564,12 +565,17 @@ export function Row(props: {
             </div>
           </Show>
         </div>
-        {/* Focus-membership badge — a static, non-interactive pill shown
-            only when the item is pinned to Focus; nothing otherwise. There
-            is no hover toggle: adding / removing goes through the row
+        {/* Focus-membership badge — a static, non-interactive pin glyph
+            shown only when the item is pinned to Focus; nothing otherwise.
+            There is no hover toggle: adding / removing goes through the row
             context menu (spec/focus.md). */}
         <Show when={canPinToFocus() && focused() && !props.expanded()}>
-          <span class="row-focus-badge">{m().focus.badge}</span>
+          <span
+            class="row-focus-badge"
+            title={m().focus.badge}
+            aria-label={m().focus.badge}
+            innerHTML={drawingPinSvg}
+          />
         </Show>
         <Show when={!props.showCreated && !props.expanded() && props.item().dueOn}>
           {(due) => (

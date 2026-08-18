@@ -12,12 +12,12 @@ import { Tooltip } from "@kobalte/core/tooltip";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Dnd, DndSelection, type DndOp } from "./dnd/solid";
 import archiveSvg from "./icons/archive.svg?raw";
-import arrowRightSvg from "./icons/arrow-right.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import cloudSvg from "./icons/cloud.svg?raw";
 import cloudOffSvg from "./icons/cloud-off.svg?raw";
 import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
+import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import externalLinkSvg from "./icons/external-link.svg?raw";
 import fileSvg from "./icons/file.svg?raw";
 import { formatRelative } from "./format.tsx";
@@ -485,7 +485,7 @@ export function Nav(props: {
           data-drop-focus=""
           onClick={() => props.setView({ kind: "focus" })}
         >
-          <span class="nav-item-icon" innerHTML={arrowRightSvg} />
+          <span class="nav-item-icon" innerHTML={drawingPinSvg} />
           {m().nav.focus}
           <Show when={props.focusCount > 0}>
             <span class="nav-item-count">{props.focusCount}</span>

@@ -12,6 +12,8 @@ import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { DueField } from "./DueField.tsx";
 import { ListPicker, type ListOption } from "./ListPicker.tsx";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
+import drawingPinSvg from "./icons/drawing-pin.svg?raw";
+import drawingPinFilledSvg from "./icons/drawing-pin-filled.svg?raw";
 import {
   addDaysToStamp,
   formatDoneStamp,
@@ -153,6 +155,8 @@ export function TaskDialog(props: {
   // New-item mode's due-date buffer: nothing exists to write to until the
   // capture commits, so picks are held here and applied after creation.
   const [newDueOn, setNewDueOn] = createSignal<string | null>(null);
+  // New-item mode's pin-to-Focus buffer, same deal as `newDueOn`.
+  const [newFocus, setNewFocus] = createSignal(false);
   // Due-date calendar popover open state, plus a handle the header ⋮ menu's
   // "Set date" item calls to open it (registered by DueField on mount).
   const [dueCalOpen, setDueCalOpen] = createSignal(false);
@@ -209,6 +213,7 @@ export function TaskDialog(props: {
     setText(t);
     setNotes(n);
     setNewDueOn(null);
+    setNewFocus(false);
     loadedId = key;
     // The editors mount when the dialog opens; defer so their refs exist,
     // then push — but only if this target is still the one showing.
@@ -244,6 +249,9 @@ export function TaskDialog(props: {
         if (n.trim()) props.app.editItemNotes(id, n);
         const d = newDueOn();
         if (d) props.app.setItemDueOn(id, d);
+        // A Done capture can't hold a Focus ref (auto-remove-on-Done,
+        // spec/focus.md), so the pin buffer only applies to open captures.
+        if (newFocus() && !nw.done) props.app.addToFocus(id);
         // Logged-as-done capture: create open, then mark done in a second op
         // (mirrors a drag-into-Done). Stamps doneAt = now.
         if (nw.done) props.app.setDone(id, true);
@@ -460,14 +468,22 @@ export function TaskDialog(props: {
                     onClick={(e) => openLinkOnClick(e, notesRef)}
                   />
                   {/* Due-date badge for the capture; picks land in the
-                      local buffer and are written after the item commits. */}
-                  <DueField
-                    dueOn={newDueOn}
-                    muted={() => newItemTarget()?.done ?? false}
-                    onChange={setNewDueOn}
-                    open={dueCalOpen}
-                    setOpen={setDueCalOpen}
-                  />
+                      local buffer and are written after the item commits.
+                      The pin toggle buffers the same way (`newFocus`). */}
+                  <div class="task-dialog-badges">
+                    <DueField
+                      dueOn={newDueOn}
+                      muted={() => newItemTarget()?.done ?? false}
+                      onChange={setNewDueOn}
+                      open={dueCalOpen}
+                      setOpen={setDueCalOpen}
+                    />
+                    <PinToggle
+                      pinned={newFocus}
+                      disabled={() => newItemTarget()?.done ?? false}
+                      onToggle={() => setNewFocus((v) => !v)}
+                    />
+                  </div>
                 </div>
               </div>
             </Show>
@@ -624,17 +640,27 @@ export function TaskDialog(props: {
 
                   {/* Always-visible due-date badge; clicking opens a quick
                       popover (Set date… / Tomorrow / Remove date). The
-                      header ⋮ menu's "Set date" also drives the calendar. */}
-                  <DueField
-                    dueOn={() => it().dueOn ?? null}
-                    muted={() => isDone(it()) || isBinned(it())}
-                    onChange={(stamp) =>
-                      props.app.setItemDueOn(it().id, stamp)
-                    }
-                    open={dueCalOpen}
-                    setOpen={setDueCalOpen}
-                    registerOpen={(fn) => (openDueCalendar = fn)}
-                  />
+                      header ⋮ menu's "Set date" also drives the calendar.
+                      The pin toggle beside it mirrors the menu's add /
+                      remove-from-Focus pair; disabled on Done / Binned
+                      items, which can't hold a Focus ref (spec/focus.md). */}
+                  <div class="task-dialog-badges">
+                    <DueField
+                      dueOn={() => it().dueOn ?? null}
+                      muted={() => isDone(it()) || isBinned(it())}
+                      onChange={(stamp) =>
+                        props.app.setItemDueOn(it().id, stamp)
+                      }
+                      open={dueCalOpen}
+                      setOpen={setDueCalOpen}
+                      registerOpen={(fn) => (openDueCalendar = fn)}
+                    />
+                    <PinToggle
+                      pinned={focused}
+                      disabled={() => isDone(it()) || isBinned(it())}
+                      onToggle={toggleFocus}
+                    />
+                  </div>
 
                   <Show when={isDone(it()) || isBinned(it())}>
                     <div class="task-dialog-meta">
@@ -695,5 +721,29 @@ export function TaskDialog(props: {
         </div>
       </Dialog.Portal>
     </Dialog>
+  );
+}
+
+/** Pin-to-Focus toggle shown beside the due-date badge: outline pin when
+ *  unpinned, filled when pinned. Backed by live Focus state for open items
+ *  and by the `newFocus` buffer in new-item capture mode. */
+function PinToggle(props: {
+  pinned: () => boolean;
+  disabled: () => boolean;
+  onToggle: () => void;
+}) {
+  const { m } = useAppI18n();
+  const label = () => (props.pinned() ? m().focus.remove : m().focus.add);
+  return (
+    <button
+      type="button"
+      class="task-dialog-pin-toggle"
+      aria-pressed={props.pinned()}
+      aria-label={label()}
+      title={label()}
+      disabled={props.disabled()}
+      onClick={props.onToggle}
+      innerHTML={props.pinned() ? drawingPinFilledSvg : drawingPinSvg}
+    />
   );
 }
