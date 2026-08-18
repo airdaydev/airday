@@ -102,6 +102,10 @@ type Messages = {
     hasNotes: string;
     markDone: string;
     markNotDone: string;
+    /** Task-dialog header stamp beside the checkbox: creation time. */
+    createdStamp: (when: string) => string;
+    /** Task-dialog header stamp once the item is done: completion time. */
+    completedStamp: (when: string) => string;
     duplicate: string;
     moveToBin: string;
     moveToList: string;
@@ -353,6 +357,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       hasNotes: "Tiene notas",
       markDone: "Marcar como hecho",
       markNotDone: "Marcar como no hecho",
+      createdStamp: (when) => `Creado ${when}`,
+      completedStamp: (when) => `Completado ${when}`,
       duplicate: "Duplicar",
       moveToBin: "Mover a la papelera",
       moveToList: "Mover a la lista",
@@ -553,6 +559,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       hasNotes: "Has notes",
       markDone: "Mark as done",
       markNotDone: "Mark as not done",
+      createdStamp: (when) => `Created ${when}`,
+      completedStamp: (when) => `Completed ${when}`,
       duplicate: "Duplicate",
       moveToBin: "Move to bin",
       moveToList: "Move to list",

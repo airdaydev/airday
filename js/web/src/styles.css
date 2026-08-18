@@ -687,6 +687,7 @@ body {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
+  gap: 3px;
   color: var(--text-faint);
   font-size: 12px;
   white-space: nowrap;
@@ -695,6 +696,17 @@ body {
   background: var(--bg-badge);
   border: 1px solid transparent;
   border-radius: 4px;
+}
+
+.row-timestamp-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.row-timestamp-icon svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* Origin-list badge on the Done view (spec/board.md — the global Done view
@@ -1826,11 +1838,13 @@ body {
   min-width: 0;
 }
 
-/* The list name is the Select trigger — styled as inline text with a
-   small caret, gaining a hover/open background so it reads as clickable. */
+/* The list name is the picker trigger — the first badge in the dialog's
+   badge row, sharing the `.due-badge` pill geometry, with a small caret
+   and a hover/open lift so it reads as clickable. */
 .task-dialog-list {
   appearance: none;
   -webkit-appearance: none;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -1838,13 +1852,14 @@ body {
   /* Widened from 8em when the list glyph joined the trigger, so the name
      keeps roughly the same room before it ellipsizes. */
   max-width: 10em;
-  margin-left: -6px;
-  padding: 2px 6px;
-  border: 0;
+  font-size: 12px;
+  line-height: 1.3em;
+  padding: 1px 6px;
+  border: 1px solid transparent;
   border-radius: 4px;
-  background: transparent;
+  background: var(--bg-badge);
   color: var(--text-muted);
-  font: inherit;
+  font-family: inherit;
   cursor: pointer;
 }
 
@@ -1869,12 +1884,12 @@ body {
 }
 
 .task-dialog-list-icon svg {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
 }
 
 .task-dialog-list-icon-emoji {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1;
 }
 
@@ -1889,8 +1904,10 @@ body {
   height: 12px;
 }
 
+/* Created / completed stamp: sits in the header, right of the checkbox. */
 .task-dialog-created {
   flex-shrink: 0;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
@@ -1916,19 +1933,12 @@ body {
   color: var(--text);
 }
 
-/* Body splits into a fixed left gutter (checkbox only) and a content
-   column that holds the title and everything below it, so the title,
-   notes, metadata and actions all share one left edge — the checkbox
-   sits outside that edge, in the gutter. */
+/* Content column: the title, notes, badges, metadata and actions all
+   share one left edge. The checkbox lives in the header, on its own line
+   above the title. */
 .task-dialog-body {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-}
-
-.task-dialog-gutter {
-  flex-shrink: 0;
-  width: 16px;
 }
 
 .task-dialog-content {
@@ -1939,13 +1949,11 @@ body {
   gap: 8px;
 }
 
-/* Checkbox mirrors the list-row checkbox, sized up to sit against the
-   18px title. `top` nudges it onto the title's first-line optical centre. */
+/* Checkbox mirrors the list-row checkbox, sized up a notch; sits on the
+   header's left, centred against the 28px close button. */
 .task-dialog-check {
   appearance: none;
   -webkit-appearance: none;
-  position: relative;
-  top: 10px;
   flex-shrink: 0;
   width: 16px;
   height: 16px;
@@ -2034,7 +2042,7 @@ body {
 .task-dialog-badges {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
   margin-top: 12px;
 }
 
@@ -2872,15 +2880,16 @@ body {
   align-self: stretch;
 }
 
-/* Board-card footer: pins the due badge to the bottom-right of the
-   stretched card body. */
+/* Board-card footer: pins all the card's badges (focus pin, due date,
+   done timestamp) to the bottom-left of the stretched card body.
+   Badges that don't fit clip rather than wrap or squash. */
 .row-footer {
   margin-top: auto;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 6px;
   min-width: 0;
+  overflow: hidden;
 }
 
 /* Compact due-date pill. `data-tone` carries the urgency color role:

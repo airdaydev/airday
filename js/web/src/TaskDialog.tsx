@@ -412,23 +412,6 @@ export function TaskDialog(props: {
             <Show when={isNew()}>
               <header class="task-dialog-header">
                 <div class="task-dialog-header-meta">
-                  <ListPicker
-                    options={listOptions}
-                    value={() => newItemListOption()?.id ?? null}
-                    onChange={setNewItemList}
-                  />
-                </div>
-                <div class="task-dialog-header-actions">
-                  <Dialog.CloseButton
-                    class="task-dialog-close"
-                    aria-label={m().common.close}
-                  >
-                    ✕
-                  </Dialog.CloseButton>
-                </div>
-              </header>
-              <div class="task-dialog-body">
-                <div class="task-dialog-gutter">
                   {/* Checked = this capture is logged as already-done. Pre-set
                       by the Done lane "+" and the Done view's "Log" button;
                       flip it off to file the item as a normal open task. */}
@@ -444,6 +427,16 @@ export function TaskDialog(props: {
                     onChange={(e) => setNewItemDone(e.currentTarget.checked)}
                   />
                 </div>
+                <div class="task-dialog-header-actions">
+                  <Dialog.CloseButton
+                    class="task-dialog-close"
+                    aria-label={m().common.close}
+                  >
+                    ✕
+                  </Dialog.CloseButton>
+                </div>
+              </header>
+              <div class="task-dialog-body">
                 <div class="task-dialog-content">
                   <div
                     ref={(el) => {
@@ -482,10 +475,16 @@ export function TaskDialog(props: {
                     onPaste={pasteAsPlainText}
                     onClick={(e) => openLinkOnClick(e, notesRef)}
                   />
-                  {/* Due-date badge for the capture; picks land in the
-                      local buffer and are written after the item commits.
-                      The pin toggle buffers the same way (`newFocus`). */}
+                  {/* List selector leads the badge row, then the due-date
+                      badge; picks land in the local buffers and are written
+                      after the item commits. The pin toggle buffers the
+                      same way (`newFocus`). */}
                   <div class="task-dialog-badges">
+                    <ListPicker
+                      options={listOptions}
+                      value={() => newItemListOption()?.id ?? null}
+                      onChange={setNewItemList}
+                    />
                     <DueField
                       dueOn={newDueOn}
                       muted={() => newItemTarget()?.done ?? false}
@@ -507,13 +506,24 @@ export function TaskDialog(props: {
                 <>
                   <header class="task-dialog-header">
                     <div class="task-dialog-header-meta">
-                      <ListPicker
-                        options={listOptions}
-                        value={() => it().listId}
-                        onChange={(id) => moveItemToList(id, it().listId)}
+                      <input
+                        type="checkbox"
+                        class="task-dialog-check"
+                        checked={isDone(it())}
+                        onChange={(e) =>
+                          props.app.setDone(it().id, e.currentTarget.checked)
+                        }
                       />
+                      {/* Created stamp, swapping to the completion stamp
+                          once the item is ticked off. */}
                       <span class="task-dialog-created">
-                        {formatRelative(it().createdAt, nowMs(), locale())}
+                        {isDone(it())
+                          ? m().workspace.completedStamp(
+                              formatDoneStamp(it().doneAt!, nowMs(), locale()),
+                            )
+                          : m().workspace.createdStamp(
+                              formatRelative(it().createdAt, nowMs(), locale()),
+                            )}
                       </span>
                     </div>
                     <div class="task-dialog-header-actions">
@@ -607,16 +617,6 @@ export function TaskDialog(props: {
                   </header>
 
                   <div class="task-dialog-body">
-                    <div class="task-dialog-gutter">
-                      <input
-                        type="checkbox"
-                        class="task-dialog-check"
-                        checked={isDone(it())}
-                        onChange={(e) =>
-                          props.app.setDone(it().id, e.currentTarget.checked)
-                        }
-                      />
-                    </div>
                     <div class="task-dialog-content">
                       <div
                         ref={(el) => {
@@ -653,13 +653,19 @@ export function TaskDialog(props: {
                     onClick={(e) => openLinkOnClick(e, notesRef)}
                   />
 
-                  {/* Always-visible due-date badge; clicking opens a quick
-                      popover (Set date… / Tomorrow / Remove date). The
+                  {/* Badge row: the move-to-list picker first, then the
+                      always-visible due-date badge — clicking it opens a
+                      quick popover (Set date… / Tomorrow / Remove date); the
                       header ⋮ menu's "Set date" also drives the calendar.
                       The pin toggle beside it mirrors the menu's add /
                       remove-from-Focus pair; disabled on Done / Binned
                       items, which can't hold a Focus ref (spec/focus.md). */}
                   <div class="task-dialog-badges">
+                    <ListPicker
+                      options={listOptions}
+                      value={() => it().listId}
+                      onChange={(id) => moveItemToList(id, it().listId)}
+                    />
                     <DueField
                       dueOn={() => it().dueOn ?? null}
                       muted={() => isDone(it()) || isBinned(it())}
@@ -677,28 +683,18 @@ export function TaskDialog(props: {
                     />
                   </div>
 
-                  <Show when={isDone(it()) || isBinned(it())}>
+                  {/* The done stamp lives in the header now; only the bin
+                      stamp still needs a meta row. */}
+                  <Show when={isBinned(it())}>
                     <div class="task-dialog-meta">
-                      <Show when={isDone(it())}>
-                        <div class="task-dialog-meta-row">
-                          <span class="task-dialog-meta-label">
-                            {m().nav.done}
-                          </span>
-                          <span>
-                            {formatDoneStamp(it().doneAt!, nowMs(), locale())}
-                          </span>
-                        </div>
-                      </Show>
-                      <Show when={isBinned(it())}>
-                        <div class="task-dialog-meta-row">
-                          <span class="task-dialog-meta-label">
-                            {m().nav.bin}
-                          </span>
-                          <span>
-                            {formatRelative(it().binnedAt!, nowMs(), locale())}
-                          </span>
-                        </div>
-                      </Show>
+                      <div class="task-dialog-meta-row">
+                        <span class="task-dialog-meta-label">
+                          {m().nav.bin}
+                        </span>
+                        <span>
+                          {formatRelative(it().binnedAt!, nowMs(), locale())}
+                        </span>
+                      </div>
                     </div>
                   </Show>
 
@@ -727,6 +723,7 @@ export function TaskDialog(props: {
                       </button>
                     </div>
                   </Show>
+
                     </div>
                   </div>
                 </>

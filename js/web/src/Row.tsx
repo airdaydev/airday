@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import archiveSvg from "./icons/archive.svg?raw";
+import checkSvg from "./icons/check.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import fileSvg from "./icons/file.svg?raw";
 import { DndSelection } from "./dnd/solid";
@@ -546,22 +547,58 @@ export function Row(props: {
               if (e.key !== "Escape") e.stopPropagation();
             }}
           />
-          <Show when={props.dueInFooter && !props.expanded() && props.item().dueOn}>
-            {(due) => (
-              <div class="row-footer">
-                <DueBadge
-                  dueOn={due()}
-                  muted={isDone(props.item()) || isBinned(props.item())}
+          {/* Board cards gather every badge on the card's bottom line;
+              list rows show them inline after the title instead. Once an
+              item leaves Open its due date stops mattering — done/binned
+              cards show only their lifecycle timestamp. */}
+          <Show
+            when={
+              props.dueInFooter &&
+              !props.expanded() &&
+              ((isOpen(props.item()) && props.item().dueOn) ||
+                (canPinToFocus() && focused()) ||
+                lifecycleTimestamp(props.item()))
+            }
+          >
+            <div class="row-footer">
+              <Show when={canPinToFocus() && focused()}>
+                <span
+                  class="row-focus-badge"
+                  title={m().focus.badge}
+                  aria-label={m().focus.badge}
+                  innerHTML={drawingPinSvg}
                 />
-              </div>
-            )}
+              </Show>
+              <Show when={isOpen(props.item()) && props.item().dueOn}>
+                {(due) => <DueBadge dueOn={due()} />}
+              </Show>
+              <Show when={lifecycleTimestamp(props.item())}>
+                {(ts) => (
+                  <span
+                    class="row-timestamp"
+                    title={new Date(ts()).toLocaleString(locale())}
+                  >
+                    <Show when={props.viewKind === "done"}>
+                      <span class="row-timestamp-icon" innerHTML={checkSvg} />
+                    </Show>
+                    {props.viewKind === "done"
+                      ? formatDoneStamp(ts(), nowMs(), locale())
+                      : formatRelative(ts(), nowMs(), locale())}
+                  </span>
+                )}
+              </Show>
+            </div>
           </Show>
         </div>
         {/* Focus-membership badge — a static, non-interactive pin glyph
             shown only when the item is pinned to Focus; nothing otherwise.
             There is no hover toggle: adding / removing goes through the row
             context menu (spec/focus.md). */}
-        <Show when={canPinToFocus() && focused() && !props.expanded()}>
+        <Show
+          when={
+            !props.dueInFooter && canPinToFocus() && focused() && !props.expanded()
+          }
+        >
           <span
             class="row-focus-badge"
             title={m().focus.badge}
@@ -569,13 +606,15 @@ export function Row(props: {
             innerHTML={drawingPinSvg}
           />
         </Show>
-        <Show when={!props.dueInFooter && !props.expanded() && props.item().dueOn}>
-          {(due) => (
-            <DueBadge
-              dueOn={due()}
-              muted={isDone(props.item()) || isBinned(props.item())}
-            />
-          )}
+        <Show
+          when={
+            !props.dueInFooter &&
+            !props.expanded() &&
+            isOpen(props.item()) &&
+            props.item().dueOn
+          }
+        >
+          {(due) => <DueBadge dueOn={due()} />}
         </Show>
         <Show when={originList()}>
           {(name) => (
@@ -608,9 +647,12 @@ export function Row(props: {
             </span>
           )}
         </Show>
-        <Show when={lifecycleTimestamp(props.item())}>
+        <Show when={!props.dueInFooter && lifecycleTimestamp(props.item())}>
           {(ts) => (
             <span class="row-timestamp" title={new Date(ts()).toLocaleString(locale())}>
+              <Show when={props.viewKind === "done"}>
+                <span class="row-timestamp-icon" innerHTML={checkSvg} />
+              </Show>
               {props.viewKind === "done"
                 ? formatDoneStamp(ts(), nowMs(), locale())
                 : formatRelative(ts(), nowMs(), locale())}
