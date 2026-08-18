@@ -70,8 +70,6 @@ type Messages = {
     archived: string;
     /** Context-menu / header action that restores an archived list. */
     unarchiveList: string;
-    /** Collapsible nav section holding the archived lists. */
-    archivedLists: string;
     renameList: string;
     newList: string;
     connected: string;
@@ -321,7 +319,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       archiveList: "Archivar",
       archived: "Archivada",
       unarchiveList: "Restaurar",
-      archivedLists: "Listas archivadas",
       renameList: "Renombrar",
       newList: "+ Nueva lista",
       connected: "Conectado",
@@ -522,7 +519,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       archiveList: "Archive",
       archived: "Archived",
       unarchiveList: "Unarchive",
-      archivedLists: "Archived lists",
       renameList: "Rename",
       newList: "+ Add list",
       connected: "Connected",

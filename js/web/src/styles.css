@@ -2946,27 +2946,6 @@ body {
 
 /* ---------- Archived lists (spec/data-model.md "Archived lists") ---------- */
 
-/* Disclosure row for the archived section: quiet, muted — reads as
-   chrome, not another list. */
-.nav-archived-toggle {
-  color: var(--text-muted);
-}
-
-.nav-archived-caret svg {
-  transform: rotate(-90deg);
-  transition: transform 120ms ease;
-}
-
-.nav-archived-caret[data-open] svg {
-  transform: rotate(0deg);
-}
-
-/* Archived rows render dimmed so they read as out-of-workspace; the
-   hover/active treatments come from the shared .nav-item rules. */
-.nav-item-archived {
-  color: var(--text-muted);
-}
-
 /* Header pill marking the currently-viewed list as archived. */
 .archived-badge {
   flex-shrink: 0;

@@ -1,7 +1,6 @@
 import {
   createEffect,
   createSignal,
-  For,
   onCleanup,
   onMount,
   Show,
@@ -13,7 +12,6 @@ import { Tooltip } from "@kobalte/core/tooltip";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Dnd, DndSelection, type DndOp } from "./dnd/solid";
 import archiveSvg from "./icons/archive.svg?raw";
-import caretDownSvg from "./icons/caret-down.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import cloudSvg from "./icons/cloud.svg?raw";
 import cloudOffSvg from "./icons/cloud-off.svg?raw";
@@ -263,12 +261,10 @@ export function StatusSlot(props: {
 
 export function Nav(props: {
   app: DocApp;
-  /** Active (non-archived) lists — the draggable main section. */
+  /** Active (non-archived) lists — the draggable main section. Archived
+   *  lists render no nav section for now; they stay reachable through
+   *  search and restorable via the header's Unarchive action. */
   lists: { id: string; name: string; icon?: string }[];
-  /** Archived lists, rendered in their own collapsible section near the
-   *  bottom (hidden when empty). Not draggable; context menu offers
-   *  Unarchive only — there is no user-facing Delete. */
-  archivedLists: { id: string; name: string; icon?: string }[];
   binCount: number;
   /** Number of visible Focus refs — the Focus nav entry's count badge, and
    *  what drives the soft "getting big" signal past the threshold. */
@@ -287,8 +283,6 @@ export function Nav(props: {
   const { m } = useAppI18n();
   const [adding, setAdding] = createSignal(false);
   const [emptyBinConfirmOpen, setEmptyBinConfirmOpen] = createSignal(false);
-  // Archived-section disclosure — session-local chrome state.
-  const [archivedOpen, setArchivedOpen] = createSignal(false);
   // Archive is non-destructive (globally undoable, trivially reversible
   // via Unarchive), so there is no confirmation dialog. Archiving the
   // list currently on screen would leave a stale view; hop to Inbox
@@ -575,70 +569,6 @@ export function Nav(props: {
           />
         </Show>
       </div>
-      {/* Archived lists (spec/data-model.md "Archived lists"): a
-          collapsible section near the bottom, hidden while nothing is
-          archived. Rows keep their original icon + name and open the
-          list on click; the context menu offers Unarchive only — there
-          is no Delete. */}
-      <Show when={props.archivedLists.length > 0}>
-        <div class="nav-group nav-archived">
-          <button
-            type="button"
-            class="nav-item nav-archived-toggle"
-            aria-expanded={archivedOpen()}
-            onClick={() => setArchivedOpen((o) => !o)}
-          >
-            <span
-              class="nav-item-icon nav-archived-caret"
-              data-open={archivedOpen() ? "" : undefined}
-              innerHTML={caretDownSvg}
-            />
-            {m().nav.archivedLists}
-            <span class="nav-item-count">{props.archivedLists.length}</span>
-          </button>
-          <Show when={archivedOpen()}>
-            <For each={props.archivedLists}>
-              {(l) => (
-                <ContextMenu>
-                  <ContextMenu.Trigger
-                    as="button"
-                    type="button"
-                    class="nav-item nav-item-archived"
-                    data-active={
-                      props.view.kind === "list" && props.view.id === l.id
-                        ? ""
-                        : undefined
-                    }
-                    onClick={() => props.setView({ kind: "list", id: l.id })}
-                  >
-                    <Show
-                      when={l.icon}
-                      fallback={<span class="nav-item-icon" innerHTML={fileSvg} />}
-                    >
-                      {(icon) => (
-                        <span class="nav-item-icon nav-item-icon-emoji">
-                          {icon()}
-                        </span>
-                      )}
-                    </Show>
-                    <span class="nav-item-label">{l.name}</span>
-                  </ContextMenu.Trigger>
-                  <ContextMenu.Portal>
-                    <ContextMenu.Content class="context-menu-content">
-                      <ContextMenu.Item
-                        class="context-menu-item"
-                        onSelect={() => props.app.setListArchived(l.id, false)}
-                      >
-                        {m().nav.unarchiveList}
-                      </ContextMenu.Item>
-                    </ContextMenu.Content>
-                  </ContextMenu.Portal>
-                </ContextMenu>
-              )}
-            </For>
-          </Show>
-        </div>
-      </Show>
       </div>
       <ConfirmDialog
         open={emptyBinConfirmOpen()}

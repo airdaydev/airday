@@ -464,9 +464,6 @@ export function Workspace(props: {
   const activeLists = createMemo((): ListView[] =>
     allLists().filter((l) => l.archivedAt == null),
   );
-  const archivedLists = createMemo((): ListView[] =>
-    allLists().filter((l) => l.archivedAt != null),
-  );
 
   // Per-list open-item counts (Backlog + Live) for the nav badge, read
   // straight off the per-list projection arrays — no item scan. (The bin
@@ -1399,7 +1396,6 @@ export function Workspace(props: {
       <Nav
         app={app}
         lists={activeLists()}
-        archivedLists={archivedLists()}
         binCount={state.binCount}
         focusCount={state.focusOrder.length}
         openCountsByList={openCountsByList()}
