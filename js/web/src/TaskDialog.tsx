@@ -14,13 +14,7 @@ import { ListPicker, type ListOption } from "./ListPicker.tsx";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import drawingPinFilledSvg from "./icons/drawing-pin-filled.svg?raw";
-import {
-  addDaysToStamp,
-  formatDoneStamp,
-  formatRelative,
-  nowMs,
-  todayStamp,
-} from "./format.tsx";
+import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import {
   collapsedCaretOffset,
@@ -172,10 +166,8 @@ export function TaskDialog(props: {
   const [newDueOn, setNewDueOn] = createSignal<string | null>(null);
   // New-item mode's pin-to-Focus buffer, same deal as `newDueOn`.
   const [newFocus, setNewFocus] = createSignal(false);
-  // Due-date calendar popover open state, plus a handle the header ⋮ menu's
-  // "Set date" item calls to open it (registered by DueField on mount).
+  // Due-date calendar popover open state, shared by both DueField modes.
   const [dueCalOpen, setDueCalOpen] = createSignal(false);
-  let openDueCalendar: (() => void) | undefined;
   // The title and notes editors are contenteditable (not textareas) so that
   // http(s) URLs render as clickable anchors, matching the row quick-entry
   // editor. Their content is set imperatively from the buffers on load — it
@@ -536,64 +528,6 @@ export function TaskDialog(props: {
                           />
                           <DropdownMenu.Portal>
                             <DropdownMenu.Content class="dropdown-menu-content task-dialog-menu-content">
-                              {/* Add / remove from Focus: only on Open items
-                                  (a Done/Binned item can't be in Focus —
-                                  spec/focus.md). */}
-                              <Show when={!isDone(it())}>
-                                <DropdownMenu.Item
-                                  class="dropdown-menu-item"
-                                  onSelect={toggleFocus}
-                                >
-                                  {focused() ? m().focus.remove : m().focus.add}
-                                </DropdownMenu.Item>
-                              </Show>
-                              <DropdownMenu.Sub gutter={4}>
-                                <DropdownMenu.SubTrigger class="dropdown-menu-item">
-                                  <span>{m().due.label}</span>
-                                  <span class="menu-sub-arrow" aria-hidden="true">
-                                    ›
-                                  </span>
-                                </DropdownMenu.SubTrigger>
-                                <DropdownMenu.Portal>
-                                  <DropdownMenu.SubContent class="dropdown-menu-content task-dialog-menu-content">
-                                    <Show when={it().dueOn}>
-                                      <DropdownMenu.Item
-                                        class="dropdown-menu-item"
-                                        onSelect={() =>
-                                          props.app.setItemDueOn(it().id, null)
-                                        }
-                                      >
-                                        <span>{m().due.remove}</span>
-                                      </DropdownMenu.Item>
-                                    </Show>
-                                    <DropdownMenu.Item
-                                      class="dropdown-menu-item"
-                                      onSelect={() => {
-                                        // The calendar is a modal dialog, so
-                                        // it won't self-dismiss on the menu's
-                                        // focus-restore; rAF just defers the
-                                        // open past the menu teardown.
-                                        requestAnimationFrame(() =>
-                                          openDueCalendar?.(),
-                                        );
-                                      }}
-                                    >
-                                      <span>{m().due.setDate}</span>
-                                    </DropdownMenu.Item>
-                                    <DropdownMenu.Item
-                                      class="dropdown-menu-item"
-                                      onSelect={() =>
-                                        props.app.setItemDueOn(
-                                          it().id,
-                                          addDaysToStamp(todayStamp(nowMs()), 1),
-                                        )
-                                      }
-                                    >
-                                      <span>{m().due.tomorrow}</span>
-                                    </DropdownMenu.Item>
-                                  </DropdownMenu.SubContent>
-                                </DropdownMenu.Portal>
-                              </DropdownMenu.Sub>
                               <DropdownMenu.Item
                                 class="dropdown-menu-item"
                                 onSelect={() => {
@@ -655,11 +589,10 @@ export function TaskDialog(props: {
 
                   {/* Badge row: the move-to-list picker first, then the
                       always-visible due-date badge — clicking it opens a
-                      quick popover (Set date… / Tomorrow / Remove date); the
-                      header ⋮ menu's "Set date" also drives the calendar.
-                      The pin toggle beside it mirrors the menu's add /
-                      remove-from-Focus pair; disabled on Done / Binned
-                      items, which can't hold a Focus ref (spec/focus.md). */}
+                      quick popover (Set date… / Tomorrow / Remove date).
+                      The pin toggle beside it adds / removes the Focus ref;
+                      disabled on Done / Binned items, which can't hold one
+                      (spec/focus.md). */}
                   <div class="task-dialog-badges">
                     <ListPicker
                       options={listOptions}
@@ -674,7 +607,6 @@ export function TaskDialog(props: {
                       }
                       open={dueCalOpen}
                       setOpen={setDueCalOpen}
-                      registerOpen={(fn) => (openDueCalendar = fn)}
                     />
                     <PinToggle
                       pinned={focused}

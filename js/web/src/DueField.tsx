@@ -1,12 +1,9 @@
 // The task dialog's due-date control: an always-visible badge (clock icon +
-// "Deadline" when unset) that opens a small popover with the same quick
-// actions as the header ⋮ menu's due submenu — Set date… (calendar modal),
-// Tomorrow, and Remove date when one is set. Opening the calendar is also
-// exposed via `registerOpen` so the header ⋮ menu's "Set date" item can
-// drive it, matching the EditableNavLabel `registerStart` pattern.
+// "Deadline" when unset) that opens a small popover with quick actions —
+// Set date… (calendar modal), Tomorrow, and Remove date when one is set.
 
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import { onMount, Show } from "solid-js";
+import { Show } from "solid-js";
 import { DueBadge } from "./DueBadge.tsx";
 import { DueCalendarDialog } from "./DueCalendarDialog.tsx";
 import { addDaysToStamp, nowMs, todayStamp } from "./format.tsx";
@@ -17,17 +14,10 @@ export function DueField(props: {
   dueOn: () => string | null;
   muted: () => boolean;
   onChange: (stamp: string | null) => void;
-  /** Called once on mount with a function that opens the calendar (invoked
-   *  by the header menu's "Set date" item). */
-  registerOpen?: (fn: () => void) => void;
   open: () => boolean;
   setOpen: (v: boolean) => void;
 }) {
   const { m } = useAppI18n();
-
-  // Register-based binding so the menu item can open us without threading a
-  // signal through every layer between here and the header.
-  onMount(() => props.registerOpen?.(() => props.setOpen(true)));
 
   return (
     <>
