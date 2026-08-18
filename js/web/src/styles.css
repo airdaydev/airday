@@ -6,7 +6,6 @@
   --bg: #f7f8fa;
   --bg-elevated: #ffffff;
   --surface: #ffffff;
-  --bg-nav: #f7f7f7;
   --bg-hover: rgba(0, 0, 0, 0.04);
   --bg-active: #e5e7eb;
   --bg-badge: rgba(0, 0, 0, 0.05);
@@ -36,7 +35,6 @@ body > div[style*="z-index: 9999"] > div[style*="overflow: hidden"] {
   --bg: #141418;
   --bg-elevated: #1a1a1c;
   --surface: #0e0e0e;
-  --bg-nav: #0b0b0b;
   --bg-hover: rgba(255, 255, 255, 0.05);
   --bg-active: #2a2a2e;
   --bg-badge: rgba(255, 255, 255, 0.06);
@@ -930,7 +928,7 @@ body {
   display: inline-flex;
   padding: 2px;
   border: 1px solid var(--border-input);
-  background: var(--bg-nav);
+  background: var(--bg);
   border-radius: 6px;
 }
 
@@ -1357,7 +1355,7 @@ body {
   padding: 2px;
   border: 1px solid var(--border-input);
   border-radius: 999px;
-  background: var(--bg-nav);
+  background: var(--bg);
   cursor: pointer;
   transition:
     background 150ms ease,
@@ -2333,7 +2331,7 @@ body {
 }
 
 .settings-sidebar {
-  background: var(--bg-nav);
+  background: var(--bg);
   border-right: 1px solid var(--border);
   padding: 8px;
   display: flex;
@@ -2749,7 +2747,7 @@ body {
   flex: 0 0 320px;
   width: 320px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--bg-nav) 50%, var(--bg));
+  background: var(--bg);
 }
 
 .board-col-header {
@@ -2805,7 +2803,7 @@ body {
    tagged so its drop target reads without a placeholder preview (it runs
    reorder-off, so there is none). */
 .board-col-done {
-  background: color-mix(in srgb, var(--bg-nav) 28%, var(--bg));
+  background: var(--bg);
 }
 
 .board-col-name-fixed {
