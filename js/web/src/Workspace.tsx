@@ -1046,31 +1046,6 @@ export function Workspace(props: {
   };
   onGlobalKey(onOpenKey);
 
-  // Cmd/Ctrl+Enter: inline "quick edit" — expand the topmost selected row for
-  // editing, or collapse the expanded row (collapse runs the save effect in
-  // Row). The expanded row's contenteditable owns Enter while editing — it
-  // dispatches an Escape to drive collapse — so the editable-surface guard
-  // keeps us from double-handling there.
-  const onQuickEdit = (e: KeyboardEvent) => {
-    if (e.key !== "Enter") return;
-    if (!(e.metaKey || e.ctrlKey)) return;
-    if (e.altKey || e.shiftKey) return;
-    // List-view only: the board has no inline edit and `dndHandle` points at
-    // the (now-unmounted) list Dnd while a board is showing.
-    if (boardListId() !== null) return;
-    if (!dndHandle) return;
-    if (dndHandle.getExpanded() !== null) {
-      e.preventDefault();
-      dndHandle.setExpanded(null);
-      return;
-    }
-    const top = selection.getSelectionTop();
-    if (top === null) return;
-    e.preventDefault();
-    dndHandle.setExpanded(top);
-  };
-  onGlobalKey(onQuickEdit);
-
   // ? opens the keyboard-shortcut cheat sheet. `?` is Shift+/, so shift is
   // expected; bail on the other modifiers. onGlobalKey already skips it
   // while typing or when another overlay is open.

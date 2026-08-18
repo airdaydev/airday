@@ -21,8 +21,6 @@ import type { Key, DndOp } from "../core/types";
 const BORDER_RADIUS_PX = 4;
 
 export interface DndImperative {
-  setExpanded(key: Key | null): void;
-  getExpanded(): Key | null;
   getSelection(): { blocks: any[]; active: any | null };
   scrollToKey(key: Key): void;
   /** Move keyboard focus to the listbox so arrow/Enter/Space act on it. */
@@ -47,7 +45,7 @@ export interface DndProps<T> {
   expandedKey?: Key | null;
   /** Fired whenever the controller requests an expansion state change. */
   onExpandedChange?: (key: Key | null) => void;
-  /** Receives an imperative handle for setExpanded / getExpanded / getSelection. */
+  /** Receives an imperative handle for getSelection / scrollToKey / focus. */
   ref?: (handle: DndImperative) => void;
   getKey: (item: T) => Key;
   /** Optional consumer-owned selection model. */
@@ -234,8 +232,6 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     }
 
     props.ref?.({
-      setExpanded: (k) => controller!.setExpanded(k),
-      getExpanded: () => controller!.getExpanded(),
       getSelection: () => controller!.getSelection(),
       scrollToKey: (k) => controller!.scrollToKey(k),
       focus: () => listboxEl.focus(),

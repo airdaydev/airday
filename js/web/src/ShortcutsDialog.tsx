@@ -20,7 +20,6 @@ export function ShortcutsDialog(props: {
     return [
       { label: s.newItem, key: "Space" },
       { label: s.openItem, key: "Enter" },
-      { label: s.editItem, key: "⌘ Enter" },
       { label: s.toggleDone, key: "X" },
       { label: s.toggleFocus, key: "F" },
       { label: s.duplicate, key: "⌘D" },

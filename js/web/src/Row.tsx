@@ -136,10 +136,10 @@ export function Row(props: {
       props.expanded,
       (now, prev) => {
         if (!prev && now) {
-          // Inline expansion is now only reached via Cmd+Enter / a new draft
-          // (double-click opens the dialog instead), so the caret always
-          // lands at the end of the text — typing appends rather than
-          // overwriting a select-all.
+          // Inline expansion is now only reached by a new draft (existing
+          // items open the dialog instead), so the caret always lands at
+          // the end of the text — typing appends rather than overwriting
+          // a select-all.
           // Swap plain text for linkified anchors so URLs become clickable
           // while the row is editable. The collapse path & mirror effect
           // restore plain text, so anchors only exist in expanded rows.

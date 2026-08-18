@@ -217,7 +217,6 @@ type Messages = {
   shortcuts: {
     title: string;
     newItem: string;
-    editItem: string;
     openItem: string;
     toggleDone: string;
     toggleFocus: string;
@@ -426,7 +425,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     shortcuts: {
       title: "Atajos de teclado",
       newItem: "Nuevo elemento",
-      editItem: "Editar elemento",
       openItem: "Abrir elemento",
       toggleDone: "Marcar como hecho",
       toggleFocus: "Añadir o quitar de Enfoque",
@@ -628,7 +626,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     shortcuts: {
       title: "Keyboard shortcuts",
       newItem: "New item",
-      editItem: "Edit item",
       openItem: "Open item",
       toggleDone: "Toggle done",
       toggleFocus: "Toggle focus",
