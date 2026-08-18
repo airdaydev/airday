@@ -26,6 +26,7 @@ import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import listBulletSvg from "./icons/list-bullet.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
 import menuSvg from "./icons/menu.svg?raw";
+import viewVerticalSvg from "./icons/view-vertical.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
 import { Board, type BoardImperative } from "./Board.tsx";
@@ -35,7 +36,7 @@ import { FindPalette } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { ListIconPicker } from "./ListIconPicker.tsx";
 import { restoreCapturedPositions } from "./linger.ts";
-import { EditableNavLabel, Nav, StatusSlot } from "./nav.tsx";
+import { EditableNavLabel, Nav, NavMenu, StatusSlot } from "./nav.tsx";
 import { digitNavTarget } from "./navShortcuts.ts";
 import { isOverlayOpen, onGlobalKey } from "./overlay.ts";
 import type { ViewKey } from "./prefs.ts";
@@ -101,6 +102,18 @@ function loadDoneShowListPref(): boolean {
     return localStorage.getItem(DONE_SHOW_LIST_PREF_KEY) !== "0";
   } catch {
     return true;
+  }
+}
+
+// Desktop "sidebar hidden" flag. Local-only chrome state like the prefs
+// above; visible is the default, so only the hidden state is persisted
+// (stored as "1"). Mobile ignores it — the drawer has its own state.
+const NAV_HIDDEN_PREF_KEY = "airday:nav-hidden";
+function loadNavHiddenPref(): boolean {
+  try {
+    return localStorage.getItem(NAV_HIDDEN_PREF_KEY) === "1";
+  } catch {
+    return false;
   }
 }
 
@@ -1327,6 +1340,20 @@ export function Workspace(props: {
 
   const [navOpen, setNavOpen] = createSignal(false);
 
+  // Desktop sidebar collapse — orthogonal to the mobile drawer's
+  // `navOpen`. Toggled from the unified app footer, which stays visible
+  // either way.
+  const [navHidden, setNavHiddenSignal] = createSignal(loadNavHiddenPref());
+  const setNavHidden = (hidden: boolean) => {
+    setNavHiddenSignal(hidden);
+    try {
+      if (hidden) localStorage.setItem(NAV_HIDDEN_PREF_KEY, "1");
+      else localStorage.removeItem(NAV_HIDDEN_PREF_KEY);
+    } catch {
+      // Quota/private-mode failures just lose the preference.
+    }
+  };
+
   // Escape closes the open drawer. Scoped to navOpen=true so we don't
   // contend with FindPalette / Settings / row-expansion escape handlers
   // when the drawer isn't even visible.
@@ -1347,6 +1374,7 @@ export function Workspace(props: {
       class="app"
       classList={{
         "nav-open": navOpen(),
+        "nav-hidden": navHidden(),
       }}
     >
       <Nav
@@ -1388,14 +1416,6 @@ export function Workspace(props: {
             dndHandle?.focus();
           });
         }}
-        session={session.session()}
-        online={session.online()}
-        lastSyncAt={session.lastSyncAt()}
-        logout={session.logout}
-        onOpenSettings={() => setSettingsOpen(true)}
-        onOpenShortcuts={() => setShortcutsOpen(true)}
-        onSession={session.swapSession}
-        isMobile={isMobile()}
       />
       <FindPalette
         app={app}
@@ -1857,11 +1877,41 @@ export function Workspace(props: {
           />
         </Show>
       </main>
-      {/* Desktop-only footer strip below the main surface; the account /
-          sync widget sits at its far right. On mobile this is hidden and
-          the widget lives in the nav drawer's footer instead. */}
+      </div>
+      {/* Unified footer strip spanning nav + main (a direct child of the
+          app grid, not nested in either pane), so its chrome stays put
+          when the sidebar hides or the mobile drawer swaps panes. Menu +
+          sidebar toggle sit bottom-left; the account / sync widget sits
+          at the far right. */}
       <footer class="footer">
+        {/* Desktop-only: mobile's drawer makes a collapsed sidebar
+            meaningless. */}
         <Show when={!isMobile()}>
+          <Tooltip openDelay={200} closeDelay={0} placement="top">
+            <Tooltip.Trigger
+              class="nav-menu-trigger"
+              aria-label={navHidden() ? m().nav.showSidebar : m().nav.hideSidebar}
+              aria-expanded={!navHidden()}
+              onClick={() => setNavHidden(!navHidden())}
+              innerHTML={viewVerticalSvg}
+            />
+            <Tooltip.Portal>
+              <Tooltip.Content class="tooltip-content">
+                {navHidden() ? m().nav.showSidebar : m().nav.hideSidebar}
+                <Tooltip.Arrow />
+              </Tooltip.Content>
+            </Tooltip.Portal>
+          </Tooltip>
+        </Show>
+        <NavMenu
+          app={app}
+          session={session.session()}
+          logout={session.logout}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenShortcuts={() => setShortcutsOpen(true)}
+          onSession={session.swapSession}
+        />
+        <div class="footer-status">
           <StatusSlot
             app={app}
             online={session.online()}
@@ -1869,9 +1919,8 @@ export function Workspace(props: {
             session={session.session()}
             onSession={session.swapSession}
           />
-        </Show>
+        </div>
       </footer>
-      </div>
     </div>
   );
 }

@@ -89,9 +89,14 @@ body {
   overflow: hidden;
 }
 
+/* Two columns (nav | content) over a footer strip that spans both — the
+   footer is a direct grid child, not nested in either pane, so its
+   chrome (app menu, sidebar toggle, account/sync widget) stays put when
+   the sidebar hides or the mobile drawer swaps panes. */
 .app {
   display: grid;
   grid-template-columns: 240px 1fr;
+  grid-template-rows: 1fr auto;
   height: 100%;
 }
 
@@ -143,6 +148,25 @@ body {
   outline-offset: 1px;
 }
 
+/* Desktop sidebar collapse: `nav-hidden` drops the nav column and the
+   main surface takes the full width; the footer toggle stays visible to
+   bring it back. Mobile is unaffected — the drawer rules in the media
+   query below come later in the file, so they win over these when both
+   flags are in play. */
+.app.nav-hidden {
+  grid-template-columns: 1fr;
+}
+
+.app.nav-hidden .nav {
+  display: none;
+}
+
+/* The main surface normally borrows its left gutter from the nav
+   column; restore it when that column is gone. */
+.app.nav-hidden .main {
+  margin-left: 8px;
+}
+
 @media (max-width: 768px) and (pointer: coarse) {
   /* Bump the inherited base size on phones; chrome elements with
      explicit px sizes (section labels, chips) keep theirs. ≥16px also
@@ -151,14 +175,15 @@ body {
     font-size: 18px;
   }
 
-  /* Full-screen drawer: nav and main each fill the viewport, stacked in
+  /* Full-screen drawer: nav and main each fill the pane row, stacked in
      the same grid cell; exactly one is shown at a time. No slide — the
-     `nav-open` flag just swaps which pane is display'd.
+     `nav-open` flag just swaps which pane is display'd. The unified
+     footer keeps its own row below either pane.
        Closed → nav hidden, main fills the screen.
        Open   → main hidden, nav fills the screen. */
   .app {
     grid-template-columns: 100vw;
-    grid-template-rows: 100%;
+    grid-template-rows: 1fr auto;
   }
 
   .nav,
@@ -166,17 +191,11 @@ body {
     grid-area: 1 / 1;
   }
 
-  /* Full-screen drawer: undo the desktop floating-surface treatment. The
-     footer is desktop-only — the account/sync widget lives in the nav
-     drawer's footer on mobile instead. */
+  /* Full-screen drawer: undo the desktop floating-surface treatment. */
   .main {
     margin: 0;
     border: 0;
     border-radius: 0;
-  }
-
-  .footer {
-    display: none;
   }
 
   .nav {
@@ -198,24 +217,6 @@ body {
 
 .nav-group {
   margin-bottom: 8px;
-}
-
-.nav-footer {
-  margin-top: auto;
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Pushes the account/sync widget to the far right of the nav footer,
-   opposite the menu trigger (mobile only — desktop shows it in the app
-   footer instead). */
-.nav-footer-status {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .nav-menu-trigger {
@@ -370,8 +371,8 @@ body {
   pointer-events: none;
 }
 
-/* Right-hand column: the main surface fills the available height and a
-   thin footer strip sits below it on the darker body background. */
+/* Right-hand column: the main surface fills the pane row; the footer
+   strip below it belongs to the app grid, not this column. */
 .content {
   display: flex;
   flex-direction: column;
@@ -393,14 +394,24 @@ body {
   border: 0.5px solid var(--border-surface);
 }
 
+/* Unified footer strip on the darker body background, spanning nav +
+   main: sidebar toggle then app menu at the left, account/sync widget
+   at the far right. Left padding lines the toggle up with the nav's
+   scroll-region gutter. */
 .footer {
-  flex-shrink: 0;
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
+  gap: 2px;
   height: 36px;
-  padding: 0 8px 0 0;
+  padding: 0 8px 0 12px;
+}
+
+.footer-status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .main-header {

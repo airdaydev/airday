@@ -202,9 +202,8 @@ function ConnectionStatusPopover(props: {
 
 /** The account/sync widget: a sign-in prompt while anonymous, the
  *  connection-status popover once authed. Lives at the far-right of the
- *  desktop footer, or in the nav drawer's footer on mobile — rendered in
- *  exactly one of those places at a time (guarded by the caller's mobile
- *  check), so its auto-open-on-mount auth dialog fires only once. */
+ *  unified app footer (see `Workspace`), rendered exactly once, so its
+ *  auto-open-on-mount auth dialog fires only once. */
 export function StatusSlot(props: {
   app: DocApp;
   online: boolean;
@@ -277,33 +276,10 @@ export function Nav(props: {
   showListCounts: boolean;
   view: ViewKey;
   setView: (v: ViewKey) => void;
-  session: Session;
-  online: boolean;
-  lastSyncAt: number | null;
-  logout: () => void;
-  onOpenSettings: () => void;
-  onOpenShortcuts: () => void;
-  onSession: (s: Session) => void;
-  /** On mobile the drawer keeps the account/sync widget in its own
-   *  footer (desktop hoists it to the app footer instead). */
-  isMobile: boolean;
 }) {
   const { m } = useAppI18n();
   const [adding, setAdding] = createSignal(false);
   const [emptyBinConfirmOpen, setEmptyBinConfirmOpen] = createSignal(false);
-  // Auth dialog opened from the overflow menu's Sign in / Sign up items
-  // (anonymous sessions only). Separate from StatusSlot's own auto-open
-  // dialog; `authMode` seeds the form's login/signup toggle.
-  const [authOpen, setAuthOpen] = createSignal(false);
-  const [authMode, setAuthMode] = createSignal<"login" | "signup">("login");
-  const openAuth = (mode: "login" | "signup") => {
-    setAuthMode(mode);
-    setAuthOpen(true);
-  };
-  const handleAuthSession = (s: Session) => {
-    setAuthOpen(false);
-    props.onSession(s);
-  };
   // When a non-empty list is about to be deleted we stage it here so the
   // ConfirmDialog can name it; null means no pending delete. Empty lists
   // (no live items) skip the dialog and delete immediately.
@@ -373,70 +349,6 @@ export function Nav(props: {
   const selectedNavIds = (id: string): string[] =>
     navSelection.isSelected(id) ? navSelection.getSelectedKeys().map(String) : [id];
 
-  // Reactive read-throughs of the engine's undo state. `app.version`
-  // bumps on every dispatched event (local mutation, undo/redo, remote
-  // import), which is exactly when undo availability can change.
-  const canUndo = (): boolean => {
-    props.app.version();
-    return props.app.canUndo();
-  };
-  const canRedo = (): boolean => {
-    props.app.version();
-    return props.app.canRedo();
-  };
-
-  // Trigger a browser download for an in-memory blob. Anchor + revoke
-  // is the only cross-browser path; FileSystem Access API isn't on
-  // Safari yet.
-  const triggerDownload = (blob: Blob, filename: string): void => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  // "Export JSON": pretty-printed semantic dump (lists + items).
-  // Readable in any editor and round-trips through Import JSON, but
-  // lossy: CRDT history, ordering metadata, and undo-stack info aren't
-  // here. (A lossless plaintext-snapshot export exists in the core —
-  // `exportSnapshot` — but stays unexposed until a matching import lands.)
-  const downloadJson = (): void => {
-    try {
-      const json = props.app.engine.exportJson();
-      const blob = new Blob([json], { type: "application/json" });
-      const stamp = new Date().toISOString().slice(0, 10);
-      triggerDownload(blob, `airday-${stamp}.json`);
-    } catch (err) {
-      console.error("export json failed:", err);
-      alert(m().nav.exportFailed);
-    }
-  };
-
-  // Hidden file input the "Import JSON" menu item triggers via .click().
-  // Resetting `value` between picks is what lets the user choose the same
-  // file twice in a row — without it the change event never fires the
-  // second time.
-  let importFileInput: HTMLInputElement | undefined;
-  const onImportFilePicked = async (
-    e: Event & { currentTarget: HTMLInputElement },
-  ): Promise<void> => {
-    const file = e.currentTarget.files?.[0];
-    e.currentTarget.value = "";
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const summary = props.app.importJson(text);
-      alert(m().nav.importSucceeded(summary.itemsAdded, summary.listsAdded));
-    } catch (err) {
-      console.error("import json failed:", err);
-      alert(m().nav.importFailed);
-    }
-  };
-
   const onReorder = (op: DndOp<NavList>) => {
     if (op.type !== "move") return;
     const ids = props.lists.map((l) => l.id);
@@ -465,13 +377,6 @@ export function Nav(props: {
   };
   return (
     <nav class="nav" onKeyDown={onNavKeyDown}>
-      <input
-        ref={importFileInput}
-        type="file"
-        accept="application/json,.json"
-        style={{ display: "none" }}
-        onChange={onImportFilePicked}
-      />
       <div class="nav-scroll">
       <div class="nav-group">
         {/* Focus: a reserved lens (spec/focus.md), not a `ListMeta` row, so
@@ -676,130 +581,6 @@ export function Nav(props: {
         </Show>
       </div>
       </div>
-      <div class="nav-footer">
-        <DropdownMenu>
-          <Tooltip openDelay={200} closeDelay={0} placement="top">
-            <Tooltip.Trigger
-              as={DropdownMenu.Trigger}
-              class="nav-menu-trigger"
-              aria-label={m().common.menu}
-              innerHTML={dotsVerticalSvg}
-            />
-            <Tooltip.Portal>
-              <Tooltip.Content class="tooltip-content">
-                {m().common.menu}
-                <Tooltip.Arrow />
-              </Tooltip.Content>
-            </Tooltip.Portal>
-          </Tooltip>
-          <DropdownMenu.Portal>
-            <DropdownMenu.Content class="dropdown-menu-content">
-              <DropdownMenu.Item
-                class="dropdown-menu-item"
-                disabled={!canUndo()}
-                onSelect={() => {
-                  props.app.undo();
-                }}
-              >
-                <span>{m().nav.undo}</span>
-                <kbd class="menu-shortcut">⌘Z</kbd>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item
-                class="dropdown-menu-item"
-                disabled={!canRedo()}
-                onSelect={() => {
-                  props.app.redo();
-                }}
-              >
-                <span>{m().nav.redo}</span>
-                <kbd class="menu-shortcut">⌘⇧Z</kbd>
-              </DropdownMenu.Item>
-              <DropdownMenu.Separator class="dropdown-menu-separator" />
-              <DropdownMenu.Item
-                class="dropdown-menu-item"
-                onSelect={() => downloadJson()}
-              >
-                {m().nav.exportJson}
-              </DropdownMenu.Item>
-              <DropdownMenu.Item
-                class="dropdown-menu-item"
-                onSelect={() => {
-                  // Defer past the menu close + focus-restore so the
-                  // native file picker isn't fighting Kobalte for focus.
-                  requestAnimationFrame(() => importFileInput?.click());
-                }}
-              >
-                {m().nav.importJson}
-              </DropdownMenu.Item>
-              <DropdownMenu.Item
-                class="dropdown-menu-item"
-                onSelect={() => props.onOpenShortcuts()}
-              >
-                <span>{m().shortcuts.title}</span>
-                <kbd class="menu-shortcut">?</kbd>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item
-                class="dropdown-menu-item"
-                onSelect={() => props.onOpenSettings()}
-              >
-                {m().nav.settings}
-              </DropdownMenu.Item>
-              <DropdownMenu.Item
-                class="dropdown-menu-item"
-                as="a"
-                href="https://air.day/"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {m().nav.website}
-                <span innerHTML={externalLinkSvg} />
-              </DropdownMenu.Item>
-              <Show when={props.session.anonymous}>
-                <DropdownMenu.Separator class="dropdown-menu-separator" />
-                <DropdownMenu.Item
-                  class="dropdown-menu-item"
-                  onSelect={() => openAuth("login")}
-                >
-                  {m().auth.signIn}
-                </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  class="dropdown-menu-item"
-                  onSelect={() => openAuth("signup")}
-                >
-                  {m().auth.signUp}
-                </DropdownMenu.Item>
-              </Show>
-              <Show when={!props.session.anonymous}>
-                <DropdownMenu.Item
-                  class="dropdown-menu-item"
-                  onSelect={() => props.logout()}
-                >
-                  {m().nav.logOut}
-                </DropdownMenu.Item>
-              </Show>
-            </DropdownMenu.Content>
-          </DropdownMenu.Portal>
-        </DropdownMenu>
-        <Show when={props.isMobile}>
-          <div class="nav-footer-status">
-            <StatusSlot
-              app={props.app}
-              online={props.online}
-              lastSyncAt={props.lastSyncAt}
-              session={props.session}
-              onSession={props.onSession}
-            />
-          </div>
-        </Show>
-      </div>
-      <Show when={props.session.anonymous}>
-        <AuthDialog
-          open={authOpen()}
-          onOpenChange={setAuthOpen}
-          onSession={handleAuthSession}
-          initialMode={authMode()}
-        />
-      </Show>
       <ConfirmDialog
         open={emptyBinConfirmOpen()}
         onOpenChange={setEmptyBinConfirmOpen}
@@ -820,6 +601,222 @@ export function Nav(props: {
         }}
       />
     </nav>
+  );
+}
+
+/** The app-menu dropdown (undo/redo, import/export, settings, auth) plus
+ *  its auxiliary chrome — the hidden import file input and the auth
+ *  dialog the Sign in / Sign up items open. Lives in the unified app
+ *  footer (see `Workspace`), not inside the nav, so it stays put when
+ *  the sidebar is hidden. */
+export function NavMenu(props: {
+  app: DocApp;
+  session: Session;
+  logout: () => void;
+  onOpenSettings: () => void;
+  onOpenShortcuts: () => void;
+  onSession: (s: Session) => void;
+}) {
+  const { m } = useAppI18n();
+  // Auth dialog opened from the menu's Sign in / Sign up items
+  // (anonymous sessions only). Separate from StatusSlot's own auto-open
+  // dialog; `authMode` seeds the form's login/signup toggle.
+  const [authOpen, setAuthOpen] = createSignal(false);
+  const [authMode, setAuthMode] = createSignal<"login" | "signup">("login");
+  const openAuth = (mode: "login" | "signup") => {
+    setAuthMode(mode);
+    setAuthOpen(true);
+  };
+  const handleAuthSession = (s: Session) => {
+    setAuthOpen(false);
+    props.onSession(s);
+  };
+
+  // Reactive read-throughs of the engine's undo state. `app.version`
+  // bumps on every dispatched event (local mutation, undo/redo, remote
+  // import), which is exactly when undo availability can change.
+  const canUndo = (): boolean => {
+    props.app.version();
+    return props.app.canUndo();
+  };
+  const canRedo = (): boolean => {
+    props.app.version();
+    return props.app.canRedo();
+  };
+
+  // Trigger a browser download for an in-memory blob. Anchor + revoke
+  // is the only cross-browser path; FileSystem Access API isn't on
+  // Safari yet.
+  const triggerDownload = (blob: Blob, filename: string): void => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  // "Export JSON": pretty-printed semantic dump (lists + items).
+  // Readable in any editor and round-trips through Import JSON, but
+  // lossy: CRDT history, ordering metadata, and undo-stack info aren't
+  // here. (A lossless plaintext-snapshot export exists in the core —
+  // `exportSnapshot` — but stays unexposed until a matching import lands.)
+  const downloadJson = (): void => {
+    try {
+      const json = props.app.engine.exportJson();
+      const blob = new Blob([json], { type: "application/json" });
+      const stamp = new Date().toISOString().slice(0, 10);
+      triggerDownload(blob, `airday-${stamp}.json`);
+    } catch (err) {
+      console.error("export json failed:", err);
+      alert(m().nav.exportFailed);
+    }
+  };
+
+  // Hidden file input the "Import JSON" menu item triggers via .click().
+  // Resetting `value` between picks is what lets the user choose the same
+  // file twice in a row — without it the change event never fires the
+  // second time.
+  let importFileInput: HTMLInputElement | undefined;
+  const onImportFilePicked = async (
+    e: Event & { currentTarget: HTMLInputElement },
+  ): Promise<void> => {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const summary = props.app.importJson(text);
+      alert(m().nav.importSucceeded(summary.itemsAdded, summary.listsAdded));
+    } catch (err) {
+      console.error("import json failed:", err);
+      alert(m().nav.importFailed);
+    }
+  };
+
+  return (
+    <>
+      <input
+        ref={importFileInput}
+        type="file"
+        accept="application/json,.json"
+        style={{ display: "none" }}
+        onChange={onImportFilePicked}
+      />
+      <DropdownMenu>
+        <Tooltip openDelay={200} closeDelay={0} placement="top">
+          <Tooltip.Trigger
+            as={DropdownMenu.Trigger}
+            class="nav-menu-trigger"
+            aria-label={m().common.menu}
+            innerHTML={dotsVerticalSvg}
+          />
+          <Tooltip.Portal>
+            <Tooltip.Content class="tooltip-content">
+              {m().common.menu}
+              <Tooltip.Arrow />
+            </Tooltip.Content>
+          </Tooltip.Portal>
+        </Tooltip>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content class="dropdown-menu-content">
+            <DropdownMenu.Item
+              class="dropdown-menu-item"
+              disabled={!canUndo()}
+              onSelect={() => {
+                props.app.undo();
+              }}
+            >
+              <span>{m().nav.undo}</span>
+              <kbd class="menu-shortcut">⌘Z</kbd>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              class="dropdown-menu-item"
+              disabled={!canRedo()}
+              onSelect={() => {
+                props.app.redo();
+              }}
+            >
+              <span>{m().nav.redo}</span>
+              <kbd class="menu-shortcut">⌘⇧Z</kbd>
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator class="dropdown-menu-separator" />
+            <DropdownMenu.Item
+              class="dropdown-menu-item"
+              onSelect={() => downloadJson()}
+            >
+              {m().nav.exportJson}
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              class="dropdown-menu-item"
+              onSelect={() => {
+                // Defer past the menu close + focus-restore so the
+                // native file picker isn't fighting Kobalte for focus.
+                requestAnimationFrame(() => importFileInput?.click());
+              }}
+            >
+              {m().nav.importJson}
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              class="dropdown-menu-item"
+              onSelect={() => props.onOpenShortcuts()}
+            >
+              <span>{m().shortcuts.title}</span>
+              <kbd class="menu-shortcut">?</kbd>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              class="dropdown-menu-item"
+              onSelect={() => props.onOpenSettings()}
+            >
+              {m().nav.settings}
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              class="dropdown-menu-item"
+              as="a"
+              href="https://air.day/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {m().nav.website}
+              <span innerHTML={externalLinkSvg} />
+            </DropdownMenu.Item>
+            <Show when={props.session.anonymous}>
+              <DropdownMenu.Separator class="dropdown-menu-separator" />
+              <DropdownMenu.Item
+                class="dropdown-menu-item"
+                onSelect={() => openAuth("login")}
+              >
+                {m().auth.signIn}
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                class="dropdown-menu-item"
+                onSelect={() => openAuth("signup")}
+              >
+                {m().auth.signUp}
+              </DropdownMenu.Item>
+            </Show>
+            <Show when={!props.session.anonymous}>
+              <DropdownMenu.Item
+                class="dropdown-menu-item"
+                onSelect={() => props.logout()}
+              >
+                {m().nav.logOut}
+              </DropdownMenu.Item>
+            </Show>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu>
+      <Show when={props.session.anonymous}>
+        <AuthDialog
+          open={authOpen()}
+          onOpenChange={setAuthOpen}
+          onSession={handleAuthSession}
+          initialMode={authMode()}
+        />
+      </Show>
+    </>
   );
 }
 
