@@ -1525,7 +1525,7 @@ export function Workspace(props: {
               <span class="archived-badge">{m().nav.archived}</span>
             </Show>
           </div>
-          <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
+          <div class="main-header-actions">
             <Show when={archivedViewListId()}>
               {(listId) => (
                 <button

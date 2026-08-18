@@ -426,6 +426,12 @@ body {
   font-weight: 400;
 }
 
+.main-header-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
 .main-header-title {
   display: flex;
   align-items: center;
