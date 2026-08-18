@@ -63,9 +63,9 @@ export function Row(props: {
   /** When true (mobile), a plain tap on the row opens the dialog instead
    *  of only selecting — inline editing is unpleasant on touch. */
   openOnTap?: () => boolean;
-  /** Board cards show the item's created date in their bottom-left corner
-   *  (list rows don't). */
-  showCreated?: boolean;
+  /** Board cards pin the due badge to a footer at the bottom of the card;
+   *  list rows show it inline after the title instead. */
+  dueInFooter?: boolean;
   /** Done view only: when true, badge the row with its origin list name.
    *  Resolved via `listLabel` so `main` shows the Home label. */
   showList?: () => boolean;
@@ -546,23 +546,15 @@ export function Row(props: {
               if (e.key !== "Escape") e.stopPropagation();
             }}
           />
-          <Show when={props.showCreated && !props.expanded()}>
-            <div class="row-footer">
-              <span
-                class="row-created"
-                title={new Date(props.item().createdAt).toLocaleString(locale())}
-              >
-                {formatRelative(props.item().createdAt, nowMs(), locale())}
-              </span>
-              <Show when={props.item().dueOn}>
-                {(due) => (
-                  <DueBadge
-                    dueOn={due()}
-                    muted={isDone(props.item()) || isBinned(props.item())}
-                  />
-                )}
-              </Show>
-            </div>
+          <Show when={props.dueInFooter && !props.expanded() && props.item().dueOn}>
+            {(due) => (
+              <div class="row-footer">
+                <DueBadge
+                  dueOn={due()}
+                  muted={isDone(props.item()) || isBinned(props.item())}
+                />
+              </div>
+            )}
           </Show>
         </div>
         {/* Focus-membership badge — a static, non-interactive pin glyph
@@ -577,7 +569,7 @@ export function Row(props: {
             innerHTML={drawingPinSvg}
           />
         </Show>
-        <Show when={!props.showCreated && !props.expanded() && props.item().dueOn}>
+        <Show when={!props.dueInFooter && !props.expanded() && props.item().dueOn}>
           {(due) => (
             <DueBadge
               dueOn={due()}

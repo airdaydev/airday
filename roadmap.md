@@ -5,6 +5,7 @@
 - another one - we probably want to remove 'done' items positions in the main lists!
 - bug: mark multiple items as done then mark one of those as not done and list position changes!
 - onAuthFailed → logout() → dekVault.clear() - a little bit blunt and not quite in local-first spirit, wipe-dek-to-anonymous the wrong response
+- Themes
 
 ## Sync & persistence
 - Report catch-up volume in `HelloAck` so clients can show progress and we can observe snapshot-vs-tail sync weight.

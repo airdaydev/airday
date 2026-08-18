@@ -2866,24 +2866,19 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Stretch the card body to the full card height so the created date can
-   sit in the bottom-left corner (below the wrapped title). */
+/* Stretch the card body to the full card height so the footer can sit
+   at the bottom (below the wrapped title). */
 .board-col-dnd .row-body {
   align-self: stretch;
 }
 
-.row-created {
-  font-size: 11px;
-  color: var(--text-faint);
-}
-
-/* Board-card footer: pins the created date + due badge to the bottom of
-   the stretched card body (row-created lost its own margin-top:auto). */
+/* Board-card footer: pins the due badge to the bottom-right of the
+   stretched card body. */
 .row-footer {
   margin-top: auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 6px;
   min-width: 0;
 }

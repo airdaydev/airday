@@ -55,7 +55,7 @@ export type BoardImperative = { focusActive: () => void };
  *  live in the Dnd controller now; the board only needs this to size the
  *  cards uniformly. Board cards are taller than list rows so the title can
  *  wrap to two lines (see `.board-col-dnd .row-text` in styles.css). */
-const CARD_HEIGHT = 96;
+const CARD_HEIGHT = 80;
 
 /** Px gutter below each card within its fixed slot — mirrors the card's
  *  `height: calc(100% - 6px)` so the drop placeholder lines up with the
@@ -666,7 +666,7 @@ function BoardColumn(props: {
               onReveal={props.onReveal}
               openOnTap={props.openOnTap}
               scrollToKey={(k) => handle?.scrollToKey(k)}
-              showCreated
+              dueInFooter
             />
           )}
         </Dnd>
