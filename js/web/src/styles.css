@@ -4,6 +4,7 @@
 
 :root {
   --bg: #f7f8fa;
+  --bg-board-col: #fbfcfd;
   --bg-elevated: #ffffff;
   --surface: #ffffff;
   --bg-hover: rgba(0, 0, 0, 0.04);
@@ -14,7 +15,7 @@
   --text-faint: #888;
   --text-empty: #999;
   --border: #e5e5e5;
-  --border-surface: #dcdcdc;
+  --border-surface: #e7e7e7;
   --border-input: #d4d4d4;
   --border-row: #efefef;
   --link: #2563eb;
@@ -33,6 +34,7 @@ body > div[style*="z-index: 9999"] > div[style*="overflow: hidden"] {
 
 [data-theme="dark"] {
   --bg: #141418;
+  --bg-board-col: #141418;
   --bg-elevated: #1a1a1c;
   --surface: #0e0e0e;
   --bg-hover: rgba(255, 255, 255, 0.05);
@@ -93,7 +95,7 @@ body {
    the sidebar hides or the mobile drawer swaps panes. */
 .app {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 260px 1fr;
   grid-template-rows: 1fr auto;
   height: 100%;
 }
@@ -414,7 +416,7 @@ body {
 
 .main-header {
   height: 3em;
-  padding: 8px;
+  padding: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -585,11 +587,11 @@ body {
 }
 
 .dnd-host .dnd-parent {
-  padding: 0 8px 8px;
+  padding: 0 12px 12px;
 }
 
 .main .dnd-drop-placeholder {
-  margin: 0 8px;
+  margin: 0 12px;
 }
 
 .row {
@@ -625,7 +627,7 @@ body {
   height: 14px;
   flex-shrink: 0;
   border: 1px solid var(--border-input);
-  border-radius: 3px;
+  border-radius: 5px;
   background: transparent;
   cursor: pointer;
   transition:
@@ -2749,7 +2751,7 @@ body {
   display: flex;
   align-items: stretch;
   gap: 10px;
-  padding: 8px;
+  padding: 12px;
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -2761,7 +2763,7 @@ body {
   flex: 0 0 320px;
   width: 320px;
   border-radius: 10px;
-  background: var(--bg);
+  background: var(--bg-board-col);
 }
 
 .board-col-header {
@@ -2816,10 +2818,6 @@ body {
 /* Fixed Done lane: visually recessed vs. the Backlog / Live lanes and
    tagged so its drop target reads without a placeholder preview (it runs
    reorder-off, so there is none). */
-.board-col-done {
-  background: var(--bg);
-}
-
 .board-col-name-fixed {
   display: inline-flex;
   align-items: center;
