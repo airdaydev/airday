@@ -548,49 +548,51 @@ export function Row(props: {
               if (e.key !== "Escape") e.stopPropagation();
             }}
           />
-          {/* Board cards gather every badge on the card's bottom line;
-              list rows show them inline after the title instead. Once an
-              item leaves Open its due date stops mattering — done/binned
-              cards show only their lifecycle timestamp. */}
-          <Show
-            when={
-              props.dueInFooter &&
-              !props.expanded() &&
-              ((isOpen(props.item()) && props.item().dueOn) ||
-                (canPinToFocus() && focused()) ||
-                lifecycleTimestamp(props.item()))
-            }
-          >
-            <div class="row-footer">
-              <Show when={canPinToFocus() && focused()}>
-                <span
-                  class="row-focus-badge"
-                  title={m().focus.badge}
-                  aria-label={m().focus.badge}
-                  innerHTML={drawingPinSvg}
-                />
-              </Show>
-              <Show when={isOpen(props.item()) && props.item().dueOn}>
-                {(due) => <DueBadge dueOn={due()} />}
-              </Show>
-              <Show when={lifecycleTimestamp(props.item())}>
-                {(ts) => (
-                  <span
-                    class="row-timestamp"
-                    title={new Date(ts()).toLocaleString(locale())}
-                  >
-                    <Show when={props.viewKind === "done"}>
-                      <span class="row-timestamp-icon" innerHTML={checkSvg} />
-                    </Show>
-                    {props.viewKind === "done"
-                      ? formatDoneStamp(ts(), nowMs(), locale())
-                      : formatRelative(ts(), nowMs(), locale())}
-                  </span>
-                )}
-              </Show>
-            </div>
-          </Show>
         </div>
+        {/* Board cards gather every badge on a full-width bottom line —
+            a direct child of the card so the badges start at the card's
+            left padding edge (under the checkbox), not the title. List
+            rows show them inline after the title instead. Once an item
+            leaves Open its due date stops mattering — done/binned cards
+            show only their lifecycle timestamp. */}
+        <Show
+          when={
+            props.dueInFooter &&
+            !props.expanded() &&
+            ((isOpen(props.item()) && props.item().dueOn) ||
+              (canPinToFocus() && focused()) ||
+              lifecycleTimestamp(props.item()))
+          }
+        >
+          <div class="row-footer">
+            <Show when={canPinToFocus() && focused()}>
+              <span
+                class="row-focus-badge"
+                title={m().focus.badge}
+                aria-label={m().focus.badge}
+                innerHTML={drawingPinSvg}
+              />
+            </Show>
+            <Show when={isOpen(props.item()) && props.item().dueOn}>
+              {(due) => <DueBadge dueOn={due()} />}
+            </Show>
+            <Show when={lifecycleTimestamp(props.item())}>
+              {(ts) => (
+                <span
+                  class="row-timestamp"
+                  title={new Date(ts()).toLocaleString(locale())}
+                >
+                  <Show when={props.viewKind === "done"}>
+                    <span class="row-timestamp-icon" innerHTML={checkSvg} />
+                  </Show>
+                  {props.viewKind === "done"
+                    ? formatDoneStamp(ts(), nowMs(), locale())
+                    : formatRelative(ts(), nowMs(), locale())}
+                </span>
+              )}
+            </Show>
+          </div>
+        </Show>
         {/* Focus-membership badge — a static, non-interactive pin glyph
             shown only when the item is pinned to Focus; nothing otherwise.
             There is no hover toggle: adding / removing goes through the row
