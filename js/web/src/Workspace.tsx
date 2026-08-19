@@ -105,6 +105,18 @@ function loadDoneShowListPref(): boolean {
   }
 }
 
+// Same origin-list badge flag for the Focus lens, which is also a single
+// global view. Off by default — only the "on" state is persisted
+// (stored as "1").
+const FOCUS_SHOW_LIST_PREF_KEY = "airday:focus-show-list";
+function loadFocusShowListPref(): boolean {
+  try {
+    return localStorage.getItem(FOCUS_SHOW_LIST_PREF_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 // Desktop "sidebar hidden" flag. Local-only chrome state like the prefs
 // above; visible is the default, so only the hidden state is persisted
 // (stored as "1"). Mobile ignores it — the drawer has its own state.
@@ -283,6 +295,19 @@ export function Workspace(props: {
     try {
       if (show) localStorage.removeItem(DONE_SHOW_LIST_PREF_KEY);
       else localStorage.setItem(DONE_SHOW_LIST_PREF_KEY, "0");
+    } catch {
+      // Quota/private-mode failures just lose the preference.
+    }
+  };
+  // Whether the Focus lens badges each item with its origin list.
+  const [focusShowList, setFocusShowListSignal] = createSignal<boolean>(
+    loadFocusShowListPref(),
+  );
+  const setFocusShowList = (show: boolean) => {
+    setFocusShowListSignal(show);
+    try {
+      if (show) localStorage.setItem(FOCUS_SHOW_LIST_PREF_KEY, "1");
+      else localStorage.removeItem(FOCUS_SHOW_LIST_PREF_KEY);
     } catch {
       // Quota/private-mode failures just lose the preference.
     }
@@ -1657,12 +1682,12 @@ export function Workspace(props: {
                   <Tooltip.Trigger
                     as={Popover.Trigger}
                     class="add-button view-mode-trigger"
-                    aria-label={m().workspace.doneOptions}
+                    aria-label={m().workspace.displayOptions}
                     innerHTML={mixerHzSvg}
                   />
                   <Tooltip.Portal>
                     <Tooltip.Content class="tooltip-content">
-                      {m().workspace.doneOptions}
+                      {m().workspace.displayOptions}
                       <Tooltip.Arrow />
                     </Tooltip.Content>
                   </Tooltip.Portal>
@@ -1675,7 +1700,7 @@ export function Workspace(props: {
                       onChange={(checked) => setDoneShowList(checked)}
                     >
                       <Switch.Label class="done-switch-label">
-                        {m().workspace.showDoneList}
+                        {m().workspace.showOriginList}
                       </Switch.Label>
                       <Switch.Input class="done-switch-input" />
                       <Switch.Control class="done-switch-control">
@@ -1708,6 +1733,41 @@ export function Workspace(props: {
                   </Tooltip.Content>
                 </Tooltip.Portal>
               </Tooltip>
+            </Show>
+            <Show when={view().kind === "focus"}>
+              <Popover placement="bottom-end" gutter={6}>
+                <Tooltip openDelay={200} closeDelay={0} placement="bottom">
+                  <Tooltip.Trigger
+                    as={Popover.Trigger}
+                    class="add-button view-mode-trigger"
+                    aria-label={m().workspace.displayOptions}
+                    innerHTML={mixerHzSvg}
+                  />
+                  <Tooltip.Portal>
+                    <Tooltip.Content class="tooltip-content">
+                      {m().workspace.displayOptions}
+                      <Tooltip.Arrow />
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                </Tooltip>
+                <Popover.Portal>
+                  <Popover.Content class="view-mode-popover">
+                    <Switch
+                      class="done-switch"
+                      checked={focusShowList()}
+                      onChange={(checked) => setFocusShowList(checked)}
+                    >
+                      <Switch.Label class="done-switch-label">
+                        {m().workspace.showOriginList}
+                      </Switch.Label>
+                      <Switch.Input class="done-switch-input" />
+                      <Switch.Control class="done-switch-control">
+                        <Switch.Thumb class="done-switch-thumb" />
+                      </Switch.Control>
+                    </Switch>
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover>
             </Show>
             <Show when={view().kind === "list" || view().kind === "focus"}>
               <Tooltip openDelay={200} closeDelay={0} placement="bottom">
@@ -1803,7 +1863,11 @@ export function Workspace(props: {
                         app={app}
                         selection={selection}
                         viewKind={view().kind}
-                        showList={doneShowList}
+                        showList={() =>
+                          view().kind === "focus"
+                            ? focusShowList()
+                            : doneShowList()
+                        }
                         listLabel={listLabel}
                         listIcon={listIcon}
                         duplicateBlock={duplicateBlock}

@@ -67,7 +67,7 @@ export function Row(props: {
   /** Board cards pin the due badge to a footer at the bottom of the card;
    *  list rows show it inline after the title instead. */
   dueInFooter?: boolean;
-  /** Done view only: when true, badge the row with its origin list name.
+  /** Done / Focus views: when true, badge the row with its origin list name.
    *  Resolved via `listLabel` so `main` shows the Home label. */
   showList?: () => boolean;
   /** Resolves a list id to its display label (see Workspace `listLabel`). */
@@ -88,15 +88,12 @@ export function Row(props: {
   scrollToKey?: (key: string) => void;
 }) {
   const { m, locale } = useAppI18n();
-  // Origin-list badge text for the flat cross-list views. Always shown in
-  // the Focus lens (the owning category is useful context there), and in
-  // the Done view when its "show list" toggle is on. Null otherwise, or
+  // Origin-list badge text for the flat cross-list views (Focus and Done),
+  // shown when the view's "show list" toggle is on. Null otherwise, or
   // when no label resolves.
   const originList = createMemo(() => {
-    if (props.viewKind === "focus") {
-      return props.listLabel?.(props.item().listId) || null;
-    }
-    return props.viewKind === "done" && props.showList?.()
+    return (props.viewKind === "focus" || props.viewKind === "done") &&
+      props.showList?.()
       ? (props.listLabel?.(props.item().listId) || null)
       : null;
   });

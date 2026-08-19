@@ -117,10 +117,12 @@ type Messages = {
     /** Tag marking the row for the list an item is already filed under, in
      *  the move-to-list picker. */
     currentList: string;
-    /** Accessible name for the Done view's display-options popover trigger. */
-    doneOptions: string;
-    /** Switch label (Done options popover) toggling the origin-list badge. */
-    showDoneList: string;
+    /** Accessible name for the Done / Focus views' display-options popover
+     *  trigger. */
+    displayOptions: string;
+    /** Switch label (Done / Focus options popover) toggling the origin-list
+     *  badge. */
+    showOriginList: string;
     /** Done-view header button that opens the modal to record a completed
      *  item directly (defaults to Inbox). */
     log: string;
@@ -364,8 +366,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       searchLists: "Buscar listas",
       noMatchingLists: "No hay listas coincidentes",
       currentList: "Actual",
-      doneOptions: "Opciones de visualización",
-      showDoneList: "Mostrar lista",
+      displayOptions: "Opciones de visualización",
+      showOriginList: "Mostrar lista",
       log: "Registrar",
       logCompleted: "Registrar elemento completado",
       listIcon: "Icono de la lista",
@@ -565,8 +567,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       searchLists: "Search lists",
       noMatchingLists: "No matching lists",
       currentList: "Current",
-      doneOptions: "Display options",
-      showDoneList: "Show list",
+      displayOptions: "Display options",
+      showOriginList: "Show list",
       log: "Log",
       logCompleted: "Log completed item",
       listIcon: "List icon",
