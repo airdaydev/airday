@@ -42,6 +42,8 @@ type Messages = {
     close: string;
     menu: string;
     copy: string;
+    /** Context-menu move-to-list action (opens the move palette). */
+    move: string;
     delete: string;
     restore: string;
     cancel: string;
@@ -222,6 +224,8 @@ type Messages = {
     openItem: string;
     toggleDone: string;
     toggleFocus: string;
+    /** The bare `m` move-to-list palette. */
+    moveToList: string;
     duplicate: string;
     copy: string;
     undo: string;
@@ -300,6 +304,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       close: "Cerrar",
       menu: "Menú",
       copy: "Copiar",
+      move: "Mover",
       delete: "Eliminar",
       restore: "Restaurar",
       cancel: "Cancelar",
@@ -430,6 +435,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       openItem: "Abrir elemento",
       toggleDone: "Marcar como hecho",
       toggleFocus: "Añadir o quitar de Enfoque",
+      moveToList: "Mover a la lista",
       duplicate: "Duplicar",
       copy: "Copiar",
       undo: "Deshacer",
@@ -501,6 +507,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       close: "Close",
       menu: "Menu",
       copy: "Copy",
+      move: "Move",
       delete: "Delete",
       restore: "Restore",
       cancel: "Cancel",
@@ -631,6 +638,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       openItem: "Open item",
       toggleDone: "Toggle done",
       toggleFocus: "Toggle focus",
+      moveToList: "Move to list",
       duplicate: "Duplicate",
       copy: "Copy",
       undo: "Undo",

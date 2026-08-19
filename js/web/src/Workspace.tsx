@@ -36,6 +36,8 @@ import { FindPalette } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { ListIconPicker } from "./ListIconPicker.tsx";
 import { restoreCapturedPositions } from "./linger.ts";
+import type { ListOption } from "./ListPicker.tsx";
+import { MovePalette } from "./MovePalette.tsx";
 import { EditableNavLabel, Nav, NavMenu, StatusSlot } from "./nav.tsx";
 import { digitNavTarget } from "./navShortcuts.ts";
 import { isOverlayOpen, onGlobalKey } from "./overlay.ts";
@@ -163,6 +165,11 @@ export function Workspace(props: {
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   // The item currently opened in the detail dialog, or null when closed.
   const [openItemId, setOpenItemId] = createSignal<string | null>(null);
+  // Rows the move palette will re-file (visible order), or null when the
+  // palette is closed. Captured at open (from the `m` shortcut's selection
+  // or a row context menu's target set) so the pick acts on what the user
+  // saw, not on whatever the selection is by commit time.
+  const [moveIds, setMoveIds] = createSignal<string[] | null>(null);
   // Shared due-date calendar, opened from a row/board context menu's "Set
   // date". Holds the target item ids and the stamp to seed the calendar
   // with (the clicked row's current due date, or null); one modal serves
@@ -868,6 +875,88 @@ export function Workspace(props: {
   };
   onGlobalKey(onToggleFocusKey);
 
+  // Open the move palette on `sourceIds`, kept in visible order so the
+  // block lands in the target list in the user's visible sequence. Board
+  // Done-lane cards aren't in `items()` (same situation as ⌫ above) —
+  // they survive the visibility filter via the extended set and follow
+  // the in-view rows.
+  const openMovePalette = (sourceIds: readonly string[]) => {
+    const visibleIds = items().map((it) => it.id);
+    const visibleSet = new Set(visibleIds);
+    const boardId = boardListId();
+    if (boardId !== null) {
+      for (const it of Object.values(state.itemsById)) {
+        if (it.listId === boardId && isDone(it) && !isBinned(it)) {
+          visibleSet.add(it.id);
+        }
+      }
+    }
+    const sourceSet = new Set(sourceIds.map(String));
+    const inView = visibleIds.filter((id) => sourceSet.has(id));
+    const inViewSet = new Set(inView);
+    const rest = [...sourceSet].filter(
+      (id) => visibleSet.has(id) && !inViewSet.has(id),
+    );
+    const ids = [...inView, ...rest];
+    if (ids.length > 0) setMoveIds(ids);
+  };
+
+  // The list the move palette annotates as "Current": only the list /
+  // board views have one — in the cross-list views (Focus / Done / Bin)
+  // the acted-on rows may come from anywhere.
+  const moveCurrentId = () => {
+    const v = view();
+    return v.kind === "list" ? v.id : null;
+  };
+
+  // Move destinations: Inbox followed by every active user list —
+  // archived lists are not offered, matching the task dialog's picker.
+  const moveListOptions = createMemo<ListOption[]>(() => [
+    { id: "inbox", name: m().nav.inbox },
+    ...activeLists().map((l) => ({ id: l.id, name: l.name, icon: l.icon })),
+  ]);
+
+  // Commit a palette pick: mirrors the drag-into-nav drop above — un-done
+  // and un-bin first, then land as the first items of the target list in
+  // visible order, all one undo step. Picking the view's own list is a
+  // no-op (not a reorder-to-top surprise), matching the task dialog's
+  // picker.
+  const moveBlockToList = (ids: readonly string[], targetListId: string) => {
+    const v = view();
+    if (v.kind === "list" && v.id === targetListId) return;
+    const toUndone = ids.filter((id) => {
+      const it = app.getItem(id);
+      return it !== undefined && isDone(it);
+    });
+    const toUnbin = ids.filter((id) => {
+      const it = app.getItem(id);
+      return it !== undefined && isBinned(it);
+    });
+    app.withActionBatch(() => {
+      if (toUndone.length > 0) app.setDoneMany(toUndone, false);
+      if (toUnbin.length > 0) app.setBinnedMany(toUnbin, false);
+      for (const [i, id] of ids.entries()) {
+        app.moveItem(id, targetListId, i);
+      }
+    });
+    // The moved rows have left this view, so a lingering selection would
+    // be a phantom block anchor (see the drag-out handling below).
+    actionSelection()?.clear();
+  };
+
+  // m: open the move palette on the current selection.
+  const onMoveKey = (e: KeyboardEvent) => {
+    if (e.key !== "m" && e.key !== "M") return;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const sel = actionSelection();
+    if (!sel) return;
+    const ids = sel.getSelectedKeys().map(String);
+    if (ids.length === 0) return;
+    e.preventDefault();
+    openMovePalette(ids);
+  };
+  onGlobalKey(onMoveKey);
+
   // Duplicate live items as a contiguous block immediately after the
   // bottom-most source row — same shape as paste — rather than each
   // clone sitting under its own original. Shared by Cmd+D and the row
@@ -1439,6 +1528,23 @@ export function Workspace(props: {
         onOpenChange={setFindOpen}
         onSelect={(r) => onFindSelect(r)}
       />
+      <MovePalette
+        open={moveIds() !== null}
+        onOpenChange={(open) => {
+          if (open) return;
+          setMoveIds(null);
+          // Hand keyboard focus back to the items listbox — the palette
+          // stole it into its filter input. Same restore the task dialog
+          // does on close.
+          restoreItemsFocus();
+        }}
+        options={moveListOptions}
+        currentId={moveCurrentId}
+        onPick={(listId) => {
+          const ids = moveIds();
+          if (ids) moveBlockToList(ids, listId);
+        }}
+      />
       <Settings
         open={settingsOpen()}
         onOpenChange={setSettingsOpen}
@@ -1880,6 +1986,7 @@ export function Workspace(props: {
                         }}
                         onSetDue={openDueCalendar}
                         onReveal={revealItemIn}
+                        onMoveToList={openMovePalette}
                         openOnTap={itemsIsMobile}
                         scrollToKey={(k) => dndHandle?.scrollToKey(k)}
                       />
@@ -1901,6 +2008,7 @@ export function Workspace(props: {
               }}
               onSetDue={openDueCalendar}
               onReveal={revealItemIn}
+              onMoveToList={openMovePalette}
               openOnTap={itemsIsMobile}
               duplicateBlock={duplicateBlock}
               copyBlock={copyBlock}

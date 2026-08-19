@@ -74,6 +74,9 @@ export function Board(props: {
   /** Row context-menu jump to the item's other appearance (the Focus
    *  lens). Forwarded to each card. */
   onReveal?: (id: string, where: "list" | "focus") => void;
+  /** Row context-menu move-to-list (opens the workspace's move palette).
+   *  Forwarded to each card. */
+  onMoveToList?: (ids: readonly string[]) => void;
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
@@ -519,6 +522,7 @@ export function Board(props: {
         onOpen={props.onOpen}
         onSetDue={props.onSetDue}
         onReveal={props.onReveal}
+        onMoveToList={props.onMoveToList}
         openOnTap={props.openOnTap}
         duplicateBlock={props.duplicateBlock}
         copyBlock={props.copyBlock}
@@ -535,6 +539,7 @@ export function Board(props: {
         onOpen={props.onOpen}
         onSetDue={props.onSetDue}
         onReveal={props.onReveal}
+        onMoveToList={props.onMoveToList}
         openOnTap={props.openOnTap}
         duplicateBlock={props.duplicateBlock}
         copyBlock={props.copyBlock}
@@ -558,6 +563,7 @@ export function Board(props: {
           onOpen={props.onOpen}
           onSetDue={props.onSetDue}
           onReveal={props.onReveal}
+          onMoveToList={props.onMoveToList}
           openOnTap={props.openOnTap}
           duplicateBlock={props.duplicateBlock}
           copyBlock={props.copyBlock}
@@ -581,6 +587,7 @@ function BoardColumn(props: {
   onOpen: (id: string, focus?: "notes", caret?: number) => void;
   onSetDue: (ids: readonly string[], initial: string | null) => void;
   onReveal?: (id: string, where: "list" | "focus") => void;
+  onMoveToList?: (ids: readonly string[]) => void;
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
@@ -664,6 +671,7 @@ function BoardColumn(props: {
               onOpen={props.onOpen}
               onSetDue={props.onSetDue}
               onReveal={props.onReveal}
+              onMoveToList={props.onMoveToList}
               openOnTap={props.openOnTap}
               scrollToKey={(k) => handle?.scrollToKey(k)}
               dueInFooter

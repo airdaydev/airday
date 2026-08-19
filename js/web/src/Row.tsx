@@ -82,6 +82,10 @@ export function Row(props: {
    *  Focus lens to its home list, or from a list / board to the Focus
    *  lens. Only offered for items that appear in both (`spec/focus.md`). */
   onReveal?: (id: string, where: "list" | "focus") => void;
+  /** Open the workspace's move palette on the target set (the selection
+   *  when this row is part of it, else this row alone) — the menu twin of
+   *  the `m` shortcut. */
+  onMoveToList?: (ids: readonly string[]) => void;
   /** Scroll the enclosing Dnd viewport so `key` is visible. Supplied by the
    *  host that owns the Dnd handle (the list view, or the board per lane) so
    *  the reorder actions below can keep the moved rows in sight. */
@@ -778,6 +782,15 @@ export function Row(props: {
                 </ContextMenu.SubContent>
               </ContextMenu.Portal>
             </ContextMenu.Sub>
+          </Show>
+          <Show when={props.onMoveToList}>
+            <ContextMenu.Item
+              class="context-menu-item"
+              onSelect={() => props.onMoveToList?.(targetIds())}
+            >
+              <span>{m().common.move}</span>
+              <kbd class="menu-shortcut">M</kbd>
+            </ContextMenu.Item>
           </Show>
           <ContextMenu.Item class="context-menu-item" onSelect={onCopy}>
             <span>{m().common.copy}</span>
