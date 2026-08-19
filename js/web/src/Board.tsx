@@ -224,6 +224,16 @@ export function Board(props: {
   const laneSelections = new Map<string, DndSelection>();
   const [activeSelection, setActiveSelection] =
     createSignal<DndSelection | null>(null);
+  // Bring a lane's column fully into the board strip's horizontal view.
+  // `inline: "nearest"` is test-then-minimal-scroll: an already-visible
+  // column no-ops, a partly-clipped one slides just past its near edge
+  // (plus `.board-col`'s scroll-margin gutter), and one wider than the
+  // viewport aligns its near edge — the "if possible" case.
+  const ensureLaneVisible = (laneKey: string): void => {
+    boardRef
+      ?.querySelector(`[data-drop-column-id="${laneKey}"]`)
+      ?.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+  };
   const selectionFor = (laneKey: string): DndSelection => {
     let s = laneSelections.get(laneKey);
     if (!s) {
@@ -236,6 +246,10 @@ export function Board(props: {
             if (other !== sel && other.hasSelection()) other.clear();
           }
           setActiveSelection(sel);
+          // Activation is the one funnel every lane-landing path shares —
+          // card click, ←/→ lane hop, cross-lane drop, "+" capture, find
+          // pick — so the column scrolls into view for all of them.
+          ensureLaneVisible(laneKey);
         } else if (activeSelection() === sel) {
           setActiveSelection(null);
         }

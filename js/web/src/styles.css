@@ -2764,6 +2764,9 @@ body {
   width: 320px;
   border-radius: 10px;
   background: var(--bg-board-col);
+  /* Matches .board's padding so ensure-lane-visible scrolls (Board.tsx)
+     land the column with the same gutter instead of flush to the edge. */
+  scroll-margin-inline: 12px;
 }
 
 .board-col-header {
