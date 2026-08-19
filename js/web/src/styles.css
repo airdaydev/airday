@@ -34,7 +34,7 @@ body > div[style*="z-index: 9999"] > div[style*="overflow: hidden"] {
 
 [data-theme="dark"] {
   --bg: #141418;
-  --bg-board-col: #141418;
+  --bg-board-col: #121214;
   --bg-elevated: #1a1a1c;
   --surface: #0e0e0e;
   --bg-hover: rgba(255, 255, 255, 0.05);
@@ -2942,7 +2942,7 @@ body {
 }
 
 [data-theme="dark"] .board-col-dnd .row {
-  background: #151517;
+  background: #1b1b1f;
   border-color: #1b1b1b;
 }
 
