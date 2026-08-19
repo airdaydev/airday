@@ -170,9 +170,9 @@ body {
 @media (max-width: 768px) and (pointer: coarse) {
   /* Bump the inherited base size on phones; chrome elements with
      explicit px sizes (section labels, chips) keep theirs. ≥16px also
-     suppresses iOS Safari's auto-zoom on input focus. */
+     suppresses iOS Safari's auto-zoom on input focus — don't go lower. */
   #root {
-    font-size: 18px;
+    font-size: 16px;
   }
 
   /* Full-screen drawer: nav and main each fill the pane row, stacked in
