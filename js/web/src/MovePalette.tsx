@@ -137,7 +137,7 @@ export function MovePalette(props: {
                 inputRef = el;
               }}
               type="text"
-              placeholder={m().workspace.searchLists}
+              placeholder={m().workspace.moveItem}
               aria-label={m().workspace.moveToList}
               value={query()}
               onInput={(e) => {

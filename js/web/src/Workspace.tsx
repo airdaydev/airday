@@ -32,7 +32,7 @@ import trashSvg from "./icons/trash.svg?raw";
 import { Board, type BoardImperative } from "./Board.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { DueCalendarDialog } from "./DueCalendarDialog.tsx";
-import { FindPalette } from "./FindPalette.tsx";
+import { FindPalette, type FindResult } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { ListIconPicker } from "./ListIconPicker.tsx";
 import { restoreCapturedPositions } from "./linger.ts";
@@ -44,7 +44,6 @@ import { isOverlayOpen, onGlobalKey } from "./overlay.ts";
 import type { ViewKey } from "./prefs.ts";
 import { Row, DRAFT_ID_PREFIX } from "./Row.tsx";
 import { planReorderMoves } from "./reorder.ts";
-import type { SearchResult } from "./search.ts";
 import { Settings } from "./Settings.tsx";
 import { ShortcutsDialog } from "./ShortcutsDialog.tsx";
 import { TaskDialog } from "./TaskDialog.tsx";
@@ -1376,11 +1375,15 @@ export function Workspace(props: {
     }, 0);
   };
 
-  // Selecting a palette result: jump to the view that contains it. Lists go
-  // straight to that list. Items pick the view based on their lifecycle —
-  // binned items live in the Bin, done-only items in Done, otherwise their
-  // list.
-  const onFindSelect = (r: SearchResult) => {
+  // Selecting a palette result: jump to the view that contains it. Built-in
+  // views (Focus / Inbox / Done) and lists go straight to that view. Items
+  // pick the view based on their lifecycle — binned items live in the Bin,
+  // done-only items in Done, otherwise their list.
+  const onFindSelect = (r: FindResult) => {
+    if (r.kind === "view") {
+      setView(r.id === "inbox" ? { kind: "list", id: "inbox" } : { kind: r.id });
+      return;
+    }
     if (r.kind === "list") {
       setView({ kind: "list", id: r.id });
       return;

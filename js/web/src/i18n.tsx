@@ -119,6 +119,8 @@ type Messages = {
     /** Placeholder / accessible name for the filter box in the move-to-list
      *  picker's popover. */
     searchLists: string;
+    /** Placeholder for the standalone move-to-list palette's filter box. */
+    moveItem: string;
     /** Empty state shown when the move-to-list filter excludes every list. */
     noMatchingLists: string;
     /** Tag marking the row for the list an item is already filed under, in
@@ -246,7 +248,6 @@ type Messages = {
   find: {
     placeholder: string;
     noMatches: string;
-    typeToFind: string;
   };
   focus: {
     /** Add-to-focus context-menu action. */
@@ -376,6 +377,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       moveToBin: "Mover a la papelera",
       moveToList: "Mover a la lista",
       searchLists: "Buscar listas",
+      moveItem: "Mover elemento",
       noMatchingLists: "No hay listas coincidentes",
       currentList: "Actual",
       displayOptions: "Opciones de visualización",
@@ -457,7 +459,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     find: {
       placeholder: "Buscar",
       noMatches: "Sin resultados",
-      typeToFind: "Escribe para buscar",
     },
     focus: {
       add: "Enfoque",
@@ -581,6 +582,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       moveToBin: "Move to bin",
       moveToList: "Move to list",
       searchLists: "Search lists",
+      moveItem: "Move item",
       noMatchingLists: "No matching lists",
       currentList: "Current",
       displayOptions: "Display options",
@@ -662,7 +664,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     find: {
       placeholder: "Find",
       noMatches: "No matches",
-      typeToFind: "Type to find",
     },
     focus: {
       add: "Focus",

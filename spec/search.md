@@ -256,6 +256,27 @@ The exact API may differ by client, but the separation is load-bearing:
 - mutation/update path is distinct from query path
 - palette UI depends on `query(...)`, not on the index internals
 
+## Palette-level entries (built-in views)
+
+The built-in views — Focus (`spec/focus.md`), Inbox (the reserved `main`
+capture list), and Done — are not `ListMeta` rows, carry localized labels,
+and are therefore **not indexed by the engine**. The palette synthesizes
+them above the engine's results:
+
+- **Empty query (default menu):** the palette shows the built-in views
+  (Focus, Inbox, Done — nav order) followed by every *active* user list in
+  CRDT order. The palette doubles as a jump-to-view switcher before the
+  user types anything. Archived lists are omitted from the default menu
+  but remain reachable by query (they stay indexed).
+- **Non-empty query:** each built-in view whose localized label matches
+  the query (same tokenizer / prefix semantics as list-name matching) is
+  prepended above the engine's results. Selecting one navigates to that
+  view.
+
+Because the labels are localization-owned UI strings, this matching lives
+in the palette, not the engine — the engine stays a pure index over doc
+entities.
+
 ## Testing
 
 Minimum test coverage:
@@ -275,5 +296,8 @@ Where feasible, use the same event stream the app uses rather than bespoke test-
 ## Open questions
 
 - Whether item `notes` should appear in the palette result preview, or only participate in matching.
-- Whether built-in list labels should be indexed by their rendered names even when one is not represented as a normal `ListMeta` row.
 - Whether CLI should expose `airday find <query>` or defer search to the web UI first.
+
+Resolved: built-in view labels are matched at the palette layer by their
+rendered (localized) names rather than indexed by the engine — see
+"Palette-level entries (built-in views)".

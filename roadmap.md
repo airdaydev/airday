@@ -79,3 +79,4 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 - Gaming controls?
 - Location based tasks
 - take checkbox off kanban board - show on hover or show below card?: I tried this and there are heavy tradeoffs with every strategy i tried (hover top left & right corners), above or text move aside
+- Remove "Notes" placeholder and have a button (+ or badge?) instead
