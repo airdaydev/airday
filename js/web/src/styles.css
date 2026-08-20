@@ -2949,6 +2949,14 @@ body {
   background: var(--dnd-select-bg);
 }
 
+/* Selected (and dragged — overlay clones keep aria-selected) cards blend
+   the hairline border into the selection fill so the card reads as one
+   solid selected surface. Placed after the dark border-color override
+   above so source order resolves the equal-specificity tie. */
+[aria-selected="true"] .row.row-card {
+  border-color: var(--dnd-select-bg);
+}
+
 /* The dnd stylesheet paints the selection highlight on the full-height slot
    (`[data-selected]`), which on the board would bleed into the gutter and
    join adjacent cards. Suppress it here and let `[aria-selected] .row`
