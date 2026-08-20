@@ -418,6 +418,13 @@ export function TaskDialog(props: {
                     }
                     onChange={(e) => setNewItemDone(e.currentTarget.checked)}
                   />
+                  {/* Stamp mirroring the edit dialog's created/completed
+                      text: names the checkbox's current meaning. */}
+                  <span class="task-dialog-created">
+                    {newItemTarget()?.done
+                      ? m().workspace.loggingDoneStamp
+                      : m().workspace.newItemStamp}
+                  </span>
                 </div>
                 <div class="task-dialog-header-actions">
                   <Dialog.CloseButton

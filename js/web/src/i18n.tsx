@@ -108,6 +108,11 @@ type Messages = {
     createdStamp: (when: string) => string;
     /** Task-dialog header stamp once the item is done: completion time. */
     completedStamp: (when: string) => string;
+    /** New-item dialog stamp beside the (unchecked) done checkbox. */
+    newItemStamp: string;
+    /** New-item dialog stamp when the done checkbox is ticked, i.e. the
+     *  capture will be filed as already completed. */
+    loggingDoneStamp: string;
     duplicate: string;
     moveToBin: string;
     moveToList: string;
@@ -365,6 +370,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       markNotDone: "Marcar como no hecho",
       createdStamp: (when) => `Creado ${when}`,
       completedStamp: (when) => `Completado ${when}`,
+      newItemStamp: "Elemento nuevo",
+      loggingDoneStamp: "Registrando como hecho",
       duplicate: "Duplicar",
       moveToBin: "Mover a la papelera",
       moveToList: "Mover a la lista",
@@ -568,6 +575,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       markNotDone: "Mark as not done",
       createdStamp: (when) => `Created ${when}`,
       completedStamp: (when) => `Completed ${when}`,
+      newItemStamp: "New item",
+      loggingDoneStamp: "Logging as done",
       duplicate: "Duplicate",
       moveToBin: "Move to bin",
       moveToList: "Move to list",
