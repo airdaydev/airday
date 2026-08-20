@@ -29,7 +29,7 @@ export function DueBadge(props: { dueOn: string; muted?: boolean }) {
     <Show when={info()}>
       {(i) => (
         <span
-          class="due-badge"
+          class="badge due-badge"
           data-tone={tone()}
           title={`${m().due.label}: ${props.dueOn}`}
         >

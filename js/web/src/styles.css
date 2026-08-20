@@ -9,7 +9,7 @@
   --surface: #ffffff;
   --bg-hover: rgba(0, 0, 0, 0.04);
   --bg-active: #e5e7eb;
-  --bg-badge: rgba(0, 0, 0, 0.05);
+  --bg-badge: rgba(0, 0, 0, 0.0375);
   --text: #1a1a1a;
   --text-muted: #555;
   --text-faint: #888;
@@ -33,7 +33,7 @@
   --surface: #0e0e0e;
   --bg-hover: rgba(255, 255, 255, 0.05);
   --bg-active: #2a2a2e;
-  --bg-badge: rgba(255, 255, 255, 0.06);
+  --bg-badge: rgba(255, 255, 255, 0.045);
   --text: #e5e5e5;
   --text-muted: #aaa;
   --text-faint: #777;
@@ -51,6 +51,24 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* Shared badge pill. Every badge carries this class; the per-badge
+   classes below (.due-badge, .row-timestamp, .row-list, …) layer only
+   their deltas on top, so this rule must precede them in source order. */
+.badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.3em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  color: var(--text-muted);
+  background: var(--bg-badge);
+  border: 1px solid transparent;
 }
 
 input,
@@ -699,18 +717,7 @@ input.task-check:hover {
 }
 
 .row-timestamp {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
   color: var(--text-faint);
-  font-size: 12px;
-  white-space: nowrap;
-  line-height: 1.3em;
-  padding: 1px 6px;
-  background: var(--bg-badge);
-  border: 1px solid transparent;
-  border-radius: 4px;
 }
 
 .row-timestamp-icon {
@@ -727,19 +734,10 @@ input.task-check:hover {
 /* Origin-list badge on the Done view (spec/board.md — the global Done view
    is cross-list). A subtle pill so it reads as metadata, not row text. */
 .row-list {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
   gap: 4px;
   max-width: 16ch;
   min-width: 0;
   color: var(--text-faint);
-  font-size: 12px;
-  line-height: 1.3em;
-  padding: 1px 6px;
-  background: var(--bg-badge);
-  border: 1px solid transparent;
-  border-radius: 4px;
 }
 
 /* The name is the only elastic part of the badge — the glyph keeps its
@@ -778,18 +776,9 @@ input.task-check:hover {
    icon-only it has no line box, so min-height pins it to the due badge's
    text-driven height (1.3em line + 2px padding + 2px border). */
 .row-focus-badge {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
   margin-top: -1px;
-  font-size: 12px;
   min-height: calc(1.3em + 4px);
-  padding: 1px 6px;
-  border-radius: 4px;
-  color: var(--text-muted);
-  background: var(--bg-badge);
-  border: 1px solid transparent;
 }
 
 .row-focus-badge svg {
@@ -1859,21 +1848,10 @@ input.task-check:hover {
 .task-dialog-list {
   appearance: none;
   -webkit-appearance: none;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
   width: fit-content;
   /* Widened from 8em when the list glyph joined the trigger, so the name
      keeps roughly the same room before it ellipsizes. */
   max-width: 10em;
-  font-size: 12px;
-  line-height: 1.3em;
-  padding: 1px 6px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: var(--bg-badge);
-  color: var(--text-muted);
   font-family: inherit;
   cursor: pointer;
 }
@@ -2047,17 +2025,9 @@ input.task-check:hover {
    muted filled pin when pressed (`aria-pressed`); disabled (Done / Binned
    items — no Focus refs, spec/focus.md) just loses the pointer. */
 .task-dialog-pin-toggle {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
-  font-size: 12px;
   min-height: calc(1.3em + 4px);
-  padding: 1px 6px;
-  border-radius: 4px;
   color: var(--text-faint);
-  background: var(--bg-badge);
-  border: 1px solid transparent;
   cursor: pointer;
   outline: none;
 }
@@ -2841,24 +2811,10 @@ input.task-check:hover {
   overflow: hidden;
 }
 
-/* Compact due-date pill. `data-tone` carries the urgency color role:
-   overdue = danger, today = accent, future = neutral, muted = done/binned
-   (no urgency). Shared by list rows and board cards. */
-.due-badge {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 12px;
-  line-height: 1.3em;
-  padding: 1px 6px;
-  border-radius: 4px;
-  white-space: nowrap;
-  color: var(--text-muted);
-  background: var(--bg-badge);
-  border: 1px solid transparent;
-}
-
+/* Compact due-date pill — the shared `.badge` styles as-is, plus a
+   `data-tone` urgency color role: overdue = danger, today = accent,
+   future = neutral, muted = done/binned (no urgency). Shared by list
+   rows and board cards. */
 .due-badge-icon {
   display: inline-flex;
   align-items: center;
@@ -2919,11 +2875,8 @@ input.task-check:hover {
 
 /* Header pill marking the currently-viewed list as archived. */
 .archived-badge {
-  flex-shrink: 0;
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--bg-active);
-  color: var(--text-muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;

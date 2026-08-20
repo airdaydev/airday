@@ -688,7 +688,7 @@ function PinToggle(props: {
   return (
     <button
       type="button"
-      class="task-dialog-pin-toggle"
+      class="badge task-dialog-pin-toggle"
       aria-pressed={props.pinned()}
       aria-label={label()}
       title={label()}

@@ -29,7 +29,7 @@ export function DueField(props: {
           <Show
             when={props.dueOn()}
             fallback={
-              <span class="due-badge" data-tone="muted">
+              <span class="badge due-badge" data-tone="muted">
                 <span class="due-badge-icon" innerHTML={timerSvg} />
                 {m().due.unset}
               </span>

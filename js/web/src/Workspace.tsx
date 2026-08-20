@@ -1653,7 +1653,7 @@ export function Workspace(props: {
             </Show>
           </h1>
             <Show when={archivedViewListId()}>
-              <span class="archived-badge">{m().nav.archived}</span>
+              <span class="badge archived-badge">{m().nav.archived}</span>
             </Show>
           </div>
           <div class="main-header-actions">

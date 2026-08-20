@@ -568,7 +568,7 @@ export function Row(props: {
           <div class="row-footer">
             <Show when={canPinToFocus() && focused()}>
               <span
-                class="row-focus-badge"
+                class="badge row-focus-badge"
                 title={m().focus.badge}
                 aria-label={m().focus.badge}
                 innerHTML={drawingPinSvg}
@@ -580,7 +580,7 @@ export function Row(props: {
             <Show when={lifecycleTimestamp(props.item())}>
               {(ts) => (
                 <span
-                  class="row-timestamp"
+                  class="badge row-timestamp"
                   title={new Date(ts()).toLocaleString(locale())}
                 >
                   <Show when={props.viewKind === "done"}>
@@ -604,7 +604,7 @@ export function Row(props: {
           }
         >
           <span
-            class="row-focus-badge"
+            class="badge row-focus-badge"
             title={m().focus.badge}
             aria-label={m().focus.badge}
             innerHTML={drawingPinSvg}
@@ -622,7 +622,7 @@ export function Row(props: {
         </Show>
         <Show when={originList()}>
           {(name) => (
-            <span class="row-list" title={name()}>
+            <span class="badge row-list" title={name()}>
               {/* Same glyphs the nav and the list picker use: the list's
                   chosen emoji, else the archive mark for the reserved Home
                   list and the file glyph for everything else. */}
@@ -653,7 +653,7 @@ export function Row(props: {
         </Show>
         <Show when={!props.dueInFooter && lifecycleTimestamp(props.item())}>
           {(ts) => (
-            <span class="row-timestamp" title={new Date(ts()).toLocaleString(locale())}>
+            <span class="badge row-timestamp" title={new Date(ts()).toLocaleString(locale())}>
               <Show when={props.viewKind === "done"}>
                 <span class="row-timestamp-icon" innerHTML={checkSvg} />
               </Show>

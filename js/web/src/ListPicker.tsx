@@ -205,7 +205,7 @@ export function ListPicker(props: {
       <button
         ref={triggerRef}
         type="button"
-        class="task-dialog-list"
+        class="badge task-dialog-list"
         aria-label={m().workspace.moveToList}
         aria-haspopup="listbox"
         aria-expanded={open()}
