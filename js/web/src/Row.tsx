@@ -396,7 +396,7 @@ export function Row(props: {
   return (
     <ContextMenu onOpenChange={onOpenChange}>
       <ContextMenu.Trigger
-        class="row"
+        class={props.dueInFooter ? "row row-card" : "row"}
         data-done={isDone(props.item()) ? "" : undefined}
         data-binned={isBinned(props.item()) ? "" : undefined}
         data-expanded={props.expanded() ? "" : undefined}

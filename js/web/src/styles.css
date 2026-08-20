@@ -26,12 +26,6 @@
   --dnd-drag-shadow: 0 12px 60px #00000026, 0 12px 32px -16px #0009321f;
 }
 
-/* Round the primavera-dnd drag overlay clones. The package exposes no
- * class hook on the wrappers, so we target them structurally. */
-body > div[style*="z-index: 9999"] > div[style*="overflow: hidden"] {
-  border-radius: 3px;
-}
-
 [data-theme="dark"] {
   --bg: #141418;
   --bg-board-col: #121214;
@@ -2869,9 +2863,12 @@ body {
    the title always clamps to two lines. The second selector outranks
    `.row[data-expanded] .row-text` (the inline-edit pre-wrap style) which
    Kobalte's context menu would otherwise trigger by setting `data-expanded`
-   on the row while its menu is open — spilling long titles out of the card. */
-.board-col-dnd .row-text,
-.board-col-dnd .row[data-expanded] .row-text {
+   on the row while its menu is open — spilling long titles out of the card.
+   Scoped by `.row-card` (a class on the card itself, not its column
+   ancestor) so the styles survive the drag overlay cloning the card out
+   of `.board-col-dnd` to under <body>. Same for every card rule below. */
+.row-card .row-text,
+.row.row-card[data-expanded] .row-text {
   white-space: normal;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -2882,7 +2879,7 @@ body {
 }
 
 /* Board-card footer: a full-width flex line of the wrapping card (see
-   `.board-col-dnd .row` below), so the badges start at the card's left
+   `.row.row-card` below), so the badges start at the card's left
    padding edge — flush with the checkbox, not the title. Badges that
    don't fit clip rather than wrap or squash. */
 .row-footer {
@@ -2933,7 +2930,7 @@ body {
    checkbox + title on the first flex line and the full-width footer on
    its own; space-between pins that footer line to the card's bottom
    (with one line, the content stays at the top). */
-.board-col-dnd .row {
+.row.row-card {
   height: calc(100% - 6px);
   border: 1px solid var(--border-row);
   border-radius: 8px;
@@ -2941,14 +2938,14 @@ body {
   align-content: space-between;
 }
 
-[data-theme="dark"] .board-col-dnd .row {
+[data-theme="dark"] .row.row-card {
   background: #1b1b1f;
   border-color: #1b1b1b;
 }
 
 /* Keep the selection highlight winning over the card bg above (its
    selector out-specifies the shared `[aria-selected] .row` rule). */
-[data-theme="dark"] .board-col-dnd [aria-selected="true"] .row {
+[data-theme="dark"] [aria-selected="true"] .row.row-card {
   background: var(--dnd-select-bg);
 }
 

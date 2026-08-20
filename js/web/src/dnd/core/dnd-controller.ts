@@ -32,8 +32,14 @@ export interface DndControllerConfig {
   clearOnClickOutside: boolean;
   fillHeight: boolean;
   /** Px shaved off the bottom of the drop placeholder so it matches gapped
-   *  cards (the board); defaults to 0 (flush list view) when omitted. */
+   *  cards (the board); defaults to 0 (flush list view) when omitted. Also
+   *  shrinks the drag-overlay clone wrappers so they conform to the visible
+   *  row rather than the full slot. */
   placeholderGap?: number;
+  /** Border radius (px) of the drag-overlay clone wrappers, matching the
+   *  host's row visuals (e.g. the board card's radius); defaults to the
+   *  selection radius when omitted. */
+  overlayRadius?: number;
 }
 
 export interface DndControllerHost {
@@ -1009,6 +1015,8 @@ export class DndController {
       this.cfg.itemHeight,
       this.opts.host.listbox.clientWidth,
       grabElement ?? elements[0],
+      this.cfg.placeholderGap ?? 0,
+      this.cfg.overlayRadius ?? 4,
     );
 
     // Notify host so it re-renders. The host is responsible for handling

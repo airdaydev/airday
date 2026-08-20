@@ -19,8 +19,14 @@ export class DndDragOverlay {
    * @param totalCount - Total number of dragged items (for badge)
    * @param startX - Initial cursor X
    * @param startY - Initial cursor Y
-   * @param itemHeight - Height of a single item row
+   * @param itemHeight - Height of a single item row (the full dnd slot)
    * @param listWidth - Width of the list container
+   * @param bottomGap - Px the visible row sits short of its slot (the
+   *   board's inter-card gutter); the clone wrapper shrinks by this so
+   *   its background/shadow/clip conform to the card, not the slot
+   * @param radius - Border radius of the clone wrapper, matching the
+   *   host's row visuals (card radius on the board, selection radius
+   *   in the list)
    */
   start(
     elements: HTMLElement[],
@@ -30,6 +36,8 @@ export class DndDragOverlay {
     itemHeight: number,
     listWidth: number,
     grabElement: HTMLElement,
+    bottomGap: number,
+    radius: number,
   ): void {
     this.active = true;
 
@@ -64,6 +72,13 @@ export class DndDragOverlay {
       clone.style.left = "0";
       clone.style.right = "auto";
       clone.style.transition = "none";
+      // The wrapper below repaints the slot's in-context computed
+      // background (resolvedBg), so the clone must not paint its own:
+      // outside the host container, ancestor-scoped suppression rules
+      // (e.g. the board's transparent [data-selected] slot) stop
+      // applying, and the raw selection background would paint the
+      // full slot — bleeding past the shorter, rounded card inside.
+      clone.style.background = "transparent";
 
       const wrapper = document.createElement("div");
       const offset = i * 2;
@@ -78,9 +93,10 @@ export class DndDragOverlay {
         z-index:${this.stackCount - i};
         transform:translate(0, ${offset}px);
         width:${listWidth}px;
-        height:${itemHeight}px;
+        height:${itemHeight - bottomGap}px;
         background:${resolvedBg};
         box-shadow:${shadow};
+        border-radius:${radius}px;
         overflow:hidden;
       `;
 

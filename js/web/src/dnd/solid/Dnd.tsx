@@ -52,8 +52,13 @@ export interface DndProps<T> {
   selection?: DndSelection;
   itemHeight?: number;
   /** Px shaved off the bottom of the drop placeholder so it matches gapped
-   *  cards (the board); defaults to 0 for the flush list view. */
+   *  cards (the board); defaults to 0 for the flush list view. Also shrinks
+   *  the drag-overlay clones so they conform to the visible row. */
   placeholderGap?: number;
+  /** Border radius (px) applied to drag-overlay clones so they conform to
+   *  the host's row visuals (e.g. the board card's 8px). Defaults to the
+   *  selection radius. */
+  overlayRadius?: number;
   expandable?: boolean;
   overscan?: number;
   confineAutoscroll?: boolean;
@@ -122,6 +127,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
   const cfg = (): DndControllerConfig => ({
     itemHeight: props.itemHeight ?? 32,
     placeholderGap: props.placeholderGap ?? 0,
+    overlayRadius: props.overlayRadius ?? BORDER_RADIUS_PX,
     overscan: props.overscan ?? 2,
     dragType: props.dragType ?? "overlay",
     roundedSelect: props.roundedSelect ?? true,

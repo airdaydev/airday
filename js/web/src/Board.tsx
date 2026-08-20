@@ -62,6 +62,10 @@ const CARD_HEIGHT = 88;
  *  cards. Passed to each lane's Dnd. */
 const CARD_GAP = 6;
 
+/** Mirrors `.row.row-card`'s border-radius so drag-overlay clones conform
+ *  to the card instead of showing square slot corners behind it. */
+const CARD_RADIUS = 8;
+
 /** Pointer-driven horizontal autoscroll for the board strip. */
 const H_SCROLL_EDGE = 48;
 const H_SCROLL_STEP = 14;
@@ -668,6 +672,7 @@ function BoardColumn(props: {
           selection={selection}
           itemHeight={CARD_HEIGHT}
           placeholderGap={CARD_GAP}
+          overlayRadius={CARD_RADIUS}
           fillHeight
           reorder={!isDoneCol}
           autofocus={props.autofocus}
