@@ -409,7 +409,7 @@ export function TaskDialog(props: {
                       flip it off to file the item as a normal open task. */}
                   <input
                     type="checkbox"
-                    class="task-dialog-check"
+                    class="task-check"
                     checked={newItemTarget()?.done ?? false}
                     aria-label={
                       newItemTarget()?.done
@@ -500,7 +500,7 @@ export function TaskDialog(props: {
                     <div class="task-dialog-header-meta">
                       <input
                         type="checkbox"
-                        class="task-dialog-check"
+                        class="task-check"
                         checked={isDone(it())}
                         onChange={(e) =>
                           props.app.setDone(it().id, e.currentTarget.checked)

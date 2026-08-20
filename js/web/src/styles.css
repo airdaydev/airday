@@ -611,50 +611,63 @@ body {
   background: var(--dnd-select-bg);
 }
 
-.row input[type="checkbox"] {
+/* Shared task checkbox: the done indicator wherever it appears (list row,
+   board card, task dialog, find palette). One look — 14px box, 5px radius,
+   tick as a background image so a non-<input> mirror (the palette's span)
+   renders identically via [data-checked]. Interaction affordances (cursor,
+   hover) are scoped to input.task-check so the mirror stays inert. */
+.task-check {
   appearance: none;
   -webkit-appearance: none;
   margin: 0;
-  position: relative;
-  top: 2px;
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
   border: 1px solid var(--border-input);
   border-radius: 5px;
   background: transparent;
-  cursor: pointer;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
   transition:
     background-color 0.12s ease,
     border-color 0.12s ease;
 }
 
-.row input[type="checkbox"]:hover {
+input.task-check {
+  cursor: pointer;
+}
+
+input.task-check:hover {
   border-color: var(--text-muted);
 }
 
-.row input[type="checkbox"]:checked {
-  background-color: transparent;
+.task-check:checked,
+.task-check[data-checked] {
   background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 100% 100%;
 }
 
-[data-theme="dark"] .row input[type="checkbox"]:checked {
+[data-theme="dark"] .task-check:checked,
+[data-theme="dark"] .task-check[data-checked] {
   background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='%23e5e5e5' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
 }
 
-.row input[type="checkbox"]:focus-visible {
+.task-check:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: 1px;
 }
 
-[aria-selected="true"] input[type="checkbox"] {
+/* Optical alignment against the row's first text line. */
+.row .task-check {
+  position: relative;
+  top: 2px;
+}
+
+[aria-selected="true"] .task-check {
   border-color: #00000030;
 }
 
-[data-theme="dark"] [aria-selected="true"] input[type="checkbox"] {
+[data-theme="dark"] [aria-selected="true"] .task-check {
   border-color: #ffffff30;
 }
 
@@ -1951,44 +1964,6 @@ body {
   gap: 8px;
 }
 
-/* Checkbox mirrors the list-row checkbox, sized up a notch; sits on the
-   header's left, centred against the 28px close button. */
-.task-dialog-check {
-  appearance: none;
-  -webkit-appearance: none;
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  border: 1px solid var(--border-input);
-  border-radius: 3px;
-  background: transparent;
-  cursor: pointer;
-  transition:
-    background-color 0.12s ease,
-    border-color 0.12s ease;
-}
-
-.task-dialog-check:hover {
-  border-color: var(--text-muted);
-}
-
-.task-dialog-check:checked {
-  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 100% 100%;
-}
-
-[data-theme="dark"] .task-dialog-check:checked {
-  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='%23e5e5e5' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-}
-
-.task-dialog-check:focus-visible {
-  outline: 2px solid var(--link);
-  outline-offset: 1px;
-}
-
 .task-dialog-title {
   width: 100%;
   margin: 0;
@@ -2609,40 +2584,15 @@ body {
   background: var(--dnd-select-bg);
 }
 
-/* Non-interactive indicator mirroring the row checkbox in .row so the
-   palette displays an item's done state without owning behaviour — the
-   row is the source of truth for toggling. Kept as a span (not <input>)
-   to avoid focus / a11y noise inside the listbox option. */
-.palette__item-check {
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  box-sizing: border-box;
-  background: transparent;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 100% 100%;
-}
-
-.palette__item-check[data-kind="item"] {
-  border: 1px solid var(--border-input);
-}
-
-.palette__item-check[data-checked] {
-  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-}
-
-[data-theme="dark"] .palette__item-check[data-checked] {
-  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='%23e5e5e5' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-}
-
-.palette__item--selected .palette__item-check[data-kind="item"] {
-  border-color: #00000030;
-}
-
-[data-theme="dark"] .palette__item--selected .palette__item-check[data-kind="item"] {
-  border-color: #ffffff30;
+/* Non-interactive .task-check mirror so the palette displays an item's
+   done state without owning behaviour — the row is the source of truth
+   for toggling. Kept as a span (not <input>) to avoid focus / a11y noise
+   inside the listbox option. Only real items show the box; other result
+   kinds keep the slot (alignment) but hide the border. */
+/* Source order outranks the shared [aria-selected] border tint, keeping
+   non-item slots borderless even while selected. */
+.palette__item-check:not([data-kind="item"]) {
+  border-color: transparent;
 }
 
 /* Leading glyph for a list result, occupying the same 14px slot as an

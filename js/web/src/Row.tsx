@@ -428,6 +428,7 @@ export function Row(props: {
       >
         <input
           type="checkbox"
+          class="task-check"
           tabIndex={-1}
           checked={isDone(props.item())}
           onMouseDown={(e) => {

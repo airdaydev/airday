@@ -238,7 +238,7 @@ export function FindPalette(props: {
                     when={item.kind === "list"}
                     fallback={
                       <span
-                        class="palette__item-check"
+                        class="task-check palette__item-check"
                         data-kind={item.kind}
                         data-checked={
                           item.lifecycle === "done" ? "" : undefined
