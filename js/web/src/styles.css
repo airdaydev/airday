@@ -2616,6 +2616,36 @@ input.task-check:hover {
   color: var(--text-faint);
 }
 
+/* Footer key hints: muted, read-only legend of the palette's bindings.
+   Phosphor glyph for the arrow keys, the context menu's ↵ for Enter,
+   literal text for esc, each in the shared .menu-shortcut kbd chip. */
+.palette__footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.palette__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The shared chip spaces out symbol combos (⌘⇧Z); a word like "esc"
+   reads better at normal tracking. */
+.palette__hint .menu-shortcut {
+  letter-spacing: normal;
+}
+
+.palette__hint .menu-shortcut svg {
+  width: 12px;
+  height: 12px;
+}
+
 .palette__empty {
   padding: 16px;
   text-align: center;

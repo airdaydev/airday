@@ -17,6 +17,7 @@ import { matchesName, type SearchResult } from "./search.ts";
 import { useAppI18n } from "./i18n.tsx";
 import { isOverlayOpen, trackOverlay } from "./overlay.ts";
 import archiveSvg from "./icons/archive.svg?raw";
+import arrowsDownUpSvg from "./icons/arrows-down-up.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import fileSvg from "./icons/file.svg?raw";
@@ -355,6 +356,20 @@ export function FindPalette(props: {
             <Show when={items().length === 0}>
               <div class="palette__empty">{m().find.noMatches}</div>
             </Show>
+          </div>
+          <div class="palette__footer" aria-hidden="true">
+            <span class="palette__hint">
+              <kbd class="menu-shortcut" innerHTML={arrowsDownUpSvg} />
+              {m().find.hintSelect}
+            </span>
+            <span class="palette__hint">
+              <kbd class="menu-shortcut">↵</kbd>
+              {m().find.hintOpen}
+            </span>
+            <span class="palette__hint">
+              <kbd class="menu-shortcut">esc</kbd>
+              {m().find.hintClose}
+            </span>
           </div>
         </div>
       </Portal>

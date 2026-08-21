@@ -1546,7 +1546,16 @@ export function Workspace(props: {
       <FindPalette
         app={app}
         open={findOpen()}
-        onOpenChange={setFindOpen}
+        onOpenChange={(open) => {
+          setFindOpen(open);
+          if (open) return;
+          // Hand keyboard focus back to the items listbox on close (Escape
+          // or a pick) — the palette stole it into its search input and
+          // the view's shortcuts are keyed off the listbox having focus.
+          // A pick may also switch views, so defer past the <Show keyed>
+          // remount like the nav's onSelect does.
+          requestAnimationFrame(() => restoreItemsFocus());
+        }}
         onSelect={(r) => onFindSelect(r)}
       />
       <MovePalette

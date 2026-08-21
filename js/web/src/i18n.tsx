@@ -248,6 +248,10 @@ type Messages = {
   find: {
     placeholder: string;
     noMatches: string;
+    /** Footer key hints. */
+    hintSelect: string;
+    hintOpen: string;
+    hintClose: string;
   };
   focus: {
     /** Add-to-focus context-menu action. */
@@ -459,6 +463,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     find: {
       placeholder: "Buscar",
       noMatches: "Sin resultados",
+      hintSelect: "Navegar",
+      hintOpen: "Abrir",
+      hintClose: "Cerrar",
     },
     focus: {
       add: "Enfoque",
@@ -664,6 +671,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     find: {
       placeholder: "Find",
       noMatches: "No matches",
+      hintSelect: "Navigate",
+      hintOpen: "Open",
+      hintClose: "Close",
     },
     focus: {
       add: "Focus",
