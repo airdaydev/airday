@@ -1695,13 +1695,17 @@ export function Workspace(props: {
                 <span>{m().workspace.emptyBin}</span>
               </button>
             </Show>
+            {/* Desktop: the view's icon buttons (display options, add)
+                share one rounded glass group instead of per-button
+                chrome. Hidden via CSS when the view contributes none. */}
+            <div class="header-group">
             <Show when={view().kind === "list"}>
               <Popover placement="bottom-end" gutter={6}>
                 <Tooltip openDelay={200} closeDelay={0} placement="bottom">
                   <Tooltip.Trigger
                     as={Popover.Trigger}
                     class="add-button view-mode-trigger"
-                    aria-label={m().nav.settings}
+                    aria-label={m().workspace.displayOptions}
                     innerHTML={mixerHzSvg}
                   />
                   <Tooltip.Portal>
@@ -1926,6 +1930,7 @@ export function Workspace(props: {
               </Tooltip.Portal>
               </Tooltip>
             </Show>
+            </div>
           </div>
         </header>
         <Show

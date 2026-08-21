@@ -453,6 +453,49 @@ body {
     rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset;
 }
 
+/* Desktop header: display-options + add sit in one rounded liquid-glass
+   group. Buttons inside drop their individual chrome so the group reads
+   as a single segmented pill. */
+.header-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+}
+
+.header-group:not(:has(.add-button)) {
+  display: none;
+}
+
+.header-group .add-button {
+  box-shadow: none;
+  border-radius: 8px;
+  padding: 4px 7px;
+}
+
+@media not ((max-width: 768px) and (pointer: coarse)) {
+  .header-group {
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.06),
+      0 1px 2px rgba(0, 0, 0, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  [data-theme="dark"] .header-group {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.25),
+      0 1px 2px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+}
+
 .add-button-icon {
   display: inline-flex;
 }
@@ -485,9 +528,10 @@ body {
    Liquid-glass: translucent fill + heavy backdrop blur + thin border +
    inset top highlight for the wet/specular feel. */
 @media (max-width: 768px) and (pointer: coarse) {
-  /* The bottom bar carries Add on mobile — keeping both would double
-     up the same action. */
-  .main-header .add-button {
+  /* The bottom bar carries Add on mobile, so the header drops its own.
+     Display options stays: it has no other home on a phone and sits to
+     the right of the title as a glass disc beside the sync indicator. */
+  .main-header .add-button:not(.view-mode-trigger) {
     display: none;
   }
 
@@ -3012,6 +3056,75 @@ input.task-check:hover {
   }
 
   .main-header .connection-indicator:active {
+    transform: scale(0.92);
+  }
+}
+
+/* Mobile board lanes: the per-lane Add is a primary capture affordance
+   on a phone, so give it a proper tap target and a legible glyph (the
+   card-stack icon's "+" is only a third of its viewBox, so it needs to
+   run larger than the desktop 16px to read at a glance). */
+@media (max-width: 768px) and (pointer: coarse) {
+  .board-col-header {
+    padding: 6px 6px 12px 12px;
+  }
+
+  .board-col-add-btn {
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+    border-radius: 8px;
+    color: var(--text);
+  }
+
+  .board-col-add-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .board-col-add-btn:active {
+    transform: scale(0.92);
+  }
+}
+
+/* Mobile header: display options as a glass disc to the right of the
+   title, matching the sync indicator disc it sits next to. */
+@media (max-width: 768px) and (pointer: coarse) {
+  .main-header-actions {
+    gap: 8px;
+  }
+
+  .main-header .view-mode-trigger {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 99px;
+    color: var(--text);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    box-shadow:
+      0 4px 14px rgba(0, 0, 0, 0.08),
+      0 1px 2px rgba(0, 0, 0, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+
+  [data-theme="dark"] .main-header .view-mode-trigger {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(30, 30, 32, 0.6);
+    box-shadow:
+      0 4px 14px rgba(0, 0, 0, 0.3),
+      0 1px 2px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .main-header .view-mode-trigger svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .main-header .view-mode-trigger:active {
     transform: scale(0.92);
   }
 }
