@@ -55,6 +55,7 @@ import {
   type DocApp,
   type ItemView,
   type ListView,
+  type RecentDoneEntry,
 } from "./sync/store.ts";
 import { createTheme, type ThemePreference } from "./theme.ts";
 import {
@@ -382,7 +383,7 @@ export function Workspace(props: {
   const actionSelection = (): DndSelection | null =>
     boardListId() !== null ? boardSelection() : selection;
 
-  // Linger group for the active list view: the unbroken chain of
+  // Linger group for the active list or Focus view: the unbroken chain of
   // recently-done items walking back from the latest click. A new
   // Done click within DONE_LINGER_MS of the previous extends the
   // whole chain, so a burst of clicks all leave together at the
@@ -390,14 +391,22 @@ export function Workspace(props: {
   // Sourced from the store's `recentDone` capture — the live
   // projection drops done items instantly, so this is the only record
   // of what just left (and where it sat, for the re-insert below).
+  // A capture belongs to the current view if it left this list (list
+  // view) or held a Focus slot (Focus lens).
+  const lingerMatches = (r: RecentDoneEntry, v: ViewKey): boolean =>
+    v.kind === "list"
+      ? r.listId === v.id
+      : v.kind === "focus" && r.focusIndex !== undefined;
   const lingerChain = createMemo(
     (): { ids: Set<string>; expiry: number } => {
       const v = view();
-      if (v.kind !== "list") return { ids: new Set(), expiry: -Infinity };
+      if (v.kind !== "list" && v.kind !== "focus") {
+        return { ids: new Set(), expiry: -Infinity };
+      }
       const done = app
         .recentDone()
         .filter((r) => {
-          if (r.listId !== v.id) return false;
+          if (!lingerMatches(r, v)) return false;
           const it = state.itemsById[r.id];
           return it !== undefined && isDone(it) && !isBinned(it);
         })
@@ -433,6 +442,27 @@ export function Workspace(props: {
   // paths independently of the ordering. Done/Bin scan `itemsById`
   // lazily — the scan only runs while that view is active, and no
   // list-view mutation path pays for it.
+  // Re-insert the linger group at the positions its rows vacated. Each
+  // index was captured after earlier Done rows had already left the
+  // projection, so replay the removals in reverse capture order to
+  // reconstruct the original layout.
+  const overlayLinger = (out: ItemView[], v: ViewKey): void => {
+    lingerTick();
+    const { ids: lingerIds, expiry } = lingerChain();
+    if (Date.now() >= expiry) return;
+    const captured: Array<{ index: number; value: ItemView }> = [];
+    for (const r of app
+      .recentDone()
+      .filter((r) => lingerMatches(r, v) && lingerIds.has(r.id))) {
+      const it = state.itemsById[r.id];
+      if (!it || !isDone(it) || isBinned(it)) continue;
+      captured.push({
+        index: v.kind === "focus" ? (r.focusIndex ?? 0) : r.index,
+        value: it,
+      });
+    }
+    restoreCapturedPositions(out, captured);
+  };
   const items = createMemo((): ItemView[] => {
     const v = view();
     if (v.kind === "list") {
@@ -441,34 +471,21 @@ export function Workspace(props: {
         const it = state.itemsById[id];
         if (it) out.push(it);
       }
-      // Re-insert the linger group at the positions its rows vacated.
-      // Each index was captured after earlier Done rows had already left
-      // `listOpen`, so replay the removals in reverse capture order to
-      // reconstruct the original layout.
-      lingerTick();
-      const { ids: lingerIds, expiry } = lingerChain();
-      if (Date.now() < expiry) {
-        const captured: Array<{ index: number; value: ItemView }> = [];
-        for (const r of app
-          .recentDone()
-          .filter((r) => r.listId === v.id && lingerIds.has(r.id))) {
-          const it = state.itemsById[r.id];
-          if (!it || !isDone(it) || isBinned(it)) continue;
-          captured.push({ index: r.index, value: it });
-        }
-        restoreCapturedPositions(out, captured);
-      }
+      overlayLinger(out, v);
       return out;
     }
     if (v.kind === "focus") {
       // The Focus lens: visible refs in curated order (spec/focus.md).
       // `focusOrder` is already Open-filtered + deduped by the engine; just
-      // resolve each id to its item.
+      // resolve each id to its item. Done auto-removes the ref, so the
+      // linger overlay is the only thing keeping a just-completed row
+      // visible for the strike-through beat.
       const out: ItemView[] = [];
       for (const id of state.focusOrder) {
         const it = state.itemsById[id];
         if (it) out.push(it);
       }
+      overlayLinger(out, v);
       return out;
     }
     if (v.kind === "done") {
@@ -846,7 +863,8 @@ export function Workspace(props: {
       const it = app.getItem(id);
       return it !== undefined && isDone(it);
     });
-    app.setDoneMany(ids, !allDone);
+    if (allDone && view().kind === "focus") app.undoneIntoFocus(ids);
+    else app.setDoneMany(ids, !allDone);
   };
   onGlobalKey(onToggleDoneKey);
 

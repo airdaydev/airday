@@ -1,7 +1,4 @@
 # Roadmap
-- indexeddb smoke tests? do we have an in-mem storage adapter? via playwright?
-- Due dates
-- list deleting - orphan handling - not really an issue we need to resolve yet, they'll sit there and can be recovered later through a resolution mechanism or an orphaned container
 - another one - we probably want to remove 'done' items positions in the main lists!
 - bug: mark multiple items as done then mark one of those as not done and list position changes!
 - onAuthFailed → logout() → dekVault.clear() - a little bit blunt and not quite in local-first spirit, wipe-dek-to-anonymous the wrong response
@@ -63,9 +60,6 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 ## CI
 - sqlite migrations
 
-## Bug
-- When we click done, then edit the item, waiting for it to depart that list, it goes bad.
-
 ## Maybe/later
 - Encoding habits?
 - vi keys (as an option)
@@ -80,3 +74,4 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 - Location based tasks
 - take checkbox off kanban board - show on hover or show below card?: I tried this and there are heavy tradeoffs with every strategy i tried (hover top left & right corners), above or text move aside
 - Remove "Notes" placeholder and have a button (+ or badge?) instead
+- Known bug - checking and unchecking contiguous tasks allowing them to linger causes confusion

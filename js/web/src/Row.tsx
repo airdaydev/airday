@@ -264,7 +264,8 @@ export function Row(props: {
   const onMarkNotDone = () => {
     const ids = targetIds();
     if (ids.length === 0) return;
-    props.app.setDoneMany(ids, false);
+    if (props.viewKind === "focus") props.app.undoneIntoFocus(ids);
+    else props.app.setDoneMany(ids, false);
   };
   // Focus toggle from the context menu acts on the whole target set (the
   // selection when this row is part of it, else this row alone) in a single
@@ -438,9 +439,16 @@ export function Row(props: {
             // the click (and toggle) still fire.
             e.preventDefault();
           }}
-          onChange={(e) =>
-            props.app.setDone(props.item().id, e.currentTarget.checked)
-          }
+          onChange={(e) => {
+            const id = props.item().id;
+            // Un-checking a lingering row in Focus re-pins it (Done dropped
+            // its ref); elsewhere it's a plain lifecycle flip.
+            if (!e.currentTarget.checked && props.viewKind === "focus") {
+              props.app.undoneIntoFocus([id]);
+            } else {
+              props.app.setDone(id, e.currentTarget.checked);
+            }
+          }}
         />
         <div class="row-body">
           <span

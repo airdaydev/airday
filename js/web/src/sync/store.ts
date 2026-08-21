@@ -122,6 +122,9 @@ export interface RecentDoneEntry {
   listId: string;
   /** Open index the item occupied just before leaving the projection. */
   index: number;
+  /** Visible Focus slot the item occupied, when it was in the Focus lens
+   *  (Done auto-removes the ref, so this is the only record). */
+  focusIndex?: number;
   doneAt: number;
 }
 
@@ -193,6 +196,11 @@ export interface DocApp {
   /** Set or clear an item's done flag. Independent of binned. */
   setDone(id: string, done: boolean): void;
   setDoneMany(ids: string[], done: boolean): void;
+  /** Un-done from inside the Focus lens: clear each id's done flag and
+   *  re-pin it at the Focus slot it vacated (Done auto-removes the ref,
+   *  spec/focus.md, so "un-done" in Focus is the deliberate re-add). Ids
+   *  without a captured slot land at the top. One undo step. */
+  undoneIntoFocus(ids: string[]): void;
   /** Set or clear an item's binned flag. Independent of done — binning a
    *  done item keeps it done; restoring keeps the done state alone. */
   setBinned(id: string, binned: boolean): void;
@@ -492,10 +500,20 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           // the vacated position (before the removal below) for the
           // linger re-insert.
           const idx = state.listOpen[prev.listId]?.indexOf(ev.id) ?? -1;
+          // Done also auto-removes the item's Focus ref (spec/focus.md), so
+          // snapshot its Focus slot too. `focusOrder` is re-derived
+          // wholesale after the drain; drop the id here as well so later
+          // captures in the same drain see sequential indices, matching
+          // what `restoreCapturedPositions` replays.
+          const focusIdx = state.focusOrder.indexOf(ev.id);
+          if (focusIdx >= 0) {
+            setState("focusOrder", (order) => order.filter((x) => x !== ev.id));
+          }
           captureRecentDone({
             id: ev.id,
             listId: prev.listId,
             index: idx >= 0 ? idx : 0,
+            focusIndex: focusIdx >= 0 ? focusIdx : undefined,
             doneAt,
           });
         } else if (nowOpen || binnedAt != null) {
@@ -709,6 +727,30 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     return result;
   };
 
+  const withActionBatch = <T,>(fn: () => T): T => {
+    const outermost = actionBatchDepth === 0;
+    actionBatchDepth++;
+    if (outermost) {
+      actionBatchStartVersion = version();
+      pendingActionSteps = 0;
+    }
+    try {
+      return fn();
+    } finally {
+      actionBatchDepth--;
+      if (outermost) {
+        if (flushDeferred) {
+          flushDeferred = false;
+          flush();
+        }
+        if (version() !== actionBatchStartVersion && pendingActionSteps > 0) {
+          recordAction(pendingActionSteps);
+        }
+        pendingActionSteps = 0;
+      }
+    }
+  };
+
   return {
     engine,
     state,
@@ -748,6 +790,25 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     setDoneMany(ids, done) {
       mutate(() => engine.setItemsDone(ids, done));
+    },
+    undoneIntoFocus(ids) {
+      if (ids.length === 0) return;
+      const wanted = new Set(ids);
+      const captured = recentDone().filter((r) => wanted.has(r.id));
+      const capturedIds = new Set(captured.map((r) => r.id));
+      withActionBatch(() => {
+        mutate(() => engine.setItemsDone(ids, false));
+        // Slots were captured sequentially (each after earlier removals),
+        // so re-insert newest-first to rebuild the original layout, as
+        // `restoreCapturedPositions` does for the render overlay.
+        for (let i = captured.length - 1; i >= 0; i--) {
+          const r = captured[i];
+          mutate(() => engine.addToFocus(r.id, r.focusIndex ?? 0));
+        }
+        for (const id of ids) {
+          if (!capturedIds.has(id)) mutate(() => engine.addToFocus(id, 0));
+        }
+      });
     },
     setBinned(id, binned) {
       mutate(() => engine.setItemBinned(id, binned));
@@ -868,28 +929,6 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     canRedo() {
       return redoStack.length > 0;
     },
-    withActionBatch(fn) {
-      const outermost = actionBatchDepth === 0;
-      actionBatchDepth++;
-      if (outermost) {
-        actionBatchStartVersion = version();
-        pendingActionSteps = 0;
-      }
-      try {
-        return fn();
-      } finally {
-        actionBatchDepth--;
-        if (outermost) {
-          if (flushDeferred) {
-            flushDeferred = false;
-            flush();
-          }
-          if (version() !== actionBatchStartVersion && pendingActionSteps > 0) {
-            recordAction(pendingActionSteps);
-          }
-          pendingActionSteps = 0;
-        }
-      }
-    },
+    withActionBatch,
   };
 }
