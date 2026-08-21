@@ -16,8 +16,8 @@ import type { DocApp } from "./sync/store.ts";
 import { matchesName, type SearchResult } from "./search.ts";
 import { useAppI18n } from "./i18n.tsx";
 import { isOverlayOpen, trackOverlay } from "./overlay.ts";
+import { PaletteFooter } from "./PaletteFooter.tsx";
 import archiveSvg from "./icons/archive.svg?raw";
-import arrowsDownUpSvg from "./icons/arrows-down-up.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import fileSvg from "./icons/file.svg?raw";
@@ -198,6 +198,21 @@ export function FindPalette(props: {
     });
   });
 
+  // Hover-to-select, but only on real pointer motion. Keyboard navigation
+  // scrolls the list under a stationary mouse, and browsers then fire
+  // mouseenter / (synthetic) mousemove on whichever row slid under the
+  // cursor — without this check the selection would snap back to the
+  // mouse the moment the list scrolls. Comparing screen coordinates
+  // filters those out: a scroll moves the rows, not the pointer.
+  let lastMouse: { x: number; y: number } | null = null;
+  function onRowMouseMove(e: MouseEvent, index: number) {
+    if (lastMouse && lastMouse.x === e.screenX && lastMouse.y === e.screenY) {
+      return;
+    }
+    lastMouse = { x: e.screenX, y: e.screenY };
+    if (selectedIndex() !== index) setSelectedIndex(index);
+  }
+
   function scrollSelectedIntoView(index: number) {
     const el = listRef?.querySelector(`[data-index="${index}"]`);
     el?.scrollIntoView({ block: "nearest" });
@@ -288,7 +303,7 @@ export function FindPalette(props: {
                     "palette__item--selected": i() === selectedIndex(),
                     "palette__item--binned": itemLifecycle(item) === "binned",
                   }}
-                  onMouseEnter={() => setSelectedIndex(i())}
+                  onMouseMove={(e) => onRowMouseMove(e, i())}
                   onClick={() => selectItem(item)}
                 >
                   {/* Slot is always rendered so titles stay aligned across
@@ -357,20 +372,7 @@ export function FindPalette(props: {
               <div class="palette__empty">{m().find.noMatches}</div>
             </Show>
           </div>
-          <div class="palette__footer" aria-hidden="true">
-            <span class="palette__hint">
-              <kbd class="menu-shortcut" innerHTML={arrowsDownUpSvg} />
-              {m().find.hintSelect}
-            </span>
-            <span class="palette__hint">
-              <kbd class="menu-shortcut">↵</kbd>
-              {m().find.hintOpen}
-            </span>
-            <span class="palette__hint">
-              <kbd class="menu-shortcut">esc</kbd>
-              {m().find.hintClose}
-            </span>
-          </div>
+          <PaletteFooter enterLabel={m().find.hintOpen} />
         </div>
       </Portal>
     </Show>

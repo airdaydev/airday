@@ -251,6 +251,7 @@ type Messages = {
     /** Footer key hints. */
     hintSelect: string;
     hintOpen: string;
+    hintMove: string;
     hintClose: string;
   };
   focus: {
@@ -465,6 +466,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       noMatches: "Sin resultados",
       hintSelect: "Navegar",
       hintOpen: "Abrir",
+      hintMove: "Mover",
       hintClose: "Cerrar",
     },
     focus: {
@@ -673,6 +675,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       noMatches: "No matches",
       hintSelect: "Navigate",
       hintOpen: "Open",
+      hintMove: "Move",
       hintClose: "Close",
     },
     focus: {

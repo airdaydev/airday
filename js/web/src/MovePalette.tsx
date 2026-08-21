@@ -19,6 +19,7 @@ import fileSvg from "./icons/file.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
 import type { ListOption } from "./ListPicker.tsx";
 import { trackOverlay } from "./overlay.ts";
+import { PaletteFooter } from "./PaletteFooter.tsx";
 import { matchesName } from "./search.ts";
 
 export function MovePalette(props: {
@@ -36,6 +37,19 @@ export function MovePalette(props: {
   trackOverlay(() => props.open);
   const [query, setQuery] = createSignal("");
   const [selectedIndex, setSelectedIndex] = createSignal(0);
+
+  // Hover-to-select only on real pointer motion: keyboard scrolling slides
+  // rows under a stationary mouse and fires mouseenter / synthetic
+  // mousemove, which would snap the selection back to the cursor. Same
+  // guard as FindPalette.
+  let lastMouse: { x: number; y: number } | null = null;
+  function onRowMouseMove(e: MouseEvent, index: number) {
+    if (lastMouse && lastMouse.x === e.screenX && lastMouse.y === e.screenY) {
+      return;
+    }
+    lastMouse = { x: e.screenX, y: e.screenY };
+    if (selectedIndex() !== index) setSelectedIndex(index);
+  }
   let inputRef: HTMLInputElement | undefined;
   let listRef: HTMLDivElement | undefined;
 
@@ -173,7 +187,7 @@ export function MovePalette(props: {
                   classList={{
                     "palette__item--selected": i() === selectedIndex(),
                   }}
-                  onMouseEnter={() => setSelectedIndex(i())}
+                  onMouseMove={(e) => onRowMouseMove(e, i())}
                   onClick={() => commit(opt)}
                 >
                   {/* Same glyphs the nav uses: the archive mark for the
@@ -211,6 +225,7 @@ export function MovePalette(props: {
               <div class="palette__empty">{m().workspace.noMatchingLists}</div>
             </Show>
           </div>
+          <PaletteFooter enterLabel={m().find.hintMove} />
         </div>
       </Portal>
     </Show>
