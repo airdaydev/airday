@@ -459,21 +459,6 @@ export function TaskDialog(props: {
                     onPaste={pasteAsPlainText}
                     onClick={(e) => openLinkOnClick(e, titleRef)}
                   />
-                  <div
-                    ref={(el) => {
-                      notesRef = el;
-                      el.setAttribute("contenteditable", "true");
-                      setLinkifiedText(el, notes());
-                    }}
-                    class="task-dialog-notes"
-                    role="textbox"
-                    aria-multiline="true"
-                    data-placeholder={m().workspace.notes}
-                    onInput={() => setNotes(editorText(notesRef))}
-                    onKeyDown={onNotesKeyDown}
-                    onPaste={pasteAsPlainText}
-                    onClick={(e) => openLinkOnClick(e, notesRef)}
-                  />
                   {/* List selector leads the badge row, then the due-date
                       badge; picks land in the local buffers and are written
                       after the item commits. The pin toggle buffers the
@@ -497,6 +482,21 @@ export function TaskDialog(props: {
                       onToggle={() => setNewFocus((v) => !v)}
                     />
                   </div>
+                  <div
+                    ref={(el) => {
+                      notesRef = el;
+                      el.setAttribute("contenteditable", "true");
+                      setLinkifiedText(el, notes());
+                    }}
+                    class="task-dialog-notes"
+                    role="textbox"
+                    aria-multiline="true"
+                    data-placeholder={m().workspace.notes}
+                    onInput={() => setNotes(editorText(notesRef))}
+                    onKeyDown={onNotesKeyDown}
+                    onPaste={pasteAsPlainText}
+                    onClick={(e) => openLinkOnClick(e, notesRef)}
+                  />
                 </div>
               </div>
             </Show>
@@ -578,22 +578,6 @@ export function TaskDialog(props: {
                       onClick={(e) => openLinkOnClick(e, titleRef)}
                     />
 
-                  <div
-                    ref={(el) => {
-                      notesRef = el;
-                      el.setAttribute("contenteditable", "true");
-                      setLinkifiedText(el, notes());
-                    }}
-                    class="task-dialog-notes"
-                    role="textbox"
-                    aria-multiline="true"
-                    data-placeholder={m().workspace.notes}
-                    onInput={() => setNotes(editorText(notesRef))}
-                    onKeyDown={onNotesKeyDown}
-                    onPaste={pasteAsPlainText}
-                    onClick={(e) => openLinkOnClick(e, notesRef)}
-                  />
-
                   {/* Badge row: the move-to-list picker first, then the
                       always-visible due-date badge — clicking it opens a
                       quick popover (Set date… / Tomorrow / Remove date).
@@ -621,6 +605,22 @@ export function TaskDialog(props: {
                       onToggle={toggleFocus}
                     />
                   </div>
+
+                  <div
+                    ref={(el) => {
+                      notesRef = el;
+                      el.setAttribute("contenteditable", "true");
+                      setLinkifiedText(el, notes());
+                    }}
+                    class="task-dialog-notes"
+                    role="textbox"
+                    aria-multiline="true"
+                    data-placeholder={m().workspace.notes}
+                    onInput={() => setNotes(editorText(notesRef))}
+                    onKeyDown={onNotesKeyDown}
+                    onPaste={pasteAsPlainText}
+                    onClick={(e) => openLinkOnClick(e, notesRef)}
+                  />
 
                   {/* The done stamp lives in the header now; only the bin
                       stamp still needs a meta row. */}

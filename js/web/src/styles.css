@@ -1668,11 +1668,8 @@ input.task-check:hover {
   line-height: 1;
   color: var(--text-muted);
   letter-spacing: 0.5px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-input);
-  border-bottom-width: 2px;
+  background: var(--bg-badge);
   border-radius: 4px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
 .dropdown-menu-item[data-disabled] .menu-shortcut {
@@ -2001,7 +1998,7 @@ input.task-check:hover {
   display: flex;
   align-items: center;
   gap: 2px;
-  margin-top: 12px;
+  margin-top: 4px;
 }
 
 /* The always-visible badge that opens the due-date quick popover (a faint
