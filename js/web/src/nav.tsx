@@ -58,6 +58,7 @@ function markAuthPromptDismissed(): void {
 }
 
 function ConnectionStatusPopover(props: {
+  class?: string;
   app: DocApp;
   online: boolean;
   lastSyncAt: number | null;
@@ -156,7 +157,7 @@ function ConnectionStatusPopover(props: {
       <Tooltip openDelay={200} closeDelay={0} placement="top">
         <Tooltip.Trigger
           as={Popover.Trigger}
-          class="connection-indicator"
+          class={props.class ? `connection-indicator ${props.class}` : "connection-indicator"}
           aria-label={statusLabel()}
         >
           <Show
@@ -205,6 +206,8 @@ function ConnectionStatusPopover(props: {
  *  unified app footer (see `Workspace`), rendered exactly once, so its
  *  auto-open-on-mount auth dialog fires only once. */
 export function StatusSlot(props: {
+  /** Extra class on the indicator button (mobile's glass chrome). */
+  class?: string;
   app: DocApp;
   online: boolean;
   lastSyncAt: number | null;
@@ -235,7 +238,7 @@ export function StatusSlot(props: {
             rather than a status popover. */}
         <button
           type="button"
-          class="connection-indicator"
+          class={props.class ? `connection-indicator ${props.class}` : "connection-indicator"}
           aria-label={m().auth.signIn}
           title={m().auth.signIn}
           onClick={() => setAuthOpen(true)}
@@ -250,6 +253,7 @@ export function StatusSlot(props: {
       </Show>
       <Show when={!props.session.anonymous}>
         <ConnectionStatusPopover
+          class={props.class}
           app={props.app}
           online={props.online}
           lastSyncAt={props.lastSyncAt}

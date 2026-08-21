@@ -136,38 +136,9 @@ body {
   padding: 0 12px;
 }
 
-/* Hamburger lives in the main header, hidden on desktop. */
-.nav-toggle {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  margin-right: 4px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.nav-toggle:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.nav-toggle:focus-visible {
-  outline: 2px solid var(--link);
-  outline-offset: 1px;
-}
-
 /* Desktop sidebar collapse: `nav-hidden` drops the nav column and the
    main surface takes the full width; the footer toggle stays visible to
-   bring it back. Mobile is unaffected — the drawer rules in the media
-   query below come later in the file, so they win over these when both
-   flags are in play. */
+   bring it back. Mobile is unaffected — the sidebar isn't rendered there. */
 .app.nav-hidden {
   grid-template-columns: 1fr;
 }
@@ -190,43 +161,24 @@ body {
     font-size: 16px;
   }
 
-  /* Full-screen drawer: nav and main each fill the pane row, stacked in
-     the same grid cell; exactly one is shown at a time. No slide — the
-     `nav-open` flag just swaps which pane is display'd. The unified
-     footer keeps its own row below either pane.
-       Closed → nav hidden, main fills the screen.
-       Open   → main hidden, nav fills the screen. */
+  /* Single pane: the desktop sidebar and footer aren't rendered on
+     phones (Workspace.tsx swaps them for MobileBar + ListSheet), so the
+     grid collapses to main alone, leaving room beneath for the fixed
+     bottom bar. */
   .app {
     grid-template-columns: 100vw;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: 1fr;
   }
 
-  .nav,
   .content {
     grid-area: 1 / 1;
   }
 
-  /* Full-screen drawer: undo the desktop floating-surface treatment. */
   .main {
     margin: 0;
     border: 0;
     border-radius: 0;
-  }
-
-  .nav {
-    display: none;
-  }
-
-  .app.nav-open .nav {
-    display: flex;
-  }
-
-  .app.nav-open .content {
-    display: none;
-  }
-
-  .nav-toggle {
-    display: inline-flex;
+    padding-bottom: calc(var(--mobile-bar-h) + 28px + env(safe-area-inset-bottom));
   }
 }
 
@@ -526,71 +478,44 @@ body {
    the nav is open — leaving the nav's own rows as the only tap targets.
    Liquid-glass: translucent fill + heavy backdrop blur + thin border +
    inset top highlight for the wet/specular feel. */
-.fab {
-  display: none;
-  position: fixed;
-  bottom: 24px;
-  width: 42px;
-  height: 42px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.18),
-    0 1px 2px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  color: var(--text);
-  cursor: pointer;
-  z-index: 50;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 0.1s ease, background 0.15s ease;
-}
-
-.fab:active {
-  transform: scale(0.94);
-}
-
-.fab:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.fab svg {
-  width: 24px;
-  height: 24px;
-}
-
-.fab-back {
-  left: 16px;
-}
-
-.fab-add {
-  right: 16px;
-}
-
-[data-theme="dark"] .fab {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(30, 30, 32, 0.55);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.5),
-    0 1px 2px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
 @media (max-width: 768px) and (pointer: coarse) {
-  .fab {
-    display: inline-flex;
-  }
-
-  /* The FABs replace these controls on mobile — keeping both would
-     double up the same actions. */
-  .nav-toggle,
+  /* The bottom bar carries Add on mobile — keeping both would double
+     up the same action. */
   .main-header .add-button {
     display: none;
+  }
+
+  /* Phone-scale title: the header is the only place the current view is
+     named (no sidebar), so give it page-heading weight. */
+  .main-header {
+    height: auto;
+    padding: 16px 12px 8px;
+    /* The glass sync disc's shadow must paint over the list below;
+       .dnd-parent is positioned at z-index 2 and would otherwise sit on
+       top of it. */
+    position: relative;
+    z-index: 3;
+  }
+
+  .main-header h1 {
+    font-size: 1.5em;
+    font-weight: 700;
+  }
+
+  .main-header .list-icon-static,
+  .main-header .list-icon-trigger {
+    width: 36px;
+    height: 36px;
+  }
+
+  .main-header .list-icon-static svg,
+  .main-header .list-icon-trigger svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .main-header .list-icon-trigger {
+    font-size: 1.35em;
   }
 }
 
@@ -2909,4 +2834,103 @@ input.task-check:hover {
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+/* ---- Mobile shell: floating glass pills ---------------------------- */
+
+:root {
+  --mobile-bar-h: 46px;
+}
+
+/* Shared liquid-glass chrome: the bottom pills and the header's sync
+   indicator on mobile. */
+.glass {
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="dark"] .glass {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(30, 30, 32, 0.6);
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.3),
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.mobile-bar {
+  position: fixed;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--mobile-bar-h);
+  padding: 0 5px;
+  border-radius: 99px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-bar-left {
+  left: calc(16px + env(safe-area-inset-left));
+}
+
+.mobile-bar-right {
+  right: calc(16px + env(safe-area-inset-right));
+}
+
+.mobile-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 99px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.mobile-bar-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mobile-bar-btn:active {
+  transform: scale(0.92);
+  background: rgba(127, 127, 127, 0.18);
+}
+
+.mobile-bar-btn:disabled {
+  opacity: 0.4;
+}
+
+@media (max-width: 768px) and (pointer: coarse) {
+  /* Header sync indicator as a small glass disc, matching the pills. */
+  .main-header .connection-indicator {
+    width: 36px;
+    height: 36px;
+    margin: 0;
+    padding: 0;
+    border-radius: 99px;
+    color: var(--text);
+  }
+
+  .main-header .connection-indicator svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .main-header .connection-indicator:active {
+    transform: scale(0.92);
+  }
 }

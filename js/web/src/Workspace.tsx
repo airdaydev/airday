@@ -18,14 +18,12 @@ import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { Switch } from "@kobalte/core/switch";
 import { Tooltip } from "@kobalte/core/tooltip";
 import archiveSvg from "./icons/archive.svg?raw";
-import caretLeftSvg from "./icons/caret-left.svg?raw";
 import cardStackSvg from "./icons/card-stack.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import listBulletSvg from "./icons/list-bullet.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
-import menuSvg from "./icons/menu.svg?raw";
 import viewVerticalSvg from "./icons/view-vertical.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
@@ -39,6 +37,7 @@ import { restoreCapturedPositions } from "./linger.ts";
 import type { ListOption } from "./ListPicker.tsx";
 import { MovePalette } from "./MovePalette.tsx";
 import { EditableNavLabel, Nav, NavMenu, StatusSlot } from "./nav.tsx";
+import { MobileBars } from "./MobileShell.tsx";
 import { digitNavTarget } from "./navShortcuts.ts";
 import { isOverlayOpen, onGlobalKey } from "./overlay.ts";
 import type { ViewKey } from "./prefs.ts";
@@ -1449,25 +1448,17 @@ export function Workspace(props: {
   document.addEventListener("contextmenu", onContextMenu, true);
   onCleanup(() => document.removeEventListener("contextmenu", onContextMenu, true));
 
-  // Mobile drawer: at narrow viewports the nav and main panes each fill
-  // the viewport and only one shows at a time (full-screen drawer — see
-  // styles.css). `navOpen` is the only state; the FAB caret opens it,
-  // tapping a list / Escape closes it.
+  // Mobile shell: at narrow viewports the sidebar + footer are replaced
+  // by MobileBars (MobileShell.tsx); Find doubles as the list switcher.
   const mobileMq = window.matchMedia("(max-width: 768px) and (pointer: coarse)");
   const [isMobile, setIsMobile] = createSignal(mobileMq.matches);
   const onMqChange = (e: MediaQueryListEvent) => {
     setIsMobile(e.matches);
-    // Leaving mobile width while open would leave the drawer stuck
-    // open behind the now-static layout. Reset on every transition.
-    if (!e.matches) setNavOpen(false);
   };
   mobileMq.addEventListener("change", onMqChange);
   onCleanup(() => mobileMq.removeEventListener("change", onMqChange));
 
-  const [navOpen, setNavOpen] = createSignal(false);
-
-  // Desktop sidebar collapse — orthogonal to the mobile drawer's
-  // `navOpen`. Toggled from the unified app footer, which stays visible
+  // Desktop sidebar collapse. Toggled from the unified app footer, which stays visible
   // either way.
   const [navHidden, setNavHiddenSignal] = createSignal(loadNavHiddenPref());
   const setNavHidden = (hidden: boolean) => {
@@ -1480,29 +1471,40 @@ export function Workspace(props: {
     }
   };
 
-  // Escape closes the open drawer. Scoped to navOpen=true so we don't
-  // contend with FindPalette / Settings / row-expansion escape handlers
-  // when the drawer isn't even visible.
-  createEffect(() => {
-    if (!navOpen()) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        setNavOpen(false);
-      }
-    };
-    document.addEventListener("keydown", onKey, true);
-    onCleanup(() => document.removeEventListener("keydown", onKey, true));
-  });
+  const navigateTo = (v: ViewKey) => {
+      setView(v);
+      // Move keyboard focus to the items listbox once Solid has
+      // settled the new view — keyboard users land ready to arrow /
+      // Enter-to-expand / Space-to-add, mouse users get the same
+      // priming so a follow-up arrow key Just Works. rAF defers past
+      // the <Show keyed> remount when the view's container changes.
+      //
+      // Skip the steal if the user has by now started editing
+      // something — a double-click on a nav label fires two clicks
+      // (queueing two rAFs) *then* dblclick → startEdit, which
+      // focuses the contenteditable via a microtask. Microtasks
+      // drain before the next rAF, so without this guard the
+      // pending rAF would yank focus right back out of rename mode.
+      requestAnimationFrame(() => {
+        const ae = document.activeElement;
+        if (
+          ae instanceof HTMLElement &&
+          (ae.isContentEditable ||
+            ae.tagName === "INPUT" ||
+            ae.tagName === "TEXTAREA")
+        ) {
+          return;
+        }
+        dndHandle?.focus();
+      });
+  };
 
   return (
     <div
       class="app"
-      classList={{
-        "nav-open": navOpen(),
-        "nav-hidden": navHidden(),
-      }}
+      classList={{ "nav-hidden": navHidden() }}
     >
+      <Show when={!isMobile()}>
       <Nav
         app={app}
         lists={activeLists()}
@@ -1511,38 +1513,9 @@ export function Workspace(props: {
         openCountsByList={openCountsByList()}
         showListCounts={state.settings.showListCounts}
         view={view()}
-        setView={(v) => {
-          setView(v);
-          // Tapping a nav item navigates and dismisses the drawer in
-          // one motion — desktop layout ignores navOpen so this is a
-          // no-op there.
-          if (isMobile()) setNavOpen(false);
-          // Move keyboard focus to the items listbox once Solid has
-          // settled the new view — keyboard users land ready to arrow /
-          // Enter-to-expand / Space-to-add, mouse users get the same
-          // priming so a follow-up arrow key Just Works. rAF defers past
-          // the <Show keyed> remount when the view's container changes.
-          //
-          // Skip the steal if the user has by now started editing
-          // something — a double-click on a nav label fires two clicks
-          // (queueing two rAFs) *then* dblclick → startEdit, which
-          // focuses the contenteditable via a microtask. Microtasks
-          // drain before the next rAF, so without this guard the
-          // pending rAF would yank focus right back out of rename mode.
-          requestAnimationFrame(() => {
-            const ae = document.activeElement;
-            if (
-              ae instanceof HTMLElement &&
-              (ae.isContentEditable ||
-                ae.tagName === "INPUT" ||
-                ae.tagName === "TEXTAREA")
-            ) {
-              return;
-            }
-            dndHandle?.focus();
-          });
-        }}
+        setView={navigateTo}
       />
+      </Show>
       <FindPalette
         app={app}
         open={findOpen()}
@@ -1637,20 +1610,10 @@ export function Workspace(props: {
       <div class="content">
       <main class="main">
         <header class="main-header">
-          {/* Title group: hamburger sits flush against the title so
-              both move as a unit at the left edge of the header. The
-              .main-header flex container's space-between then keeps
-              the action buttons on the right regardless of group
+          {/* Title group at the left edge; .main-header's space-between
+              keeps the action buttons on the right regardless of group
               width. */}
           <div class="main-header-title">
-            <button
-              type="button"
-              class="nav-toggle"
-              aria-label={m().common.menu}
-              aria-expanded={navOpen()}
-              onClick={() => setNavOpen((o) => !o)}
-              innerHTML={menuSvg}
-            />
             {/* User-created lists carry a display icon (chosen emoji or
                 the default glyph). Reserved `inbox` has no `ListMeta` row,
                 so it can't store one — gated out. */}
@@ -1687,6 +1650,19 @@ export function Workspace(props: {
             </Show>
           </div>
           <div class="main-header-actions">
+            {/* Mobile: the sync indicator lives up here (there's no
+                footer). Always mounted while mobile so its first-run
+                auth prompt still fires on load, as on desktop. */}
+            <Show when={isMobile()}>
+              <StatusSlot
+                class="glass"
+                app={app}
+                online={session.online()}
+                lastSyncAt={session.lastSyncAt()}
+                session={session.session()}
+                onSession={session.swapSession}
+              />
+            </Show>
             <Show when={archivedViewListId()}>
               {(listId) => (
                 <button
@@ -2053,81 +2029,64 @@ export function Workspace(props: {
             />
           )}
         </Show>
-        {/* Mobile-only floating action buttons, fixed to the viewport.
-            They sit inside .main, so opening the full-screen drawer hides
-            them along with main (see styles.css). */}
-        <button
-          type="button"
-          class="fab fab-back"
-          aria-label={m().common.menu}
-          onClick={() => setNavOpen(true)}
-          innerHTML={caretLeftSvg}
-        />
-        <Show
-          when={
-            (view().kind === "list" || view().kind === "focus") &&
-            boardListId() === null
-          }
-        >
-          <button
-            type="button"
-            class="fab fab-add"
-            aria-label={m().common.add}
-            disabled={draft() !== null}
-            onClick={(e) => {
-              // See header Add button: stop the dnd's document-level
-              // collapse handler from immediately closing the new draft.
-              e.stopImmediatePropagation();
-              startDraft();
-            }}
-            innerHTML={plusSvg}
-          />
-        </Show>
       </main>
       </div>
-      {/* Unified footer strip spanning nav + main (a direct child of the
-          app grid, not nested in either pane), so its chrome stays put
-          when the sidebar hides or the mobile drawer swaps panes. Menu +
-          sidebar toggle sit bottom-left; the account / sync widget sits
-          at the far right. */}
-      <footer class="footer">
-        {/* Desktop-only: mobile's drawer makes a collapsed sidebar
-            meaningless. */}
-        <Show when={!isMobile()}>
+      <Show when={!isMobile()}>
+        {/* Unified footer strip spanning nav + main (a direct child of the
+            app grid, not nested in either pane), so its chrome stays put
+            when the sidebar hides or the mobile drawer swaps panes. Menu +
+            sidebar toggle sit bottom-left; the account / sync widget sits
+            at the far right. */}
+        <footer class="footer">
+          {/* Desktop-only: mobile's drawer makes a collapsed sidebar
+              meaningless. */}
           <Tooltip openDelay={200} closeDelay={0} placement="top">
-            <Tooltip.Trigger
-              class="nav-menu-trigger"
-              aria-label={navHidden() ? m().nav.showSidebar : m().nav.hideSidebar}
-              aria-expanded={!navHidden()}
-              onClick={() => setNavHidden(!navHidden())}
-              innerHTML={viewVerticalSvg}
-            />
-            <Tooltip.Portal>
-              <Tooltip.Content class="tooltip-content">
-                {navHidden() ? m().nav.showSidebar : m().nav.hideSidebar}
-                <Tooltip.Arrow />
-              </Tooltip.Content>
-            </Tooltip.Portal>
-          </Tooltip>
-        </Show>
-        <NavMenu
-          app={app}
-          session={session.session()}
-          logout={session.logout}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onOpenShortcuts={() => setShortcutsOpen(true)}
-          onSession={session.swapSession}
-        />
-        <div class="footer-status">
-          <StatusSlot
+              <Tooltip.Trigger
+                class="nav-menu-trigger"
+                aria-label={navHidden() ? m().nav.showSidebar : m().nav.hideSidebar}
+                aria-expanded={!navHidden()}
+                onClick={() => setNavHidden(!navHidden())}
+                innerHTML={viewVerticalSvg}
+              />
+              <Tooltip.Portal>
+                <Tooltip.Content class="tooltip-content">
+                  {navHidden() ? m().nav.showSidebar : m().nav.hideSidebar}
+                  <Tooltip.Arrow />
+                </Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip>
+          <NavMenu
             app={app}
-            online={session.online()}
-            lastSyncAt={session.lastSyncAt()}
             session={session.session()}
+            logout={session.logout}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenShortcuts={() => setShortcutsOpen(true)}
             onSession={session.swapSession}
           />
-        </div>
-      </footer>
+          <div class="footer-status">
+            <StatusSlot
+              app={app}
+              online={session.online()}
+              lastSyncAt={session.lastSyncAt()}
+              session={session.session()}
+              onSession={session.swapSession}
+            />
+          </div>
+        </footer>
+      </Show>
+      <Show when={isMobile()}>
+        <MobileBars
+          onFind={() => setFindOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onAdd={
+            (view().kind === "list" || view().kind === "focus") &&
+            boardListId() === null
+              ? startDraft
+              : null
+          }
+          addDisabled={draft() !== null}
+        />
+      </Show>
     </div>
   );
 }
