@@ -8,7 +8,7 @@
 
 import { Dialog } from "@kobalte/core/dialog";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { DueField } from "./DueField.tsx";
 import { ListPicker, type ListOption } from "./ListPicker.tsx";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
@@ -346,332 +346,393 @@ export function TaskDialog(props: {
     placeCaretAtEnd(titleRef);
   };
 
-  return (
-    <Dialog
-      open={open()}
-      onOpenChange={(o) => {
-        if (!o) close();
-      }}
-      modal
-    >
-      <Dialog.Portal>
-        <Dialog.Overlay class="dialog-overlay" />
-        <div class="dialog-positioner">
-          <Dialog.Content
-            class="task-dialog"
-            onKeyDown={(e) => {
-              // Cmd/Ctrl+Enter anywhere in the dialog = save & close.
-              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                e.preventDefault();
-                close();
-              }
-            }}
-            onCloseAutoFocus={(e) => {
-              // Kobalte would restore focus to whatever opened the dialog
-              // (a row's open icon, the note badge, …). Take over and send
-              // focus to the list so keyboard nav resumes there.
-              e.preventDefault();
-              props.onClosed?.();
-            }}
-            onOpenAutoFocus={(e) => {
-              // Kobalte would focus the first tabbable (the close button);
-              // take over and land the caret. rAF defers past the load
-              // effect that linkifies the title value.
-              e.preventDefault();
-              requestAnimationFrame(() => {
-                const toNotes = props.focusField?.() === "notes";
-                const el = toNotes ? notesRef : titleRef;
-                if (!el) return;
-                // A double-click passes a title caret offset — place it
-                // exactly where the user pointed (mapped through the
-                // linkified anchors); otherwise land at the end.
-                const caret = toNotes ? null : (props.caret?.() ?? null);
-                if (caret === null) {
-                  placeCaretAtEnd(el);
-                  return;
-                }
-                el.focus();
-                const pos = locateOffsetInLinkified(el, caret);
-                const sel = window.getSelection();
-                const range = document.createRange();
-                range.setStart(pos.node, pos.offset);
-                range.collapse(true);
-                sel?.removeAllRanges();
-                sel?.addRange(range);
-              });
-            }}
-          >
-            <Show when={isNew()}>
-              <header class="task-dialog-header">
-                <div class="task-dialog-header-meta">
-                  {/* Checked = this capture is logged as already-done. Pre-set
-                      by the Done lane "+" and the Done view's "Log" button;
-                      flip it off to file the item as a normal open task. */}
-                  <input
-                    type="checkbox"
-                    class="task-check"
-                    checked={newItemTarget()?.done ?? false}
-                    aria-label={
-                      newItemTarget()?.done
-                        ? m().workspace.markNotDone
-                        : m().workspace.markDone
-                    }
-                    onChange={(e) => setNewItemDone(e.currentTarget.checked)}
-                  />
-                  {/* Stamp mirroring the edit dialog's created/completed
-                      text: names the checkbox's current meaning. */}
-                  <span class="task-dialog-created">
-                    {newItemTarget()?.done
-                      ? m().workspace.loggingDoneStamp
-                      : m().workspace.newItemStamp}
-                  </span>
-                </div>
-                <div class="task-dialog-header-actions">
-                  <Dialog.CloseButton
-                    class="task-dialog-close"
-                    aria-label={m().common.close}
-                  >
-                    ✕
-                  </Dialog.CloseButton>
-                </div>
-              </header>
-              <div class="task-dialog-body">
-                <div class="task-dialog-content">
-                  <div
-                    ref={(el) => {
-                      titleRef = el;
-                      // Set the literal attribute value (not Solid's folded
-                      // valueless `contenteditable`) so the workspace's
-                      // `[contenteditable="true"]` shortcut guard matches.
-                      el.setAttribute("contenteditable", "true");
-                      setLinkifiedText(el, text());
-                    }}
-                    class="task-dialog-title"
-                    role="textbox"
-                    data-done={newItemTarget()?.done ? "" : undefined}
-                    data-placeholder={
-                      newItemTarget()?.done
-                        ? m().workspace.logCompleted
-                        : m().board.addItem
-                    }
-                    onInput={() => setText(editorText(titleRef))}
-                    onKeyDown={onTitleKeyDown}
-                    onPaste={pasteAsPlainText}
-                    onClick={(e) => openLinkOnClick(e, titleRef)}
-                  />
-                  {/* List selector leads the badge row, then the due-date
-                      badge; picks land in the local buffers and are written
-                      after the item commits. The pin toggle buffers the
-                      same way (`newFocus`). */}
-                  <div class="task-dialog-badges">
-                    <ListPicker
-                      options={listOptions}
-                      value={() => newItemListOption()?.id ?? null}
-                      onChange={setNewItemList}
-                    />
-                    <DueField
-                      dueOn={newDueOn}
-                      muted={() => newItemTarget()?.done ?? false}
-                      onChange={setNewDueOn}
-                      open={dueCalOpen}
-                      setOpen={setDueCalOpen}
-                    />
-                    <PinToggle
-                      pinned={newFocus}
-                      disabled={() => newItemTarget()?.done ?? false}
-                      onToggle={() => setNewFocus((v) => !v)}
-                    />
-                  </div>
-                  <div
-                    ref={(el) => {
-                      notesRef = el;
-                      el.setAttribute("contenteditable", "true");
-                      setLinkifiedText(el, notes());
-                    }}
-                    class="task-dialog-notes"
-                    role="textbox"
-                    aria-multiline="true"
-                    data-placeholder={m().workspace.notes}
-                    onInput={() => setNotes(editorText(notesRef))}
-                    onKeyDown={onNotesKeyDown}
-                    onPaste={pasteAsPlainText}
-                    onClick={(e) => openLinkOnClick(e, notesRef)}
-                  />
-                </div>
-              </div>
-            </Show>
-            <Show when={item()}>
-              {(it) => (
-                <>
-                  <header class="task-dialog-header">
-                    <div class="task-dialog-header-meta">
-                      <input
-                        type="checkbox"
-                        class="task-check"
-                        checked={isDone(it())}
-                        onChange={(e) =>
-                          props.app.setDone(it().id, e.currentTarget.checked)
-                        }
-                      />
-                      {/* Created stamp, swapping to the completion stamp
-                          once the item is ticked off. */}
-                      <span class="task-dialog-created">
-                        {isDone(it())
-                          ? m().workspace.completedStamp(
-                              formatDoneStamp(it().doneAt!, nowMs(), locale()),
-                            )
-                          : m().workspace.createdStamp(
-                              formatRelative(it().createdAt, nowMs(), locale()),
-                            )}
-                      </span>
-                    </div>
-                    <div class="task-dialog-header-actions">
-                      <Show when={!isBinned(it())}>
-                        <DropdownMenu>
-                          <DropdownMenu.Trigger
-                            class="nav-menu-trigger"
-                            aria-label={m().common.menu}
-                            innerHTML={dotsVerticalSvg}
-                          />
-                          <DropdownMenu.Portal>
-                            <DropdownMenu.Content class="dropdown-menu-content task-dialog-menu-content">
-                              <DropdownMenu.Item
-                                class="dropdown-menu-item"
-                                onSelect={() => {
-                                  props.app.setBinnedMany([it().id], true);
-                                  props.setItemId(null);
-                                }}
-                              >
-                                {m().workspace.moveToBin}
-                              </DropdownMenu.Item>
-                            </DropdownMenu.Content>
-                          </DropdownMenu.Portal>
-                        </DropdownMenu>
-                      </Show>
-                      <Dialog.CloseButton
-                        class="task-dialog-close"
-                        aria-label={m().common.close}
-                      >
-                        ✕
-                      </Dialog.CloseButton>
-                    </div>
-                  </header>
+  // Land the caret on open: the title (or notes when asked), at the
+  // pointed-at offset for a double-click. rAF defers past the load effect
+  // that linkifies the title value.
+  const focusOnOpen = () => {
+    requestAnimationFrame(() => {
+      const toNotes = props.focusField?.() === "notes";
+      const el = toNotes ? notesRef : titleRef;
+      if (!el) return;
+      // A double-click passes a title caret offset — place it
+      // exactly where the user pointed (mapped through the
+      // linkified anchors); otherwise land at the end.
+      const caret = toNotes ? null : (props.caret?.() ?? null);
+      if (caret === null) {
+        placeCaretAtEnd(el);
+        return;
+      }
+      el.focus();
+      const pos = locateOffsetInLinkified(el, caret);
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.setStart(pos.node, pos.offset);
+      range.collapse(true);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    });
+  };
 
-                  <div class="task-dialog-body">
-                    <div class="task-dialog-content">
-                      <div
-                        ref={(el) => {
-                          titleRef = el;
-                          el.setAttribute("contenteditable", "true");
-                          setLinkifiedText(el, text());
-                        }}
-                        class="task-dialog-title"
-                      role="textbox"
-                      data-done={isDone(it()) ? "" : undefined}
-                      onInput={() => {
-                        const v = editorText(titleRef);
-                        setText(v);
-                        props.onLiveText?.(v);
-                      }}
-                      onKeyDown={onTitleKeyDown}
-                      onPaste={pasteAsPlainText}
-                      onClick={(e) => openLinkOnClick(e, titleRef)}
-                    />
+  // Cmd/Ctrl+Enter anywhere in the surface = save & close. The page shell
+  // (mobile) also takes Escape, which Kobalte handles for the dialog.
+  const onShellKeyDown = (e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      close();
+      return;
+    }
+    if (e.key === "Escape" && isMobile()) {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    }
+  };
 
-                  {/* Badge row: the move-to-list picker first, then the
-                      always-visible due-date badge — clicking it opens a
-                      quick popover (Set date… / Tomorrow / Remove date).
-                      The pin toggle beside it adds / removes the Focus ref;
-                      disabled on Done / Binned items, which can't hold one
-                      (spec/focus.md). */}
-                  <div class="task-dialog-badges">
-                    <ListPicker
-                      options={listOptions}
-                      value={() => it().listId}
-                      onChange={(id) => moveItemToList(id, it().listId)}
-                    />
-                    <DueField
-                      dueOn={() => it().dueOn ?? null}
-                      muted={() => isDone(it()) || isBinned(it())}
-                      onChange={(stamp) =>
-                        props.app.setItemDueOn(it().id, stamp)
-                      }
-                      open={dueCalOpen}
-                      setOpen={setDueCalOpen}
-                    />
-                    <PinToggle
-                      pinned={focused}
-                      disabled={() => isDone(it()) || isBinned(it())}
-                      onToggle={toggleFocus}
-                    />
-                  </div>
-
-                  <div
-                    ref={(el) => {
-                      notesRef = el;
-                      el.setAttribute("contenteditable", "true");
-                      setLinkifiedText(el, notes());
-                    }}
-                    class="task-dialog-notes"
-                    role="textbox"
-                    aria-multiline="true"
-                    data-placeholder={m().workspace.notes}
-                    onInput={() => setNotes(editorText(notesRef))}
-                    onKeyDown={onNotesKeyDown}
-                    onPaste={pasteAsPlainText}
-                    onClick={(e) => openLinkOnClick(e, notesRef)}
-                  />
-
-                  {/* The done stamp lives in the header now; only the bin
-                      stamp still needs a meta row. */}
-                  <Show when={isBinned(it())}>
-                    <div class="task-dialog-meta">
-                      <div class="task-dialog-meta-row">
-                        <span class="task-dialog-meta-label">
-                          {m().nav.bin}
-                        </span>
-                        <span>
-                          {formatRelative(it().binnedAt!, nowMs(), locale())}
-                        </span>
-                      </div>
-                    </div>
-                  </Show>
-
-                  <Show when={isBinned(it())}>
-                    <div class="task-dialog-actions">
-                      <span class="task-dialog-actions-spacer" />
-                      <button
-                        type="button"
-                        class="task-dialog-btn"
-                        onClick={() => {
-                          props.app.setBinnedMany([it().id], false);
-                          props.setItemId(null);
-                        }}
-                      >
-                        {m().common.restore}
-                      </button>
-                      <button
-                        type="button"
-                        class="task-dialog-btn destructive"
-                        onClick={() => {
-                          props.app.deleteBinnedMany([it().id]);
-                          props.setItemId(null);
-                        }}
-                      >
-                        {m().common.delete}
-                      </button>
-                    </div>
-                  </Show>
-
-                    </div>
-                  </div>
-                </>
-              )}
-            </Show>
-          </Dialog.Content>
+  // The surface body, shared by both shells below.
+  const body = () => (
+    <>
+    <Show when={isNew()}>
+      <header class="task-dialog-header">
+        <div class="task-dialog-header-meta">
+          {/* Checked = this capture is logged as already-done. Pre-set
+              by the Done lane "+" and the Done view's "Log" button;
+              flip it off to file the item as a normal open task. */}
+          <input
+            type="checkbox"
+            class="task-check"
+            checked={newItemTarget()?.done ?? false}
+            aria-label={
+              newItemTarget()?.done
+                ? m().workspace.markNotDone
+                : m().workspace.markDone
+            }
+            onChange={(e) => setNewItemDone(e.currentTarget.checked)}
+          />
+          {/* Stamp mirroring the edit dialog's created/completed
+              text: names the checkbox's current meaning. */}
+          <span class="task-dialog-created">
+            {newItemTarget()?.done
+              ? m().workspace.loggingDoneStamp
+              : m().workspace.newItemStamp}
+          </span>
         </div>
-      </Dialog.Portal>
-    </Dialog>
+        <div class="task-dialog-header-actions">
+          <button
+            type="button"
+            class="task-dialog-close"
+            aria-label={m().common.close}
+            onClick={close}
+          >
+            ✕
+          </button>
+        </div>
+      </header>
+      <div class="task-dialog-body">
+        <div class="task-dialog-content">
+          <div
+            ref={(el) => {
+              titleRef = el;
+              // Set the literal attribute value (not Solid's folded
+              // valueless `contenteditable`) so the workspace's
+              // `[contenteditable="true"]` shortcut guard matches.
+              el.setAttribute("contenteditable", "true");
+              setLinkifiedText(el, text());
+            }}
+            class="task-dialog-title"
+            role="textbox"
+            data-done={newItemTarget()?.done ? "" : undefined}
+            data-placeholder={
+              newItemTarget()?.done
+                ? m().workspace.logCompleted
+                : m().board.addItem
+            }
+            onInput={() => setText(editorText(titleRef))}
+            onKeyDown={onTitleKeyDown}
+            onPaste={pasteAsPlainText}
+            onClick={(e) => openLinkOnClick(e, titleRef)}
+          />
+          {/* List selector leads the badge row, then the due-date
+              badge; picks land in the local buffers and are written
+              after the item commits. The pin toggle buffers the
+              same way (`newFocus`). */}
+          <div class="task-dialog-badges">
+            <ListPicker
+              options={listOptions}
+              value={() => newItemListOption()?.id ?? null}
+              onChange={setNewItemList}
+            />
+            <DueField
+              dueOn={newDueOn}
+              muted={() => newItemTarget()?.done ?? false}
+              onChange={setNewDueOn}
+              open={dueCalOpen}
+              setOpen={setDueCalOpen}
+            />
+            <PinToggle
+              pinned={newFocus}
+              disabled={() => newItemTarget()?.done ?? false}
+              onToggle={() => setNewFocus((v) => !v)}
+            />
+          </div>
+          <div
+            ref={(el) => {
+              notesRef = el;
+              el.setAttribute("contenteditable", "true");
+              setLinkifiedText(el, notes());
+            }}
+            class="task-dialog-notes"
+            role="textbox"
+            aria-multiline="true"
+            data-placeholder={m().workspace.notes}
+            onInput={() => setNotes(editorText(notesRef))}
+            onKeyDown={onNotesKeyDown}
+            onPaste={pasteAsPlainText}
+            onClick={(e) => openLinkOnClick(e, notesRef)}
+          />
+        </div>
+      </div>
+    </Show>
+    <Show when={item()}>
+      {(it) => (
+        <>
+          <header class="task-dialog-header">
+            <div class="task-dialog-header-meta">
+              <input
+                type="checkbox"
+                class="task-check"
+                checked={isDone(it())}
+                onChange={(e) =>
+                  props.app.setDone(it().id, e.currentTarget.checked)
+                }
+              />
+              {/* Created stamp, swapping to the completion stamp
+                  once the item is ticked off. */}
+              <span class="task-dialog-created">
+                {isDone(it())
+                  ? m().workspace.completedStamp(
+                      formatDoneStamp(it().doneAt!, nowMs(), locale()),
+                    )
+                  : m().workspace.createdStamp(
+                      formatRelative(it().createdAt, nowMs(), locale()),
+                    )}
+              </span>
+            </div>
+            <div class="task-dialog-header-actions">
+              <Show when={!isBinned(it())}>
+                <DropdownMenu>
+                  <DropdownMenu.Trigger
+                    class="nav-menu-trigger"
+                    aria-label={m().common.menu}
+                    innerHTML={dotsVerticalSvg}
+                  />
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content class="dropdown-menu-content task-dialog-menu-content">
+                      <DropdownMenu.Item
+                        class="dropdown-menu-item"
+                        onSelect={() => {
+                          props.app.setBinnedMany([it().id], true);
+                          props.setItemId(null);
+                        }}
+                      >
+                        {m().workspace.moveToBin}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu>
+              </Show>
+              <button
+                type="button"
+                class="task-dialog-close"
+                aria-label={m().common.close}
+                onClick={close}
+              >
+                ✕
+              </button>
+            </div>
+          </header>
+
+          <div class="task-dialog-body">
+            <div class="task-dialog-content">
+              <div
+                ref={(el) => {
+                  titleRef = el;
+                  el.setAttribute("contenteditable", "true");
+                  setLinkifiedText(el, text());
+                }}
+                class="task-dialog-title"
+              role="textbox"
+              data-done={isDone(it()) ? "" : undefined}
+              onInput={() => {
+                const v = editorText(titleRef);
+                setText(v);
+                props.onLiveText?.(v);
+              }}
+              onKeyDown={onTitleKeyDown}
+              onPaste={pasteAsPlainText}
+              onClick={(e) => openLinkOnClick(e, titleRef)}
+            />
+
+          {/* Badge row: the move-to-list picker first, then the
+              always-visible due-date badge — clicking it opens a
+              quick popover (Set date… / Tomorrow / Remove date).
+              The pin toggle beside it adds / removes the Focus ref;
+              disabled on Done / Binned items, which can't hold one
+              (spec/focus.md). */}
+          <div class="task-dialog-badges">
+            <ListPicker
+              options={listOptions}
+              value={() => it().listId}
+              onChange={(id) => moveItemToList(id, it().listId)}
+            />
+            <DueField
+              dueOn={() => it().dueOn ?? null}
+              muted={() => isDone(it()) || isBinned(it())}
+              onChange={(stamp) =>
+                props.app.setItemDueOn(it().id, stamp)
+              }
+              open={dueCalOpen}
+              setOpen={setDueCalOpen}
+            />
+            <PinToggle
+              pinned={focused}
+              disabled={() => isDone(it()) || isBinned(it())}
+              onToggle={toggleFocus}
+            />
+          </div>
+
+          <div
+            ref={(el) => {
+              notesRef = el;
+              el.setAttribute("contenteditable", "true");
+              setLinkifiedText(el, notes());
+            }}
+            class="task-dialog-notes"
+            role="textbox"
+            aria-multiline="true"
+            data-placeholder={m().workspace.notes}
+            onInput={() => setNotes(editorText(notesRef))}
+            onKeyDown={onNotesKeyDown}
+            onPaste={pasteAsPlainText}
+            onClick={(e) => openLinkOnClick(e, notesRef)}
+          />
+
+          {/* The done stamp lives in the header now; only the bin
+              stamp still needs a meta row. */}
+          <Show when={isBinned(it())}>
+            <div class="task-dialog-meta">
+              <div class="task-dialog-meta-row">
+                <span class="task-dialog-meta-label">
+                  {m().nav.bin}
+                </span>
+                <span>
+                  {formatRelative(it().binnedAt!, nowMs(), locale())}
+                </span>
+              </div>
+            </div>
+          </Show>
+
+          <Show when={isBinned(it())}>
+            <div class="task-dialog-actions">
+              <span class="task-dialog-actions-spacer" />
+              <button
+                type="button"
+                class="task-dialog-btn"
+                onClick={() => {
+                  props.app.setBinnedMany([it().id], false);
+                  props.setItemId(null);
+                }}
+              >
+                {m().common.restore}
+              </button>
+              <button
+                type="button"
+                class="task-dialog-btn destructive"
+                onClick={() => {
+                  props.app.deleteBinnedMany([it().id]);
+                  props.setItemId(null);
+                }}
+              >
+                {m().common.delete}
+              </button>
+            </div>
+          </Show>
+
+            </div>
+          </div>
+        </>
+      )}
+    </Show>
+    </>
+  );
+
+  // Two shells around one body. Desktop: a centred modal Dialog (focus
+  // trap, overlay, Escape from Kobalte). Mobile: a plain full-screen page
+  // under the floating pills — no modal, no portal, so the pills stay
+  // live and nothing counts as an "outside" interaction.
+  const isMobileMq = window.matchMedia("(max-width: 768px) and (pointer: coarse)");
+  const [isMobile, setIsMobile] = createSignal(isMobileMq.matches);
+  const onMq = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+  isMobileMq.addEventListener("change", onMq);
+  onCleanup(() => isMobileMq.removeEventListener("change", onMq));
+
+  // Page shell: focus the editor on open (Kobalte does this for the
+  // dialog via onOpenAutoFocus) and hand focus back on close.
+  createEffect(() => {
+    if (!isMobile()) return;
+    if (!open()) return;
+    focusOnOpen();
+    onCleanup(() => props.onClosed?.());
+  });
+
+  return (
+    <Show
+      when={!isMobile()}
+      fallback={
+        <Show when={open()}>
+          <section
+            class="task-dialog task-page"
+            role="region"
+            aria-label={m().common.close}
+            onKeyDown={onShellKeyDown}
+          >
+            {body()}
+          </section>
+        </Show>
+      }
+    >
+      <Dialog
+        open={open()}
+        onOpenChange={(o) => {
+          if (!o) close();
+        }}
+        modal
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay class="dialog-overlay" />
+          <div class="dialog-positioner">
+            <Dialog.Content
+              class="task-dialog"
+              onKeyDown={onShellKeyDown}
+              onCloseAutoFocus={(e) => {
+                // Kobalte would restore focus to whatever opened the dialog
+                // (a row's open icon, the note badge, …). Take over and send
+                // focus to the list so keyboard nav resumes there.
+                e.preventDefault();
+                props.onClosed?.();
+              }}
+              onOpenAutoFocus={(e) => {
+                // Kobalte would focus the first tabbable (the close button);
+                // take over and land the caret.
+                e.preventDefault();
+                focusOnOpen();
+              }}
+            >
+              {body()}
+            </Dialog.Content>
+          </div>
+        </Dialog.Portal>
+      </Dialog>
+    </Show>
   );
 }
 

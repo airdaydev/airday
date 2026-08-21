@@ -1529,7 +1529,13 @@ export function Workspace(props: {
           // remount like the nav's onSelect does.
           requestAnimationFrame(() => restoreItemsFocus());
         }}
-        onSelect={(r) => onFindSelect(r)}
+        onSelect={(r) => {
+          // A pick navigates the workspace behind any open item's page
+          // (mobile pills can open the palette over it); close the item
+          // so the result is actually visible.
+          setOpenItemId(null);
+          onFindSelect(r);
+        }}
       />
       <MovePalette
         open={moveIds() !== null}
@@ -2081,7 +2087,12 @@ export function Workspace(props: {
           onAdd={
             (view().kind === "list" || view().kind === "focus") &&
             boardListId() === null
-              ? startDraft
+              ? () => {
+                  // The pills stay live over an open item's page; Add
+                  // captures into the list behind it, so close it first.
+                  setOpenItemId(null);
+                  startDraft();
+                }
               : null
           }
           addDisabled={draft() !== null}
