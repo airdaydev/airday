@@ -147,12 +147,6 @@ body {
   display: none;
 }
 
-/* The main surface normally borrows its left gutter from the nav
-   column; restore it when that column is gone. */
-.app.nav-hidden .main {
-  margin-left: 8px;
-}
-
 @media (max-width: 768px) and (pointer: coarse) {
   /* Bump the inherited base size on phones; chrome elements with
      explicit px sizes (section labels, chips) keep theirs. ≥16px also
@@ -174,10 +168,8 @@ body {
     grid-area: 1 / 1;
   }
 
+  /* Room beneath the floating pills. */
   .main {
-    margin: 0;
-    border: 0;
-    border-radius: 0;
     padding-bottom: calc(var(--mobile-bar-h) + 28px + env(safe-area-inset-bottom));
   }
 }
@@ -355,10 +347,24 @@ body {
   min-height: 0;
   min-width: 0;
   overflow-y: scroll;
-  margin: 8px 8px 0 0;
   background: var(--surface);
-  border-radius: 8px;
-  border: 0.5px solid var(--border-surface);
+}
+
+/* Mobile-first: the floating-surface frame (gutter, radius, hairline) is
+   desktop-only, gated on the exact inverse of the mobile query so neither
+   rule depends on source order. */
+@media not all and (max-width: 768px) and (pointer: coarse) {
+  .main {
+    margin: 8px 8px 0 0;
+    border-radius: 8px;
+    border: 0.5px solid var(--border-surface);
+  }
+
+  /* The main surface normally borrows its left gutter from the nav
+     column; restore it when that column is gone. */
+  .app.nav-hidden .main {
+    margin-left: 8px;
+  }
 }
 
 /* Unified footer strip on the darker body background, spanning nav +
@@ -1926,6 +1932,20 @@ input.task-check:hover {
   margin-top: 4px;
 }
 
+/* Dialog badges run a step larger than the 12px row badges; their glyphs
+   scale with them. */
+.task-dialog-badges .badge {
+  font-size: 14px;
+  padding: 2px 8px;
+}
+
+.task-dialog-badges .badge svg,
+.task-dialog-badges .task-dialog-list-icon-emoji {
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+}
+
 /* The always-visible badge that opens the due-date quick popover (a faint
    "Deadline" placeholder when unset). Button reset so the DueBadge inside
    keeps its own look. */
@@ -2210,6 +2230,15 @@ input.task-check:hover {
     z-index: 40;
     box-shadow: none;
     padding-bottom: calc(var(--mobile-bar-h) + 28px + env(safe-area-inset-bottom));
+  }
+
+  /* Thumb-sized badges: extra padding over the desktop 2px 8px. */
+  .task-page .task-dialog-badges .badge {
+    padding: 6px 10px;
+  }
+
+  .task-page .task-dialog-badges {
+    gap: 6px;
   }
 
   .settings-dialog {
