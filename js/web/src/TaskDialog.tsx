@@ -190,7 +190,42 @@ export function TaskDialog(props: {
 
   // Push a buffer value into a contenteditable editor as linkified content.
   const loadEditor = (el: HTMLDivElement | undefined, value: string) => {
-    if (el) setLinkifiedText(el, value);
+    if (!el) return;
+    setLinkifiedText(el, value);
+    ensureTrailingBreak(el);
+  };
+
+  // A "\n" at the very end of a pre-wrap block doesn't get its own line
+  // box, so the caret has nowhere to land after a trailing newline. A
+  // trailing <br> gives it one; textContent ignores <br>, so the saved
+  // string is unaffected.
+  const ensureTrailingBreak = (el: HTMLDivElement) => {
+    if (!(el.textContent ?? "").endsWith("\n")) return;
+    if (el.lastChild instanceof HTMLBRElement) return;
+    el.appendChild(document.createElement("br"));
+  };
+
+  // Replace the selection inside `el` with a literal "\n" text node. Done by
+  // hand rather than execCommand("insertText", "\n") because WebKit (every
+  // iOS browser) treats that as a block split or drops it, so the newline
+  // never reaches textContent and never saves. Returns false when the
+  // selection isn't inside `el`.
+  const insertNewline = (el: HTMLDivElement | undefined): boolean => {
+    if (!el) return false;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return false;
+    const range = sel.getRangeAt(0);
+    if (!el.contains(range.commonAncestorContainer)) return false;
+    range.deleteContents();
+    const nl = document.createTextNode("\n");
+    range.insertNode(nl);
+    range.setStartAfter(nl);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    ensureTrailingBreak(el);
+    setNotes(editorText(el));
+    return true;
   };
 
   // Write the current editor contents back to `id` if they differ. Empty
@@ -324,8 +359,7 @@ export function TaskDialog(props: {
       !e.isComposing
     ) {
       e.preventDefault();
-      document.execCommand("insertText", false, "\n");
-      setNotes(editorText(notesRef));
+      insertNewline(notesRef);
       return;
     }
     // ArrowUp at the very start of the notes jumps back up to the title.
@@ -344,6 +378,20 @@ export function TaskDialog(props: {
     if (off === null || off !== 0) return;
     e.preventDefault();
     placeCaretAtEnd(titleRef);
+  };
+
+  // iOS soft keyboards can deliver Return without a keydown the handler
+  // above sees (or with key "Unidentified"); the editing intent still
+  // arrives here as insertParagraph / insertLineBreak. Swap the default
+  // block split for the same literal newline.
+  const onNotesBeforeInput = (e: InputEvent) => {
+    if (
+      e.inputType !== "insertParagraph" &&
+      e.inputType !== "insertLineBreak"
+    )
+      return;
+    if (e.isComposing) return;
+    if (insertNewline(notesRef)) e.preventDefault();
   };
 
   // Land the caret on open: the title (or notes when asked), at the
@@ -486,6 +534,7 @@ export function TaskDialog(props: {
             data-placeholder={m().workspace.notes}
             onInput={() => setNotes(editorText(notesRef))}
             onKeyDown={onNotesKeyDown}
+            on:beforeinput={onNotesBeforeInput}
             onPaste={pasteAsPlainText}
             onClick={(e) => openLinkOnClick(e, notesRef)}
           />
@@ -612,6 +661,7 @@ export function TaskDialog(props: {
             data-placeholder={m().workspace.notes}
             onInput={() => setNotes(editorText(notesRef))}
             onKeyDown={onNotesKeyDown}
+            on:beforeinput={onNotesBeforeInput}
             onPaste={pasteAsPlainText}
             onClick={(e) => openLinkOnClick(e, notesRef)}
           />

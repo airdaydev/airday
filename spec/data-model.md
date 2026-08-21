@@ -36,8 +36,8 @@ One child `LoroMap` under `items`, keyed by `ItemId`.
 | Field | Type | Notes |
 |---|---|---|
 | `id` | string | same as the map key; kept inside the map so a container handle resolves back to its id during diff translation |
-| `text` | string | the user's content |
-| `notes` | string | optional richer text; empty string when absent in simple clients |
+| `text` | string | the user's content. **Planned:** becomes a `LoroText` child container before sharing ships, see `sharing-plan.md` "Text fields must be mergeable before sharing"; as a string register, concurrent edits are whole-value LWW |
+| `notes` | string | optional free-form plain text; empty string when absent in simple clients. Same `LoroText` plan as `text` |
 | `location` | string | **atomic placement register** — encoded `"<list_id>:<placement_id>"`, see below |
 | `live` | bool? | lifecycle flag. Absent or `false` ≡ Backlog; `true` ≡ Live. New items omit it (Backlog). See "Lifecycle" below. |
 | `due_on` | string? | optional **date-only** due date, a floating local calendar date in `YYYY-MM-DD` format (no time, no timezone, not unix millis). Absent ≡ no due date; clearing deletes the key. Values that are not a well-formed `YYYY-MM-DD` calendar date are rejected by the mutation. |
