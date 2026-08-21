@@ -623,6 +623,40 @@ input.task-check:hover {
   border-color: #ffffff30;
 }
 
+/* Touch devices: the 14px box is a hard target. Inflate the input with a
+   transparent border so the tap area is 32px while the visible box stays
+   18px. The border is now hit-padding, so the visible edge moves to an
+   inset box-shadow and the check glyph is clipped to the padding box. The
+   negative margins cancel the padding so the row layout doesn't shift. */
+@media (pointer: coarse) {
+  .row input[type="checkbox"] {
+    --check-border: var(--border-input);
+    top: -6px;
+    width: 32px;
+    height: 32px;
+    margin: 0 -7px;
+    border: 7px solid transparent;
+    border-radius: 10px;
+    background-clip: padding-box;
+    background-origin: padding-box;
+    box-shadow: inset 0 0 0 1px var(--check-border);
+  }
+
+  .row input[type="checkbox"]:hover {
+    border-color: transparent;
+  }
+
+  [aria-selected="true"] input[type="checkbox"] {
+    --check-border: #00000030;
+    border-color: transparent;
+  }
+
+  [data-theme="dark"] [aria-selected="true"] input[type="checkbox"] {
+    --check-border: #ffffff30;
+    border-color: transparent;
+  }
+}
+
 .row-body {
   flex: 1;
   min-width: 0;
