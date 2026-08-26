@@ -977,6 +977,17 @@ export function Workspace(props: {
   // bottom-most source row — same shape as paste — rather than each
   // clone sitting under its own original. Shared by Cmd+D and the row
   // context menu's Duplicate action so both behave identically.
+  // A clone is a full copy, not just the title: carry the notes and due
+  // date across. Both are no-ops when the source has neither, so the
+  // batch stays a single undo step either way.
+  const copyItemDetails = (
+    id: string,
+    src: { notes: string; dueOn: string | undefined },
+  ): void => {
+    if (src.notes) app.editItemNotes(id, src.notes);
+    if (src.dueOn) app.setItemDueOn(id, src.dueOn);
+  };
+
   const duplicateBlock = (sourceIds: readonly string[]): void => {
     const v = view();
     if (v.kind === "focus") {
@@ -991,6 +1002,8 @@ export function Workspace(props: {
         id: string;
         idx: number;
         text: string;
+        notes: string;
+        dueOn: string | undefined;
         live: boolean;
         listId: string;
       }[] = [];
@@ -999,7 +1012,15 @@ export function Workspace(props: {
         const it = app.getItem(id);
         if (!it || !isOpen(it)) return;
         const listId = app.state.listsById[it.listId] ? it.listId : "inbox";
-        sources.push({ id, idx, text: it.text, live: it.live, listId });
+        sources.push({
+          id,
+          idx,
+          text: it.text,
+          notes: it.notes,
+          dueOn: it.dueOn,
+          live: it.live,
+          listId,
+        });
       });
       if (sources.length === 0) return;
       const insertAt = sources[sources.length - 1].idx + 1;
@@ -1018,6 +1039,7 @@ export function Workspace(props: {
           const at = order.indexOf(s.id) + 1;
           const id = app.addItemAt(s.listId, s.text, at);
           order.splice(at, 0, id);
+          copyItemDetails(id, s);
           if (s.live) app.setLifecycle(id, "live");
           app.addToFocus(id, insertAt + i);
           created.push(id);
@@ -1040,13 +1062,21 @@ export function Workspace(props: {
     const sourcesInOrder: {
       idx: number;
       text: string;
+      notes: string;
+      dueOn: string | undefined;
       live: boolean;
     }[] = [];
     visible.forEach((id, idx) => {
       if (!sourceSet.has(id)) return;
       const it = app.getItem(id);
       if (!it || !isOpen(it)) return;
-      sourcesInOrder.push({ idx, text: it.text, live: it.live });
+      sourcesInOrder.push({
+        idx,
+        text: it.text,
+        notes: it.notes,
+        dueOn: it.dueOn,
+        live: it.live,
+      });
     });
     if (sourcesInOrder.length === 0) return;
     const insertAt = sourcesInOrder[sourcesInOrder.length - 1].idx + 1;
@@ -1057,7 +1087,10 @@ export function Workspace(props: {
     const newIds = app.withActionBatch(() => {
       const ids = app.addItemsAt(v.id, texts, insertAt);
       ids.forEach((id, i) => {
-        if (sourcesInOrder[i]?.live) app.setLifecycle(id, "live");
+        const src = sourcesInOrder[i];
+        if (!src) return;
+        copyItemDetails(id, src);
+        if (src.live) app.setLifecycle(id, "live");
       });
       return ids;
     });

@@ -516,11 +516,12 @@ export function TaskDialog(props: {
               open={dueCalOpen}
               setOpen={setDueCalOpen}
             />
-            <PinToggle
-              pinned={newFocus}
-              disabled={() => newItemTarget()?.done ?? false}
-              onToggle={() => setNewFocus((v) => !v)}
-            />
+            <Show when={!(newItemTarget()?.done ?? false)}>
+              <PinToggle
+                pinned={newFocus}
+                onToggle={() => setNewFocus((v) => !v)}
+              />
+            </Show>
           </div>
           <div
             ref={(el) => {
@@ -625,7 +626,7 @@ export function TaskDialog(props: {
               always-visible due-date badge — clicking it opens a
               quick popover (Set date… / Tomorrow / Remove date).
               The pin toggle beside it adds / removes the Focus ref;
-              disabled on Done / Binned items, which can't hold one
+              hidden on Done / Binned items, which can't hold one
               (spec/focus.md). */}
           <div class="task-dialog-badges">
             <ListPicker
@@ -642,11 +643,9 @@ export function TaskDialog(props: {
               open={dueCalOpen}
               setOpen={setDueCalOpen}
             />
-            <PinToggle
-              pinned={focused}
-              disabled={() => isDone(it()) || isBinned(it())}
-              onToggle={toggleFocus}
-            />
+            <Show when={!isDone(it()) && !isBinned(it())}>
+              <PinToggle pinned={focused} onToggle={toggleFocus} />
+            </Show>
           </div>
 
           <div
@@ -791,7 +790,6 @@ export function TaskDialog(props: {
  *  and by the `newFocus` buffer in new-item capture mode. */
 function PinToggle(props: {
   pinned: () => boolean;
-  disabled: () => boolean;
   onToggle: () => void;
 }) {
   const { m } = useAppI18n();
@@ -803,7 +801,6 @@ function PinToggle(props: {
       aria-pressed={props.pinned()}
       aria-label={label()}
       title={label()}
-      disabled={props.disabled()}
       onClick={props.onToggle}
       innerHTML={props.pinned() ? drawingPinFilledSvg : drawingPinSvg}
     />
