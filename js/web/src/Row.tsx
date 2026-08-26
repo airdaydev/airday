@@ -765,7 +765,9 @@ export function Row(props: {
               <span>{m().focus.showInFocus}</span>
             </ContextMenu.Item>
           </Show>
-          <Show when={!isBinned(props.item())}>
+          {/* Due date only matters while the item is open (the badge hides
+              for done/binned rows too, see above). */}
+          <Show when={isOpen(props.item())}>
             <ContextMenu.Sub gutter={4}>
               <ContextMenu.SubTrigger class="context-menu-item">
                 <span>{m().due.label}</span>

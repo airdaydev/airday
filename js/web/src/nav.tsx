@@ -9,6 +9,7 @@ import { ContextMenu } from "@kobalte/core/context-menu";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Popover } from "@kobalte/core/popover";
 import { Tooltip } from "@kobalte/core/tooltip";
+import { createPopoverTooltipGuard } from "./popoverTooltip.ts";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Dnd, DndSelection, type DndOp } from "./dnd/solid";
 import archiveSvg from "./icons/archive.svg?raw";
@@ -64,7 +65,10 @@ function ConnectionStatusPopover(props: {
   lastSyncAt: number | null;
 }) {
   const { m, locale } = useAppI18n();
-  const [open, setOpen] = createSignal(false);
+  // Tooltip + popover share the trigger; the guard keeps the tooltip quiet
+  // while the popover is open and across the focus-restore on close.
+  const guard = createPopoverTooltipGuard();
+  const open = guard.open;
   // Local seconds-resolution clock — only ticks while the popover is
   // visible so we don't spend a 5s interval forever just to drive a
   // string the user can't see. Falls back to a one-shot read when
@@ -153,8 +157,8 @@ function ConnectionStatusPopover(props: {
   };
 
   return (
-    <Popover open={open()} onOpenChange={setOpen} placement="top-start" gutter={6}>
-      <Tooltip openDelay={200} closeDelay={0} placement="top">
+    <Popover {...guard.popover} placement="top-start" gutter={6}>
+      <Tooltip {...guard.tooltip} openDelay={200} closeDelay={0} placement="top">
         <Tooltip.Trigger
           as={Popover.Trigger}
           class={props.class ? `connection-indicator ${props.class}` : "connection-indicator"}
@@ -176,7 +180,7 @@ function ConnectionStatusPopover(props: {
         </Tooltip.Portal>
       </Tooltip>
       <Popover.Portal>
-        <Popover.Content class="status-popover">
+        <Popover.Content {...guard.content} class="status-popover">
           <div class="status-line">
             <span
               class="status-dot"

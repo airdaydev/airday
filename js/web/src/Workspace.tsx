@@ -5,6 +5,7 @@ import {
   on,
   onCleanup,
   Show,
+  type JSX,
 } from "solid-js";
 import {
   Dnd,
@@ -34,6 +35,7 @@ import { FindPalette, type FindResult } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { ListIconPicker } from "./ListIconPicker.tsx";
 import { restoreCapturedPositions } from "./linger.ts";
+import { createPopoverTooltipGuard } from "./popoverTooltip.ts";
 import type { ListOption } from "./ListPicker.tsx";
 import { MovePalette } from "./MovePalette.tsx";
 import { EditableNavLabel, Nav, NavMenu, StatusSlot } from "./nav.tsx";
@@ -140,6 +142,37 @@ function createKbDeviceSignal(): () => boolean {
   mql.addEventListener("change", onChange);
   onCleanup(() => mql.removeEventListener("change", onChange));
   return matches;
+}
+
+/** The header's "Display options" popover: tooltip on the trigger, popover
+    body from children. The guard keeps the tooltip from showing while the
+    popover is open (or when focus returns to the button on close). */
+function DisplayOptionsPopover(props: { children: JSX.Element }) {
+  const { m } = useAppI18n();
+  const guard = createPopoverTooltipGuard();
+  return (
+    <Popover {...guard.popover} placement="bottom-end" gutter={6}>
+      <Tooltip {...guard.tooltip} openDelay={200} closeDelay={0} placement="bottom">
+        <Tooltip.Trigger
+          as={Popover.Trigger}
+          class="add-button view-mode-trigger"
+          aria-label={m().workspace.displayOptions}
+          innerHTML={mixerHzSvg}
+        />
+        <Tooltip.Portal>
+          <Tooltip.Content class="tooltip-content">
+            {m().workspace.displayOptions}
+            <Tooltip.Arrow />
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      </Tooltip>
+      <Popover.Portal>
+        <Popover.Content {...guard.content} class="view-mode-popover">
+          {props.children}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover>
+  );
 }
 
 export function Workspace(props: {
@@ -1733,138 +1766,102 @@ export function Workspace(props: {
                 chrome. Hidden via CSS when the view contributes none. */}
             <div class="header-group">
             <Show when={view().kind === "list"}>
-              <Popover placement="bottom-end" gutter={6}>
-                <Tooltip openDelay={200} closeDelay={0} placement="bottom">
-                  <Tooltip.Trigger
-                    as={Popover.Trigger}
-                    class="add-button view-mode-trigger"
-                    aria-label={m().workspace.displayOptions}
-                    innerHTML={mixerHzSvg}
-                  />
-                  <Tooltip.Portal>
-                    <Tooltip.Content class="tooltip-content">
-                      {m().nav.settings}
-                      <Tooltip.Arrow />
-                    </Tooltip.Content>
-                  </Tooltip.Portal>
-                </Tooltip>
-                <Popover.Portal>
-                  <Popover.Content class="view-mode-popover">
-                    <SegmentedControl
-                      class="theme-segmented"
-                      aria-label={m().board.viewMode}
-                      value={boardListId() !== null ? "board" : "list"}
-                      onChange={(value) => {
-                        const v = view();
-                        if (v.kind !== "list") return;
-                        const wantBoard = value === "board";
-                        if (wantBoard !== (boardListId() !== null)) {
-                          toggleBoard(v.id);
-                        }
-                      }}
-                    >
-                      <SegmentedControl.Indicator class="theme-segment-indicator" />
-                      <SegmentedControl.Item value="list" class="theme-segment">
-                        <SegmentedControl.ItemInput />
-                        <SegmentedControl.ItemControl class="theme-segment-control">
-                          <SegmentedControl.ItemLabel class="view-mode-label">
-                            <span
-                              class="view-mode-icon"
-                              aria-hidden="true"
-                              innerHTML={listBulletSvg}
-                            />
-                            <span>{m().board.list}</span>
-                          </SegmentedControl.ItemLabel>
-                        </SegmentedControl.ItemControl>
-                      </SegmentedControl.Item>
-                      <SegmentedControl.Item value="board" class="theme-segment">
-                        <SegmentedControl.ItemInput />
-                        <SegmentedControl.ItemControl class="theme-segment-control">
-                          <SegmentedControl.ItemLabel class="view-mode-label">
-                            <span
-                              class="view-mode-icon"
-                              aria-hidden="true"
-                              innerHTML={cardStackSvg}
-                            />
-                            <span>{m().board.board}</span>
-                          </SegmentedControl.ItemLabel>
-                        </SegmentedControl.ItemControl>
-                      </SegmentedControl.Item>
-                    </SegmentedControl>
-                    <Show when={boardListId()}>
-                      {(listId) => (
-                        <Switch
-                          class="done-switch"
-                          checked={showDoneColumn(listId())}
-                          onChange={(checked) =>
-                            setShowDoneColumn(listId(), checked)
-                          }
-                        >
-                          <Switch.Label class="done-switch-label">
-                            {m().board.showDoneColumn}
-                          </Switch.Label>
-                          <Switch.Input class="done-switch-input" />
-                          <Switch.Control class="done-switch-control">
-                            <Switch.Thumb class="done-switch-thumb" />
-                          </Switch.Control>
-                        </Switch>
-                      )}
-                    </Show>
-                    {/* Publish this view as the list's default for every
-                        device. Disabled once it already is the default —
-                        the label then reads as a state, not an action. */}
-                    <Show when={currentListId()}>
-                      {(listId) => (
-                        <button
-                          type="button"
-                          class="view-default-button"
-                          disabled={isSavedDefault(listId())}
-                          onClick={() => saveViewAsDefault(listId())}
-                        >
-                          {isSavedDefault(listId())
-                            ? m().board.savedAsDefault
-                            : m().board.saveAsDefault}
-                        </button>
-                      )}
-                    </Show>
-                  </Popover.Content>
-                </Popover.Portal>
-              </Popover>
-            </Show>
-            <Show when={view().kind === "done"}>
-              <Popover placement="bottom-end" gutter={6}>
-                <Tooltip openDelay={200} closeDelay={0} placement="bottom">
-                  <Tooltip.Trigger
-                    as={Popover.Trigger}
-                    class="add-button view-mode-trigger"
-                    aria-label={m().workspace.displayOptions}
-                    innerHTML={mixerHzSvg}
-                  />
-                  <Tooltip.Portal>
-                    <Tooltip.Content class="tooltip-content">
-                      {m().workspace.displayOptions}
-                      <Tooltip.Arrow />
-                    </Tooltip.Content>
-                  </Tooltip.Portal>
-                </Tooltip>
-                <Popover.Portal>
-                  <Popover.Content class="view-mode-popover">
+              <DisplayOptionsPopover>
+                <SegmentedControl
+                  class="theme-segmented"
+                  aria-label={m().board.viewMode}
+                  value={boardListId() !== null ? "board" : "list"}
+                  onChange={(value) => {
+                    const v = view();
+                    if (v.kind !== "list") return;
+                    const wantBoard = value === "board";
+                    if (wantBoard !== (boardListId() !== null)) {
+                      toggleBoard(v.id);
+                    }
+                  }}
+                >
+                  <SegmentedControl.Indicator class="theme-segment-indicator" />
+                  <SegmentedControl.Item value="list" class="theme-segment">
+                    <SegmentedControl.ItemInput />
+                    <SegmentedControl.ItemControl class="theme-segment-control">
+                      <SegmentedControl.ItemLabel class="view-mode-label">
+                        <span
+                          class="view-mode-icon"
+                          aria-hidden="true"
+                          innerHTML={listBulletSvg}
+                        />
+                        <span>{m().board.list}</span>
+                      </SegmentedControl.ItemLabel>
+                    </SegmentedControl.ItemControl>
+                  </SegmentedControl.Item>
+                  <SegmentedControl.Item value="board" class="theme-segment">
+                    <SegmentedControl.ItemInput />
+                    <SegmentedControl.ItemControl class="theme-segment-control">
+                      <SegmentedControl.ItemLabel class="view-mode-label">
+                        <span
+                          class="view-mode-icon"
+                          aria-hidden="true"
+                          innerHTML={cardStackSvg}
+                        />
+                        <span>{m().board.board}</span>
+                      </SegmentedControl.ItemLabel>
+                    </SegmentedControl.ItemControl>
+                  </SegmentedControl.Item>
+                </SegmentedControl>
+                <Show when={boardListId()}>
+                  {(listId) => (
                     <Switch
                       class="done-switch"
-                      checked={doneShowList()}
-                      onChange={(checked) => setDoneShowList(checked)}
+                      checked={showDoneColumn(listId())}
+                      onChange={(checked) =>
+                        setShowDoneColumn(listId(), checked)
+                      }
                     >
                       <Switch.Label class="done-switch-label">
-                        {m().workspace.showOriginList}
+                        {m().board.showDoneColumn}
                       </Switch.Label>
                       <Switch.Input class="done-switch-input" />
                       <Switch.Control class="done-switch-control">
                         <Switch.Thumb class="done-switch-thumb" />
                       </Switch.Control>
                     </Switch>
-                  </Popover.Content>
-                </Popover.Portal>
-              </Popover>
+                  )}
+                </Show>
+                {/* Publish this view as the list's default for every
+                    device. Disabled once it already is the default —
+                    the label then reads as a state, not an action. */}
+                <Show when={currentListId()}>
+                  {(listId) => (
+                    <button
+                      type="button"
+                      class="view-default-button"
+                      disabled={isSavedDefault(listId())}
+                      onClick={() => saveViewAsDefault(listId())}
+                    >
+                      {isSavedDefault(listId())
+                        ? m().board.savedAsDefault
+                        : m().board.saveAsDefault}
+                    </button>
+                  )}
+                </Show>
+              </DisplayOptionsPopover>
+            </Show>
+            <Show when={view().kind === "done"}>
+              <DisplayOptionsPopover>
+                <Switch
+                  class="done-switch"
+                  checked={doneShowList()}
+                  onChange={(checked) => setDoneShowList(checked)}
+                >
+                  <Switch.Label class="done-switch-label">
+                    {m().workspace.showOriginList}
+                  </Switch.Label>
+                  <Switch.Input class="done-switch-input" />
+                  <Switch.Control class="done-switch-control">
+                    <Switch.Thumb class="done-switch-thumb" />
+                  </Switch.Control>
+                </Switch>
+              </DisplayOptionsPopover>
               <Tooltip openDelay={200} closeDelay={0} placement="bottom">
                 <Tooltip.Trigger
                   as="button"
@@ -1890,39 +1887,21 @@ export function Workspace(props: {
               </Tooltip>
             </Show>
             <Show when={view().kind === "focus"}>
-              <Popover placement="bottom-end" gutter={6}>
-                <Tooltip openDelay={200} closeDelay={0} placement="bottom">
-                  <Tooltip.Trigger
-                    as={Popover.Trigger}
-                    class="add-button view-mode-trigger"
-                    aria-label={m().workspace.displayOptions}
-                    innerHTML={mixerHzSvg}
-                  />
-                  <Tooltip.Portal>
-                    <Tooltip.Content class="tooltip-content">
-                      {m().workspace.displayOptions}
-                      <Tooltip.Arrow />
-                    </Tooltip.Content>
-                  </Tooltip.Portal>
-                </Tooltip>
-                <Popover.Portal>
-                  <Popover.Content class="view-mode-popover">
-                    <Switch
-                      class="done-switch"
-                      checked={focusShowList()}
-                      onChange={(checked) => setFocusShowList(checked)}
-                    >
-                      <Switch.Label class="done-switch-label">
-                        {m().workspace.showOriginList}
-                      </Switch.Label>
-                      <Switch.Input class="done-switch-input" />
-                      <Switch.Control class="done-switch-control">
-                        <Switch.Thumb class="done-switch-thumb" />
-                      </Switch.Control>
-                    </Switch>
-                  </Popover.Content>
-                </Popover.Portal>
-              </Popover>
+              <DisplayOptionsPopover>
+                <Switch
+                  class="done-switch"
+                  checked={focusShowList()}
+                  onChange={(checked) => setFocusShowList(checked)}
+                >
+                  <Switch.Label class="done-switch-label">
+                    {m().workspace.showOriginList}
+                  </Switch.Label>
+                  <Switch.Input class="done-switch-input" />
+                  <Switch.Control class="done-switch-control">
+                    <Switch.Thumb class="done-switch-thumb" />
+                  </Switch.Control>
+                </Switch>
+              </DisplayOptionsPopover>
             </Show>
             <Show when={view().kind === "list" || view().kind === "focus"}>
               <Tooltip openDelay={200} closeDelay={0} placement="bottom">

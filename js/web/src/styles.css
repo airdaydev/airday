@@ -9,7 +9,11 @@
   --surface: #ffffff;
   --bg-hover: rgba(0, 0, 0, 0.04);
   --bg-active: #e5e7eb;
-  --bg-badge: rgba(0, 0, 0, 0.0375);
+  /* Badge pill: a faintly cool grey; text tokens share its hue so the
+     pill reads as one tinted surface rather than neutral grey on lilac. */
+  --bg-badge: #f3f2f7;
+  --text-badge: #5e5c68;
+  --text-badge-faint: #8c8a96;
   --text: #1a1a1a;
   --text-muted: #555;
   --text-faint: #888;
@@ -35,7 +39,9 @@
   --surface: #0e0e0e;
   --bg-hover: rgba(255, 255, 255, 0.05);
   --bg-active: #2a2a2e;
-  --bg-badge: rgba(255, 255, 255, 0.045);
+  --bg-badge: #24232a;
+  --text-badge: #aaa8b2;
+  --text-badge-faint: #7a7884;
   --text: #e5e5e5;
   --text-muted: #aaa;
   --text-faint: #777;
@@ -67,9 +73,9 @@
   font-size: 12px;
   line-height: 1.3em;
   padding: 1px 3px;
-  border-radius: 4px;
+  border-radius: 6px;
   white-space: nowrap;
-  color: var(--text-muted);
+  color: var(--text-badge);
   background: var(--bg-badge);
   border: 1px solid transparent;
 }
@@ -756,7 +762,7 @@ input.task-check:hover {
   gap: 4px;
   max-width: 16ch;
   min-width: 0;
-  color: var(--text-faint);
+  color: var(--text-badge-faint);
 }
 
 /* The name is the only elastic part of the badge — the glyph keeps its
@@ -2062,7 +2068,7 @@ input.task-check:hover {
   border: none;
   background: transparent;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
   outline: none;
 }
 
@@ -2945,7 +2951,7 @@ input.task-check:hover {
 }
 
 .due-badge[data-tone="muted"] {
-  color: var(--text-faint);
+  color: var(--text-badge-faint);
 }
 
 /* Card feel: each dnd slot is CARD_HEIGHT tall, but the row sits shorter so
