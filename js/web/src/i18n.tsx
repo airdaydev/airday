@@ -283,6 +283,10 @@ type Messages = {
     light: string;
     dark: string;
     showListCounts: string;
+    /** 12 / 24-hour clock preference; "Auto" reuses `auto`. */
+    timeFormat: string;
+    timeFormat12: string;
+    timeFormat24: string;
     localOnlyAccount: string;
     loginToSeeDevices: string;
     email: string;
@@ -492,6 +496,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       light: "Claro",
       dark: "Oscuro",
       showListCounts: "Mostrar contadores de listas",
+      timeFormat: "Formato de hora",
+      timeFormat12: "12 h",
+      timeFormat24: "24 h",
       localOnlyAccount:
         "Estás usando una cuenta solo local. Usa Iniciar sesión o Crear cuenta desde el menú de la cuenta para hacer copia de seguridad de tus datos y sincronizar entre dispositivos.",
       loginToSeeDevices: "Inicia sesión para ver los dispositivos vinculados a tu cuenta.",
@@ -701,6 +708,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       light: "Light",
       dark: "Dark",
       showListCounts: "Show list counts",
+      timeFormat: "Time format",
+      timeFormat12: "12h",
+      timeFormat24: "24h",
       localOnlyAccount:
         "You're using a local-only account. Use Sign in or Sign up from the account menu to back up your data and sync across devices.",
       loginToSeeDevices: "Log in to see devices linked to your account.",

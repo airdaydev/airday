@@ -805,6 +805,27 @@ input.task-check:hover {
   height: 12px;
 }
 
+/* Has-notes badge: same pill geometry as the focus badge, but a button
+   (it opens the dialog to notes) — reset the UA chrome so it sits flush. */
+.row-notes-badge {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  justify-content: center;
+  margin-top: -1px;
+  min-height: calc(1.3em + 4px);
+  cursor: pointer;
+}
+
+.row-notes-badge:hover {
+  color: var(--text);
+}
+
+.row-notes-badge svg {
+  width: 12px;
+  height: 12px;
+}
+
 /* `overflow: hidden` on .dnd-item (set by primavera-dnd's inline stylesheet)
    makes it a scroll container, which trips the browser's caret-scroll-into-view
    while typing in the expanded row's contenteditable: text wraps below the
@@ -2072,6 +2093,29 @@ input.task-check:hover {
 }
 
 .task-dialog-pin-toggle svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Has-notes badge beside the pin toggle: same pill, focuses the notes
+   editor on click. */
+.task-dialog-notes-badge {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  justify-content: center;
+  min-height: calc(1.3em + 4px);
+  color: var(--text-muted);
+  cursor: pointer;
+  outline: none;
+}
+
+.task-dialog-notes-badge:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.task-dialog-notes-badge svg {
   width: 12px;
   height: 12px;
 }

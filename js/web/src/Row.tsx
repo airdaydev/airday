@@ -4,11 +4,13 @@ import archiveSvg from "./icons/archive.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import fileSvg from "./icons/file.svg?raw";
+import noteSvg from "./icons/note.svg?raw";
 import { DndSelection } from "./dnd/solid";
 import { trackOverlay } from "./overlay.ts";
 import { DueBadge } from "./DueBadge.tsx";
 import {
   addDaysToStamp,
+  formatDateTime,
   formatDoneStamp,
   formatRelative,
   nowMs,
@@ -105,6 +107,28 @@ export function Row(props: {
   // overlay count so global keyboard shortcuts stand down while it's up.
   const [menuOpen, setMenuOpen] = createSignal(false);
   trackOverlay(menuOpen);
+
+  // Whether the item carries any notes text. Whitespace-only notes don't
+  // count — the dialog would open to an empty-looking editor.
+  const hasNotes = () => props.item().notes.trim().length > 0;
+  // The badge is a button (it opens the dialog to notes), so it swallows
+  // pointer-down to keep the dnd / selection from treating it as a row
+  // press.
+  const NotesBadge = () => (
+    <button
+      type="button"
+      tabIndex={-1}
+      class="badge row-notes-badge"
+      title={m().workspace.hasNotes}
+      aria-label={m().workspace.hasNotes}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        props.onOpen?.(props.item().id, "notes");
+      }}
+      innerHTML={noteSvg}
+    />
+  );
 
   // Whether this row currently has a visible Focus ref. `focusOrder` is a
   // small (bounded) store array, so the membership scan is cheap and only
@@ -570,10 +594,14 @@ export function Row(props: {
             !props.expanded() &&
             ((isOpen(props.item()) && props.item().dueOn) ||
               (canPinToFocus() && focused()) ||
+              hasNotes() ||
               lifecycleTimestamp(props.item()))
           }
         >
           <div class="row-footer">
+            <Show when={hasNotes()}>
+              <NotesBadge />
+            </Show>
             <Show when={canPinToFocus() && focused()}>
               <span
                 class="badge row-focus-badge"
@@ -589,7 +617,7 @@ export function Row(props: {
               {(ts) => (
                 <span
                   class="badge row-timestamp"
-                  title={new Date(ts()).toLocaleString(locale())}
+                  title={formatDateTime(ts(), locale())}
                 >
                   <Show when={props.viewKind === "done"}>
                     <span class="row-timestamp-icon" innerHTML={checkSvg} />
@@ -601,6 +629,11 @@ export function Row(props: {
               )}
             </Show>
           </div>
+        </Show>
+        {/* Has-notes badge: a corner-fold glyph that opens the dialog
+            straight to the notes editor. */}
+        <Show when={!props.dueInFooter && !props.expanded() && hasNotes()}>
+          <NotesBadge />
         </Show>
         {/* Focus-membership badge — a static, non-interactive pin glyph
             shown only when the item is pinned to Focus; nothing otherwise.
@@ -661,7 +694,7 @@ export function Row(props: {
         </Show>
         <Show when={!props.dueInFooter && lifecycleTimestamp(props.item())}>
           {(ts) => (
-            <span class="badge row-timestamp" title={new Date(ts()).toLocaleString(locale())}>
+            <span class="badge row-timestamp" title={formatDateTime(ts(), locale())}>
               <Show when={props.viewKind === "done"}>
                 <span class="row-timestamp-icon" innerHTML={checkSvg} />
               </Show>

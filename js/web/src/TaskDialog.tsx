@@ -14,6 +14,7 @@ import { ListPicker, type ListOption } from "./ListPicker.tsx";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import drawingPinFilledSvg from "./icons/drawing-pin-filled.svg?raw";
+import noteSvg from "./icons/note.svg?raw";
 import { formatDialogStamp, nowMs } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import {
@@ -161,6 +162,20 @@ export function TaskDialog(props: {
 
   const [text, setText] = createSignal("");
   const [notes, setNotes] = createSignal("");
+  const hasNotes = () => notes().trim().length > 0;
+  const focusNotes = () => {
+    const el = notesRef;
+    if (!el) return;
+    el.focus();
+    // Land the caret at the end rather than the start.
+    const sel = window.getSelection();
+    if (!sel) return;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  };
   // New-item mode's due-date buffer: nothing exists to write to until the
   // capture commits, so picks are held here and applied after creation.
   const [newDueOn, setNewDueOn] = createSignal<string | null>(null);
@@ -516,6 +531,7 @@ export function TaskDialog(props: {
               open={dueCalOpen}
               setOpen={setDueCalOpen}
             />
+            <NotesBadge shown={hasNotes} onClick={focusNotes} />
             <Show when={!(newItemTarget()?.done ?? false)}>
               <PinToggle
                 pinned={newFocus}
@@ -643,6 +659,7 @@ export function TaskDialog(props: {
               open={dueCalOpen}
               setOpen={setDueCalOpen}
             />
+            <NotesBadge shown={hasNotes} onClick={focusNotes} />
             <Show when={!isDone(it()) && !isBinned(it())}>
               <PinToggle pinned={focused} onToggle={toggleFocus} />
             </Show>
@@ -788,6 +805,25 @@ export function TaskDialog(props: {
 /** Pin-to-Focus toggle shown beside the due-date badge: outline pin when
  *  unpinned, filled when pinned. Backed by live Focus state for open items
  *  and by the `newFocus` buffer in new-item capture mode. */
+// Has-notes badge in the dialog's badge row: same pill as the row badge,
+// mirrors the live editor contents so it appears as soon as notes are
+// typed. Clicking drops the caret into the notes editor.
+function NotesBadge(props: { shown: () => boolean; onClick: () => void }) {
+  const { m } = useAppI18n();
+  return (
+    <Show when={props.shown()}>
+      <button
+        type="button"
+        class="badge task-dialog-notes-badge"
+        title={m().workspace.hasNotes}
+        aria-label={m().workspace.hasNotes}
+        onClick={props.onClick}
+        innerHTML={noteSvg}
+      />
+    </Show>
+  );
+}
+
 function PinToggle(props: {
   pinned: () => boolean;
   onToggle: () => void;

@@ -16,6 +16,11 @@ import type { Session } from "./Login.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { trackOverlay } from "./overlay.ts";
 import type { ThemePreference } from "./theme.ts";
+import {
+  setTimeFormatPref,
+  timeFormatPref,
+  type TimeFormatPreference,
+} from "./format.tsx";
 
 type Section = "general" | "account" | "devices";
 
@@ -261,6 +266,43 @@ export function Settings(props: {
                         aria-label={m().settings.dark}
                       >
                         <MoonIcon />
+                      </SegmentedControl.ItemControl>
+                    </SegmentedControl.Item>
+                  </SegmentedControl>
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-label">{m().settings.timeFormat}</div>
+                  <SegmentedControl
+                    class="theme-segmented"
+                    aria-label={m().settings.timeFormat}
+                    value={timeFormatPref()}
+                    onChange={(value) =>
+                      setTimeFormatPref(value as TimeFormatPreference)
+                    }
+                  >
+                    <SegmentedControl.Indicator class="theme-segment-indicator" />
+                    <SegmentedControl.Item value="auto" class="theme-segment">
+                      <SegmentedControl.ItemInput />
+                      <SegmentedControl.ItemControl class="theme-segment-control">
+                        <SegmentedControl.ItemLabel>
+                          {m().settings.auto}
+                        </SegmentedControl.ItemLabel>
+                      </SegmentedControl.ItemControl>
+                    </SegmentedControl.Item>
+                    <SegmentedControl.Item value="12h" class="theme-segment">
+                      <SegmentedControl.ItemInput />
+                      <SegmentedControl.ItemControl class="theme-segment-control">
+                        <SegmentedControl.ItemLabel>
+                          {m().settings.timeFormat12}
+                        </SegmentedControl.ItemLabel>
+                      </SegmentedControl.ItemControl>
+                    </SegmentedControl.Item>
+                    <SegmentedControl.Item value="24h" class="theme-segment">
+                      <SegmentedControl.ItemInput />
+                      <SegmentedControl.ItemControl class="theme-segment-control">
+                        <SegmentedControl.ItemLabel>
+                          {m().settings.timeFormat24}
+                        </SegmentedControl.ItemLabel>
                       </SegmentedControl.ItemControl>
                     </SegmentedControl.Item>
                   </SegmentedControl>

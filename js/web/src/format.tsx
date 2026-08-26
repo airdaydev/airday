@@ -7,6 +7,79 @@ const [nowMs, setNowMs] = createSignal(Date.now());
 setInterval(() => setNowMs(Date.now()), 60_000);
 export { nowMs };
 
+// ---------- 12 / 24-hour display preference ----------
+//
+// "auto" defers to the browser's locale default (what `Intl` picks for
+// the active locale); "12h" / "24h" force a cycle. A per-device display
+// preference like theme and language, so it lives in a cookie alongside
+// them rather than in the synced doc.
+
+export type TimeFormatPreference = "auto" | "12h" | "24h";
+
+const TIME_FORMAT_COOKIE = "hourcycle";
+const TIME_FORMAT_MAX_AGE = 31536000; // 1 year
+
+function readTimeFormat(): TimeFormatPreference {
+  try {
+    const m = document.cookie.match(/(?:^|; )hourcycle=(12|24)/);
+    if (m?.[1] === "12") return "12h";
+    if (m?.[1] === "24") return "24h";
+  } catch {}
+  return "auto";
+}
+
+function writeTimeFormat(pref: TimeFormatPreference) {
+  const attrs = (maxAge: number) => `path=/;max-age=${maxAge};SameSite=Lax`;
+  if (pref === "auto") {
+    document.cookie = `${TIME_FORMAT_COOKIE}=;${attrs(0)}`;
+  } else {
+    document.cookie = `${TIME_FORMAT_COOKIE}=${pref === "12h" ? "12" : "24"};${attrs(TIME_FORMAT_MAX_AGE)}`;
+  }
+}
+
+const [timeFormatPref, setTimeFormatSignal] = createSignal<TimeFormatPreference>(
+  readTimeFormat(),
+);
+export { timeFormatPref };
+
+export function setTimeFormatPref(pref: TimeFormatPreference): void {
+  setTimeFormatSignal(pref);
+  writeTimeFormat(pref);
+}
+
+// `hourCycle` rather than `hour12: false` — the latter yields "24:05" at
+// midnight in some engines; h23 / h12 are unambiguous.
+function hourCycleOpts(): Intl.DateTimeFormatOptions {
+  switch (timeFormatPref()) {
+    case "12h":
+      return { hourCycle: "h12" };
+    case "24h":
+      return { hourCycle: "h23" };
+    default:
+      return {};
+  }
+}
+
+// The one place a time of day gets formatted. Every stamp below goes
+// through here so the 12 / 24-hour preference applies uniformly; reading
+// the preference signal inside makes callers re-render when it changes.
+export function timeFormatter(locale: string): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat(locale, {
+    hour: "numeric",
+    minute: "2-digit",
+    ...hourCycleOpts(),
+  });
+}
+
+// Full date + time, for hover titles where the compact stamp isn't enough.
+export function formatDateTime(ts: number, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    ...hourCycleOpts(),
+  }).format(new Date(ts));
+}
+
 function calendarDayDiff(later: Date, earlier: Date): number {
   const a = new Date(later.getFullYear(), later.getMonth(), later.getDate()).getTime();
   const b = new Date(earlier.getFullYear(), earlier.getMonth(), earlier.getDate()).getTime();
@@ -30,10 +103,7 @@ const relativeEn = {
 export function formatRelative(ts: number, now: number, locale: string): string {
   const diffMs = now - ts;
   const m = locale.startsWith("es") ? relativeEs : relativeEn;
-  const timeFmt = new Intl.DateTimeFormat(locale, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const timeFmt = timeFormatter(locale);
   const weekdayFmt = new Intl.DateTimeFormat(locale, { weekday: "short" });
   const monthDayFmt = new Intl.DateTimeFormat(locale, {
     month: "short",
@@ -153,10 +223,7 @@ export function formatDoneStamp(ts: number, now: number, locale: string): string
   const tsDate = new Date(ts);
   const nowDate = new Date(now);
   if (calendarDayDiff(nowDate, tsDate) === 0) {
-    return new Intl.DateTimeFormat(locale, {
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(tsDate);
+    return timeFormatter(locale).format(tsDate);
   }
   if (tsDate.getFullYear() === nowDate.getFullYear()) {
     return new Intl.DateTimeFormat(locale, {
@@ -185,10 +252,7 @@ export function formatDialogStamp(
 ): string {
   const tsDate = new Date(ts);
   const nowDate = new Date(now);
-  const time = new Intl.DateTimeFormat(locale, {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(tsDate);
+  const time = timeFormatter(locale).format(tsDate);
   const days = calendarDayDiff(nowDate, tsDate);
   if (days === 0) return time;
   if (days === 1) {
