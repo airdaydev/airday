@@ -14,7 +14,7 @@ import { ListPicker, type ListOption } from "./ListPicker.tsx";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import drawingPinFilledSvg from "./icons/drawing-pin-filled.svg?raw";
-import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
+import { formatDialogStamp, nowMs } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import {
   collapsedCaretOffset,
@@ -559,10 +559,10 @@ export function TaskDialog(props: {
               <span class="task-dialog-created">
                 {isDone(it())
                   ? m().workspace.completedStamp(
-                      formatDoneStamp(it().doneAt!, nowMs(), locale()),
+                      formatDialogStamp(it().doneAt!, nowMs(), locale(), { inline: true }),
                     )
                   : m().workspace.createdStamp(
-                      formatRelative(it().createdAt, nowMs(), locale()),
+                      formatDialogStamp(it().createdAt, nowMs(), locale(), { inline: true }),
                     )}
               </span>
             </div>
@@ -675,7 +675,7 @@ export function TaskDialog(props: {
                   {m().nav.bin}
                 </span>
                 <span>
-                  {formatRelative(it().binnedAt!, nowMs(), locale())}
+                  {formatDialogStamp(it().binnedAt!, nowMs(), locale())}
                 </span>
               </div>
             </div>

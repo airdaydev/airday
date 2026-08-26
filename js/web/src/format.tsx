@@ -170,3 +170,31 @@ export function formatDoneStamp(ts: number, now: number, locale: string): string
     year: "numeric",
   }).format(tsDate);
 }
+
+// Task-dialog stamp: the dialog has room for the full picture, so every
+// stamp carries its time of day. Today → time only; yesterday → "Yesterday
+// HH:MM"; otherwise the date (with the year once it differs) plus time.
+//
+// `inline` marks a stamp that continues a sentence ("Created yesterday
+// 8:06 PM"), where "Yesterday" drops its capital; standalone stamps keep it.
+export function formatDialogStamp(
+  ts: number,
+  now: number,
+  locale: string,
+  opts?: { inline?: boolean },
+): string {
+  const tsDate = new Date(ts);
+  const nowDate = new Date(now);
+  const time = new Intl.DateTimeFormat(locale, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(tsDate);
+  const days = calendarDayDiff(nowDate, tsDate);
+  if (days === 0) return time;
+  if (days === 1) {
+    const m = locale.startsWith("es") ? relativeEs : relativeEn;
+    const label = m.yesterdayAt(time);
+    return opts?.inline ? label.charAt(0).toLocaleLowerCase(locale) + label.slice(1) : label;
+  }
+  return `${compactDate(tsDate, nowDate, locale)} ${time}`;
+}
