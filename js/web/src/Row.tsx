@@ -145,6 +145,19 @@ export function Row(props: {
     !isDraftId(props.item().id);
   const inFocusView = (): boolean =>
     props.viewKind === "focus" && !isDraftId(props.item().id);
+
+  // Any inline (non-footer) badge visible on this list row? Mirrors the
+  // individual `<Show>` guards below so the `.row-badges` container only
+  // renders when it has children — an empty flex box would still eat a
+  // slot of the row's gap.
+  const showInlineBadges = () =>
+    Boolean(originList()) ||
+    (!props.dueInFooter &&
+      (Boolean(lifecycleTimestamp(props.item())) ||
+        (!props.expanded() &&
+          (hasNotes() ||
+            (canPinToFocus() && focused()) ||
+            (isOpen(props.item()) && Boolean(props.item().dueOn))))));
   let textRef!: HTMLSpanElement;
   // Set by the Enter keydown handler before it dispatches the synthetic
   // Escape that drives collapse. The collapse effect reads (and resets)
@@ -630,79 +643,86 @@ export function Row(props: {
             </Show>
           </div>
         </Show>
-        {/* Has-notes badge: a corner-fold glyph that opens the dialog
-            straight to the notes editor. */}
-        <Show when={!props.dueInFooter && !props.expanded() && hasNotes()}>
-          <NotesBadge />
-        </Show>
-        {/* Focus-membership badge — a static, non-interactive pin glyph
-            shown only when the item is pinned to Focus; nothing otherwise.
-            There is no hover toggle: adding / removing goes through the row
-            context menu (spec/focus.md). */}
-        <Show
-          when={
-            !props.dueInFooter && canPinToFocus() && focused() && !props.expanded()
-          }
-        >
-          <span
-            class="badge row-focus-badge"
-            title={m().focus.badge}
-            aria-label={m().focus.badge}
-            innerHTML={drawingPinSvg}
-          />
-        </Show>
-        <Show
-          when={
-            !props.dueInFooter &&
-            !props.expanded() &&
-            isOpen(props.item()) &&
-            props.item().dueOn
-          }
-        >
-          {(due) => <DueBadge dueOn={due()} />}
-        </Show>
-        <Show when={originList()}>
-          {(name) => (
-            <span class="badge row-list" title={name()}>
-              {/* Same glyphs the nav and the list picker use: the list's
-                  chosen emoji, else the archive mark for the reserved Home
-                  list and the file glyph for everything else. */}
-              <Show
-                when={props.listIcon?.(props.item().listId)}
-                fallback={
-                  <span
-                    class="row-list-icon"
-                    aria-hidden="true"
-                    innerHTML={
-                      props.item().listId === "inbox" ? archiveSvg : fileSvg
+        {/* List rows: inline badges after the title, grouped in their own
+            flex container so they sit 4px apart while the row's own 8px
+            gap still separates the group from the title. */}
+        <Show when={showInlineBadges()}>
+          <div class="row-badges">
+            {/* Has-notes badge: a corner-fold glyph that opens the dialog
+                straight to the notes editor. */}
+            <Show when={!props.dueInFooter && !props.expanded() && hasNotes()}>
+              <NotesBadge />
+            </Show>
+            {/* Focus-membership badge — a static, non-interactive pin glyph
+                shown only when the item is pinned to Focus; nothing otherwise.
+                There is no hover toggle: adding / removing goes through the row
+                context menu (spec/focus.md). */}
+            <Show
+              when={
+                !props.dueInFooter && canPinToFocus() && focused() && !props.expanded()
+              }
+            >
+              <span
+                class="badge row-focus-badge"
+                title={m().focus.badge}
+                aria-label={m().focus.badge}
+                innerHTML={drawingPinSvg}
+              />
+            </Show>
+            <Show
+              when={
+                !props.dueInFooter &&
+                !props.expanded() &&
+                isOpen(props.item()) &&
+                props.item().dueOn
+              }
+            >
+              {(due) => <DueBadge dueOn={due()} />}
+            </Show>
+            <Show when={originList()}>
+              {(name) => (
+                <span class="badge row-list" title={name()}>
+                  {/* Same glyphs the nav and the list picker use: the list's
+                      chosen emoji, else the archive mark for the reserved Home
+                      list and the file glyph for everything else. */}
+                  <Show
+                    when={props.listIcon?.(props.item().listId)}
+                    fallback={
+                      <span
+                        class="row-list-icon"
+                        aria-hidden="true"
+                        innerHTML={
+                          props.item().listId === "inbox" ? archiveSvg : fileSvg
+                        }
+                      />
                     }
-                  />
-                }
-              >
-                {(icon) => (
-                  <span
-                    class="row-list-icon row-list-icon-emoji"
-                    aria-hidden="true"
                   >
-                    {icon()}
-                  </span>
-                )}
-              </Show>
-              <span class="row-list-name">{name()}</span>
-            </span>
-          )}
-        </Show>
-        <Show when={!props.dueInFooter && lifecycleTimestamp(props.item())}>
-          {(ts) => (
-            <span class="badge row-timestamp" title={formatDateTime(ts(), locale())}>
-              <Show when={props.viewKind === "done"}>
-                <span class="row-timestamp-icon" innerHTML={checkSvg} />
-              </Show>
-              {props.viewKind === "done"
-                ? formatDoneStamp(ts(), nowMs(), locale())
-                : formatRelative(ts(), nowMs(), locale())}
-            </span>
-          )}
+                    {(icon) => (
+                      <span
+                        class="row-list-icon row-list-icon-emoji"
+                        aria-hidden="true"
+                      >
+                        {icon()}
+                      </span>
+                    )}
+                  </Show>
+                  <span class="row-list-name">{name()}</span>
+                </span>
+              )}
+            </Show>
+            <Show when={!props.dueInFooter && lifecycleTimestamp(props.item())}>
+              {(ts) => (
+                <span class="badge row-timestamp" title={formatDateTime(ts(), locale())}>
+                  <Show when={props.viewKind === "done"}>
+                    <span class="row-timestamp-icon" innerHTML={checkSvg} />
+                  </Show>
+                  {props.viewKind === "done"
+                    ? formatDoneStamp(ts(), nowMs(), locale())
+                    : formatRelative(ts(), nowMs(), locale())}
+                </span>
+              )}
+            </Show>
+          </div>
         </Show>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>

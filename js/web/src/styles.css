@@ -16,7 +16,7 @@
   --text-badge-faint: #8c8a96;
   --text: #1a1a1a;
   --text-muted: #555;
-  --text-faint: #888;
+  --text-faint: #9e9e9f;
   --text-empty: #999;
   --border: #e5e5e5;
   --border-surface: #e7e7e7;
@@ -33,10 +33,10 @@
 }
 
 [data-theme="dark"] {
-  --bg: #141418;
+  --bg: #1a1a1d;
   --bg-board-col: #121214;
   --bg-elevated: #1a1a1c;
-  --surface: #0e0e0e;
+  --surface: #151414;
   --bg-hover: rgba(255, 255, 255, 0.05);
   --bg-active: #2a2a2e;
   --bg-badge: #24232a;
@@ -44,7 +44,7 @@
   --text-badge-faint: #7a7884;
   --text: #e5e5e5;
   --text-muted: #aaa;
-  --text-faint: #777;
+  --text-faint: #636364;
   --text-empty: #666;
   --border: #2a2a2a;
   --border-surface: #1f1f1f;
@@ -459,15 +459,12 @@ body {
     rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset;
 }
 
-/* Desktop header: display-options + add sit in one rounded liquid-glass
-   group. Buttons inside drop their individual chrome so the group reads
-   as a single segmented pill. */
+/* Desktop header: display-options + add sit together in one plain group
+   (no border / background / shadow of its own). */
 .header-group {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 2px;
-  border-radius: 10px;
 }
 
 .header-group:not(:has(.add-button)) {
@@ -478,28 +475,6 @@ body {
   box-shadow: none;
   border-radius: 8px;
   padding: 4px 7px;
-}
-
-@media not ((max-width: 768px) and (pointer: coarse)) {
-  .header-group {
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    background: rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.06),
-      0 1px 2px rgba(0, 0, 0, 0.04),
-      inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  }
-
-  [data-theme="dark"] .header-group {
-    border-color: rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.25),
-      0 1px 2px rgba(0, 0, 0, 0.2),
-      inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  }
 }
 
 .add-button-icon {
@@ -722,6 +697,15 @@ input.task-check:hover {
   gap: 4px;
 }
 
+/* Inline badge group on list rows: badges sit tighter to each other
+   (4px) than the row's 8px gap that separates the group from the title. */
+.row-badges {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .row-text {
   min-width: 0;
   white-space: nowrap;
@@ -743,6 +727,7 @@ input.task-check:hover {
 
 .row-timestamp {
   color: var(--text-faint);
+  background: none;
 }
 
 .row-timestamp-icon {
@@ -2930,7 +2915,7 @@ input.task-check:hover {
   flex-basis: 100%;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   overflow: hidden;
 }
