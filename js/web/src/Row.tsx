@@ -1,9 +1,7 @@
 import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
 import { ContextMenu } from "@kobalte/core/context-menu";
-import archiveSvg from "./icons/archive.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
-import fileSvg from "./icons/file.svg?raw";
 import noteSvg from "./icons/note.svg?raw";
 import { DndSelection } from "./dnd/solid";
 import { trackOverlay } from "./overlay.ts";
@@ -74,9 +72,6 @@ export function Row(props: {
   showList?: () => boolean;
   /** Resolves a list id to its display label (see Workspace `listLabel`). */
   listLabel?: (listId: string) => string;
-  /** Resolves a list id to its chosen emoji, if it has one. Undefined means
-   *  the badge falls back to the nav's default glyphs. */
-  listIcon?: (listId: string) => string | undefined;
   /** Open the shared calendar modal to set a due date on the target set.
    *  `initial` seeds the calendar (this row's current due date, or null). */
   onSetDue?: (ids: readonly string[], initial: string | null) => void;
@@ -682,30 +677,6 @@ export function Row(props: {
             <Show when={originList()}>
               {(name) => (
                 <span class="badge row-list" title={name()}>
-                  {/* Same glyphs the nav and the list picker use: the list's
-                      chosen emoji, else the archive mark for the reserved Home
-                      list and the file glyph for everything else. */}
-                  <Show
-                    when={props.listIcon?.(props.item().listId)}
-                    fallback={
-                      <span
-                        class="row-list-icon"
-                        aria-hidden="true"
-                        innerHTML={
-                          props.item().listId === "inbox" ? archiveSvg : fileSvg
-                        }
-                      />
-                    }
-                  >
-                    {(icon) => (
-                      <span
-                        class="row-list-icon row-list-icon-emoji"
-                        aria-hidden="true"
-                      >
-                        {icon()}
-                      </span>
-                    )}
-                  </Show>
                   <span class="row-list-name">{name()}</span>
                 </span>
               )}

@@ -217,6 +217,15 @@ type Messages = {
     /** Accessible label for the calendar's next-month button. */
     nextMonth: string;
   };
+  deadlines: {
+    /** Title of the right-hand deadline rail. */
+    title: string;
+    /** Footer toggle labels. */
+    show: string;
+    hide: string;
+    /** Rail body when no open item carries a due date. */
+    empty: string;
+  };
   order: {
     /** Submenu label for the item-ordering actions. */
     label: string;
@@ -442,6 +451,12 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       prevMonth: "Mes anterior",
       nextMonth: "Mes siguiente",
     },
+    deadlines: {
+      title: "Próximo",
+      show: "Mostrar fechas límite",
+      hide: "Ocultar fechas límite",
+      empty: "Sin fechas límite",
+    },
     order: {
       label: "Ordenar",
       moveToTop: "Mover al principio",
@@ -653,6 +668,12 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       dialogTitle: "Set due date",
       prevMonth: "Previous month",
       nextMonth: "Next month",
+    },
+    deadlines: {
+      title: "Upcoming",
+      show: "Show deadlines",
+      hide: "Hide deadlines",
+      empty: "No upcoming deadlines",
     },
     order: {
       label: "Order",

@@ -19,6 +19,7 @@ import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { Switch } from "@kobalte/core/switch";
 import { Tooltip } from "@kobalte/core/tooltip";
 import archiveSvg from "./icons/archive.svg?raw";
+import calendarSvg from "./icons/calendar.svg?raw";
 import cardStackSvg from "./icons/card-stack.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
@@ -30,6 +31,7 @@ import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
 import { Board, type BoardImperative } from "./Board.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
+import { Deadlines } from "./Deadlines.tsx";
 import { DueCalendarDialog } from "./DueCalendarDialog.tsx";
 import { FindPalette, type FindResult } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
@@ -124,9 +126,18 @@ function loadFocusShowListPref(): boolean {
 // above; visible is the default, so only the hidden state is persisted
 // (stored as "1"). Mobile ignores it — the drawer has its own state.
 const NAV_HIDDEN_PREF_KEY = "airday:nav-hidden";
+const DEADLINES_OPEN_PREF_KEY = "airday:deadlines-open";
 function loadNavHiddenPref(): boolean {
   try {
     return localStorage.getItem(NAV_HIDDEN_PREF_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function loadDeadlinesOpenPref(): boolean {
+  try {
+    return localStorage.getItem(DEADLINES_OPEN_PREF_KEY) === "1";
   } catch {
     return false;
   }
@@ -587,12 +598,6 @@ export function Workspace(props: {
     listId === "inbox"
       ? m().nav.inbox
       : (state.listsById[listId]?.name ?? listId);
-
-  // Companion to `listLabel`: a list's chosen emoji, if it set one. The
-  // reserved Home list can't carry one, so it always falls through to the
-  // caller's default glyph.
-  const listIcon = (listId: string): string | undefined =>
-    listId === "inbox" ? undefined : state.listsById[listId]?.icon;
 
   createEffect(() => {
     const next = items();
@@ -1537,6 +1542,21 @@ export function Workspace(props: {
     }
   };
 
+  // Desktop deadline rail (right-hand column). Toggled from the calendar
+  // button beside the sync widget; persisted per browser like the nav.
+  const [deadlinesOpen, setDeadlinesOpenSignal] = createSignal(
+    loadDeadlinesOpenPref(),
+  );
+  const setDeadlinesOpen = (open: boolean) => {
+    setDeadlinesOpenSignal(open);
+    try {
+      if (open) localStorage.setItem(DEADLINES_OPEN_PREF_KEY, "1");
+      else localStorage.removeItem(DEADLINES_OPEN_PREF_KEY);
+    } catch {
+      // Quota/private-mode failures just lose the preference.
+    }
+  };
+
   const navigateTo = (v: ViewKey) => {
       setView(v);
       // Move keyboard focus to the items listbox once Solid has
@@ -1568,7 +1588,10 @@ export function Workspace(props: {
   return (
     <div
       class="app"
-      classList={{ "nav-hidden": navHidden() }}
+      classList={{
+        "nav-hidden": navHidden(),
+        "deadlines-open": !isMobile() && deadlinesOpen(),
+      }}
     >
       <Show when={!isMobile()}>
       <Nav
@@ -2004,7 +2027,6 @@ export function Workspace(props: {
                             : doneShowList()
                         }
                         listLabel={listLabel}
-                        listIcon={listIcon}
                         duplicateBlock={duplicateBlock}
                         copyBlock={copyBlock}
                         onDraftSettle={settleDraft}
@@ -2054,6 +2076,15 @@ export function Workspace(props: {
         </Show>
       </main>
       </div>
+      <Show when={!isMobile() && deadlinesOpen()}>
+        <Deadlines
+          app={app}
+          onReveal={(id) => {
+            setOpenItemId(null);
+            revealItemIn(id, "list");
+          }}
+        />
+      </Show>
       <Show when={!isMobile()}>
         {/* Unified footer strip spanning nav + main (a direct child of the
             app grid, not nested in either pane), so its chrome stays put
@@ -2087,6 +2118,23 @@ export function Workspace(props: {
             onSession={session.swapSession}
           />
           <div class="footer-status">
+            <Tooltip openDelay={200} closeDelay={0} placement="top">
+              <Tooltip.Trigger
+                class="nav-menu-trigger deadlines-toggle"
+                aria-label={
+                  deadlinesOpen() ? m().deadlines.hide : m().deadlines.show
+                }
+                aria-pressed={deadlinesOpen()}
+                onClick={() => setDeadlinesOpen(!deadlinesOpen())}
+                innerHTML={calendarSvg}
+              />
+              <Tooltip.Portal>
+                <Tooltip.Content class="tooltip-content">
+                  {deadlinesOpen() ? m().deadlines.hide : m().deadlines.show}
+                  <Tooltip.Arrow />
+                </Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip>
             <StatusSlot
               app={app}
               online={session.online()}
