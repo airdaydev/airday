@@ -9,7 +9,7 @@
 import { Dialog } from "@kobalte/core/dialog";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
-import { DueField } from "./DueField.tsx";
+import { DeadlineField } from "./DeadlineField.tsx";
 import { ListPicker, type ListOption } from "./ListPicker.tsx";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
@@ -176,13 +176,13 @@ export function TaskDialog(props: {
     sel.removeAllRanges();
     sel.addRange(range);
   };
-  // New-item mode's due-date buffer: nothing exists to write to until the
+  // New-item mode's deadline buffer: nothing exists to write to until the
   // capture commits, so picks are held here and applied after creation.
-  const [newDueOn, setNewDueOn] = createSignal<string | null>(null);
-  // New-item mode's pin-to-Focus buffer, same deal as `newDueOn`.
+  const [newDeadline, setNewDeadline] = createSignal<string | null>(null);
+  // New-item mode's pin-to-Focus buffer, same deal as `newDeadline`.
   const [newFocus, setNewFocus] = createSignal(false);
-  // Due-date calendar popover open state, shared by both DueField modes.
-  const [dueCalOpen, setDueCalOpen] = createSignal(false);
+  // Deadline calendar popover open state, shared by both DeadlineField modes.
+  const [deadlineCalOpen, setDeadlineCalOpen] = createSignal(false);
   // The title and notes editors are contenteditable (not textareas) so that
   // http(s) URLs render as clickable anchors, matching the row quick-entry
   // editor. Their content is set imperatively from the buffers on load — it
@@ -269,7 +269,7 @@ export function TaskDialog(props: {
     const n = it?.notes ?? "";
     setText(t);
     setNotes(n);
-    setNewDueOn(null);
+    setNewDeadline(null);
     setNewFocus(false);
     loadedId = key;
     // The editors mount when the dialog opens; defer so their refs exist,
@@ -304,8 +304,8 @@ export function TaskDialog(props: {
           : props.app.addItemAt(nw.listId, t, at);
         const n = editorText(notesRef);
         if (n.trim()) props.app.editItemNotes(id, n);
-        const d = newDueOn();
-        if (d) props.app.setItemDueOn(id, d);
+        const d = newDeadline();
+        if (d) props.app.setItemDeadline(id, d);
         // A Done capture can't hold a Focus ref (auto-remove-on-Done,
         // spec/focus.md), so the pin buffer only applies to open captures.
         if (newFocus() && !nw.done) props.app.addToFocus(id);
@@ -514,7 +514,7 @@ export function TaskDialog(props: {
             onPaste={pasteAsPlainText}
             onClick={(e) => openLinkOnClick(e, titleRef)}
           />
-          {/* List selector leads the badge row, then the due-date
+          {/* List selector leads the badge row, then the deadline
               badge; picks land in the local buffers and are written
               after the item commits. The pin toggle buffers the
               same way (`newFocus`). */}
@@ -524,12 +524,12 @@ export function TaskDialog(props: {
               value={() => newItemListOption()?.id ?? null}
               onChange={setNewItemList}
             />
-            <DueField
-              dueOn={newDueOn}
+            <DeadlineField
+              deadline={newDeadline}
               muted={() => newItemTarget()?.done ?? false}
-              onChange={setNewDueOn}
-              open={dueCalOpen}
-              setOpen={setDueCalOpen}
+              onChange={setNewDeadline}
+              open={deadlineCalOpen}
+              setOpen={setDeadlineCalOpen}
             />
             <NotesBadge shown={hasNotes} onClick={focusNotes} />
             <Show when={!(newItemTarget()?.done ?? false)}>
@@ -639,7 +639,7 @@ export function TaskDialog(props: {
             />
 
           {/* Badge row: the move-to-list picker first, then the
-              always-visible due-date badge — clicking it opens a
+              always-visible deadline badge — clicking it opens a
               quick popover (Set date… / Tomorrow / Remove date).
               The pin toggle beside it adds / removes the Focus ref;
               hidden on Done / Binned items, which can't hold one
@@ -650,14 +650,14 @@ export function TaskDialog(props: {
               value={() => it().listId}
               onChange={(id) => moveItemToList(id, it().listId)}
             />
-            <DueField
-              dueOn={() => it().dueOn ?? null}
+            <DeadlineField
+              deadline={() => it().deadline ?? null}
               muted={() => isDone(it()) || isBinned(it())}
               onChange={(stamp) =>
-                props.app.setItemDueOn(it().id, stamp)
+                props.app.setItemDeadline(it().id, stamp)
               }
-              open={dueCalOpen}
-              setOpen={setDueCalOpen}
+              open={deadlineCalOpen}
+              setOpen={setDeadlineCalOpen}
             />
             <NotesBadge shown={hasNotes} onClick={focusNotes} />
             <Show when={!isDone(it()) && !isBinned(it())}>
@@ -802,7 +802,7 @@ export function TaskDialog(props: {
   );
 }
 
-/** Pin-to-Focus toggle shown beside the due-date badge: outline pin when
+/** Pin-to-Focus toggle shown beside the deadline badge: outline pin when
  *  unpinned, filled when pinned. Backed by live Focus state for open items
  *  and by the `newFocus` buffer in new-item capture mode. */
 // Has-notes badge in the dialog's badge row: same pill as the row badge,

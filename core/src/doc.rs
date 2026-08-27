@@ -90,12 +90,12 @@ const KEY_LOCATION: &str = "location";
 /// Written only when `true` and deleted when cleared, so Backlog items
 /// (the default) carry no key.
 const KEY_LIVE: &str = "live";
-/// Optional date-only due date: a floating local calendar date in
-/// `YYYY-MM-DD` format (no time, no timezone). Absent ≡ no due date;
+/// Optional date-only deadline: a floating local calendar date in
+/// `YYYY-MM-DD` format (no time, no timezone). Absent ≡ no deadline;
 /// the mutation deletes the key when cleared. Written on its own scalar
 /// register; malformed values never reach the doc (validated in
-/// `set_item_due_on`).
-const KEY_DUE_ON: &str = "due_on";
+/// `set_item_deadline`).
+const KEY_DEADLINE: &str = "deadline";
 const KEY_NAME: &str = "name";
 /// Optional per-list display icon. Stored as the literal emoji grapheme
 /// the user picked (e.g. `"📥"`); absent/empty means "no icon, render the
@@ -201,10 +201,10 @@ pub struct ItemView {
     /// Backlog. Masked by `done_at`/`binned_at` when those are set; it is
     /// the underlying open state revealed by un-done / restore.
     pub live: bool,
-    /// Optional date-only due date — a floating local calendar date in
-    /// `YYYY-MM-DD` format. `None` ≡ no due date. The core stores and
+    /// Optional date-only deadline — a floating local calendar date in
+    /// `YYYY-MM-DD` format. `None` ≡ no deadline. The core stores and
     /// echoes the raw string; it never parses it into a timestamp.
-    pub due_on: Option<String>,
+    pub deadline: Option<String>,
     pub created_at: i64,
     pub done_at: Option<i64>,
     pub binned_at: Option<i64>,
@@ -403,10 +403,10 @@ pub struct ExportItem {
     /// byte-compatible with pre-lifecycle dumps.
     #[serde(skip_serializing_if = "std::ops::Not::not", default)]
     pub live: bool,
-    /// Date-only due date (`YYYY-MM-DD`). Skipped when unset to keep
-    /// pre-due-date dumps byte-identical.
+    /// Date-only deadline (`YYYY-MM-DD`). Skipped when unset to keep
+    /// pre-deadline dumps byte-identical.
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub due_on: Option<String>,
+    pub deadline: Option<String>,
     pub created_at: i64,
     pub done_at: Option<i64>,
     pub binned_at: Option<i64>,
@@ -1308,7 +1308,7 @@ impl Doc {
                 done_at: None,
                 binned_at: None,
                 live,
-                due_on: None,
+                deadline: None,
                 open_index,
             });
         }
@@ -1344,28 +1344,28 @@ impl Doc {
         Ok(())
     }
 
-    /// Set or clear an item's date-only due date. `Some(date)` validates
-    /// a `YYYY-MM-DD` calendar date and writes the `due_on` register;
+    /// Set or clear an item's date-only deadline. `Some(date)` validates
+    /// a `YYYY-MM-DD` calendar date and writes the `deadline` register;
     /// `None` deletes the key. One Loro commit. Malformed dates are
     /// rejected with `Invalid` and never touch the doc. The stored value
     /// is a floating local calendar date — the core never converts it to
     /// a timestamp.
-    pub fn set_item_due_on(&self, item_id: &str, due_on: Option<&str>) -> Result<(), DocError> {
-        let normalized = match due_on {
-            Some(raw) => Some(parse_due_on(raw)?),
+    pub fn set_item_deadline(&self, item_id: &str, deadline: Option<&str>) -> Result<(), DocError> {
+        let normalized = match deadline {
+            Some(raw) => Some(parse_deadline(raw)?),
             None => None,
         };
         let map = self.find_item(item_id)?;
         match &normalized {
-            Some(date) => map.insert(KEY_DUE_ON, date.as_str())?,
+            Some(date) => map.insert(KEY_DEADLINE, date.as_str())?,
             None => {
-                let _ = map.delete(KEY_DUE_ON);
+                let _ = map.delete(KEY_DEADLINE);
             }
         }
         self.inner.commit();
-        self.push_event(AppEvent::ItemDueChanged {
+        self.push_event(AppEvent::ItemDeadlineChanged {
             id: item_id.to_string(),
-            due_on: normalized,
+            deadline: normalized,
         });
         Ok(())
     }
@@ -2685,7 +2685,7 @@ impl Doc {
                 notes: item.notes,
                 list_id: item.list_id,
                 live: item.live,
-                due_on: item.due_on,
+                deadline: item.deadline,
                 created_at: item.created_at,
                 done_at: item.done_at,
                 binned_at: item.binned_at,
@@ -2728,7 +2728,7 @@ impl Doc {
     /// remapped onto the fresh item ids and **appended** after any
     /// existing local Focus (additive import doesn't disturb local
     /// curation); refs to items that weren't imported or aren't Open are
-    /// dropped silently, like malformed `dueOn` values.
+    /// dropped silently, like malformed `deadline` values.
     /// Existing local content is untouched. All writes land in a
     /// single Loro commit; UI events are emitted via the standard
     /// pre/post state-diff.
@@ -2828,15 +2828,15 @@ impl Doc {
             if src_item.live {
                 map.insert(KEY_LIVE, true)?;
             }
-            // Carry a well-formed due date through; a malformed one in a
+            // Carry a well-formed deadline through; a malformed one in a
             // hand-edited export is silently dropped rather than aborting
             // the whole import.
             if let Some(date) = src_item
-                .due_on
+                .deadline
                 .as_deref()
-                .and_then(|d| parse_due_on(d).ok())
+                .and_then(|d| parse_deadline(d).ok())
             {
-                map.insert(KEY_DUE_ON, date.as_str())?;
+                map.insert(KEY_DEADLINE, date.as_str())?;
             }
             let notes = src_item.notes.trim();
             if !notes.is_empty() {
@@ -3493,10 +3493,10 @@ impl Doc {
                         notes: view.notes.clone(),
                     });
                 }
-                if has(KEY_DUE_ON) {
-                    self.push_event(AppEvent::ItemDueChanged {
+                if has(KEY_DEADLINE) {
+                    self.push_event(AppEvent::ItemDeadlineChanged {
                         id: id.clone(),
-                        due_on: view.due_on.clone(),
+                        deadline: view.deadline.clone(),
                     });
                 }
                 // A Backlog↔Live flip (the `live` register alone) on an
@@ -3545,7 +3545,7 @@ impl Doc {
                     done_at: view.done_at,
                     binned_at: view.binned_at,
                     live: view.live,
-                    due_on: view.due_on,
+                    deadline: view.deadline,
                     open_index: None,
                 });
                 continue;
@@ -3603,7 +3603,7 @@ impl Doc {
                             done_at: view.done_at,
                             binned_at: view.binned_at,
                             live: view.live,
-                            due_on: view.due_on,
+                            deadline: view.deadline,
                             open_index: Some(i),
                         },
                     );
@@ -3848,7 +3848,7 @@ impl Doc {
                 done_at: item.done_at,
                 binned_at: item.binned_at,
                 live: item.live,
-                due_on: item.due_on,
+                deadline: item.deadline,
                 open_index,
             });
         }
@@ -3940,7 +3940,7 @@ impl Doc {
             hash_str(&mut hasher, &i.list_id);
             // Lifecycle flag is part of logical state (`spec/data-model.md`).
             hasher.update([i.live as u8]);
-            hash_opt_str(&mut hasher, i.due_on.as_deref());
+            hash_opt_str(&mut hasher, i.deadline.as_deref());
             hasher.update(i.created_at.to_be_bytes());
             hash_opt_i64(&mut hasher, i.done_at);
             hash_opt_i64(&mut hasher, i.binned_at);
@@ -4303,17 +4303,17 @@ fn item_meta(map: &LoroMap) -> ItemMeta {
     }
 }
 
-/// Validate a date-only due date and return it normalized. Accepts
+/// Validate a date-only deadline and return it normalized. Accepts
 /// exactly `YYYY-MM-DD` (4-digit year, 2-digit month, 2-digit day) that
 /// names a real calendar day (month 1–12, day within the month's length,
 /// leap years honored). Leading/trailing whitespace is trimmed before
 /// checking. Any other shape — a time component, unix millis, a
 /// single-digit field, an out-of-range day — is rejected. The value is a
 /// floating local date; no timezone is applied.
-fn parse_due_on(raw: &str) -> Result<String, DocError> {
+fn parse_deadline(raw: &str) -> Result<String, DocError> {
     let s = raw.trim();
     let bytes = s.as_bytes();
-    let invalid = || DocError::Invalid(format!("due date must be YYYY-MM-DD: {raw:?}"));
+    let invalid = || DocError::Invalid(format!("deadline must be YYYY-MM-DD: {raw:?}"));
     if bytes.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-' {
         return Err(invalid());
     }
@@ -4357,7 +4357,7 @@ fn item_view(map: &LoroMap) -> Option<ItemView> {
         notes: read_string(map, KEY_NOTES).unwrap_or_default(),
         list_id: location,
         live: read_live(map),
-        due_on: read_string(map, KEY_DUE_ON).filter(|s| !s.is_empty()),
+        deadline: read_string(map, KEY_DEADLINE).filter(|s| !s.is_empty()),
         created_at: read_i64(map, KEY_CREATED_AT)?,
         done_at: read_i64(map, KEY_DONE_AT),
         binned_at: read_i64(map, KEY_BINNED_AT),
@@ -4538,7 +4538,7 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     done_at: post_it.done_at,
                     binned_at: post_it.binned_at,
                     live: post_it.live,
-                    due_on: post_it.due_on.clone(),
+                    deadline: post_it.deadline.clone(),
                     open_index,
                 });
             }
@@ -4555,10 +4555,10 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                         notes: post_it.notes.clone(),
                     });
                 }
-                if pre_it.due_on != post_it.due_on {
-                    out.push(AppEvent::ItemDueChanged {
+                if pre_it.deadline != post_it.deadline {
+                    out.push(AppEvent::ItemDeadlineChanged {
                         id: post_it.id.clone(),
-                        due_on: post_it.due_on.clone(),
+                        deadline: post_it.deadline.clone(),
                     });
                 }
                 if pre_it.live != post_it.live
@@ -5165,14 +5165,14 @@ mod tests {
         doc.set_default_view(&list, Some(DefaultView::BOARD))
             .unwrap();
 
-        // A list with every lifecycle represented, notes, a due date, a
+        // A list with every lifecycle represented, notes, a deadline, a
         // manual reorder, and a Focus ref.
         let a = doc.add_item(&list, "a").unwrap();
         let b = doc.add_item(&list, "b").unwrap();
         let c = doc.add_item(&list, "c").unwrap();
         let d = doc.add_item(&list, "d").unwrap();
         doc.edit_item_notes(&a, "some notes").unwrap();
-        doc.set_item_due_on(&a, Some("2026-09-01")).unwrap();
+        doc.set_item_deadline(&a, Some("2026-09-01")).unwrap();
         doc.set_item_lifecycle(&b, ItemLifecycle::Live).unwrap();
         doc.set_item_done(&c, true).unwrap();
         doc.set_item_binned(&d, true).unwrap();
@@ -7254,7 +7254,7 @@ mod tests {
             notes: String::new(),
             list_id: LIST_INBOX.to_string(),
             live: false,
-            due_on: None,
+            deadline: None,
             created_at: 1,
             done_at: None,
             binned_at: None,
@@ -7332,46 +7332,46 @@ mod tests {
     }
 
     #[test]
-    fn set_and_clear_item_due_on() {
+    fn set_and_clear_item_deadline() {
         let doc = Doc::new().unwrap();
         let id = doc.add_item(LIST_INBOX, "pay rent").unwrap();
         let _ = doc.drain_events();
 
-        doc.set_item_due_on(&id, Some("2026-07-15")).unwrap();
+        doc.set_item_deadline(&id, Some("2026-07-15")).unwrap();
         assert_eq!(
-            doc.get_item(&id).unwrap().due_on.as_deref(),
+            doc.get_item(&id).unwrap().deadline.as_deref(),
             Some("2026-07-15")
         );
         assert_eq!(
             doc.drain_events(),
-            vec![AppEvent::ItemDueChanged {
+            vec![AppEvent::ItemDeadlineChanged {
                 id: id.clone(),
-                due_on: Some("2026-07-15".into()),
+                deadline: Some("2026-07-15".into()),
             }]
         );
 
         // Whitespace is trimmed before storage.
-        doc.set_item_due_on(&id, Some("  2026-08-01  ")).unwrap();
+        doc.set_item_deadline(&id, Some("  2026-08-01  ")).unwrap();
         assert_eq!(
-            doc.get_item(&id).unwrap().due_on.as_deref(),
+            doc.get_item(&id).unwrap().deadline.as_deref(),
             Some("2026-08-01")
         );
         let _ = doc.drain_events();
 
         // Clearing deletes the key.
-        doc.set_item_due_on(&id, None).unwrap();
-        assert_eq!(doc.get_item(&id).unwrap().due_on, None);
+        doc.set_item_deadline(&id, None).unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().deadline, None);
         assert_eq!(
             doc.drain_events(),
-            vec![AppEvent::ItemDueChanged {
+            vec![AppEvent::ItemDeadlineChanged {
                 id: id.clone(),
-                due_on: None,
+                deadline: None,
             }]
         );
     }
 
     #[test]
-    fn set_item_due_on_rejects_malformed_dates() {
+    fn set_item_deadline_rejects_malformed_dates() {
         let doc = Doc::new().unwrap();
         let id = doc.add_item(LIST_INBOX, "task").unwrap();
         let _ = doc.drain_events();
@@ -7388,32 +7388,32 @@ mod tests {
             "not-a-date",
             "",
         ] {
-            let err = doc.set_item_due_on(&id, Some(bad)).unwrap_err();
+            let err = doc.set_item_deadline(&id, Some(bad)).unwrap_err();
             assert!(
                 matches!(err, DocError::Invalid(_)),
                 "expected Invalid for {bad:?}, got {err:?}"
             );
         }
         // Nothing was written and no event fired.
-        assert_eq!(doc.get_item(&id).unwrap().due_on, None);
+        assert_eq!(doc.get_item(&id).unwrap().deadline, None);
         assert!(doc.drain_events().is_empty());
 
         // A leap day in a leap year is accepted.
-        doc.set_item_due_on(&id, Some("2028-02-29")).unwrap();
+        doc.set_item_deadline(&id, Some("2028-02-29")).unwrap();
         assert_eq!(
-            doc.get_item(&id).unwrap().due_on.as_deref(),
+            doc.get_item(&id).unwrap().deadline.as_deref(),
             Some("2028-02-29")
         );
         // The same day in a non-leap year is rejected.
-        assert!(doc.set_item_due_on(&id, Some("2027-02-29")).is_err());
+        assert!(doc.set_item_deadline(&id, Some("2027-02-29")).is_err());
     }
 
     #[test]
-    fn export_import_preserves_due_on() {
+    fn export_import_preserves_deadline() {
         let src = Doc::new().unwrap();
-        let a = src.add_item(LIST_INBOX, "with due").unwrap();
-        let _b = src.add_item(LIST_INBOX, "no due").unwrap();
-        src.set_item_due_on(&a, Some("2026-09-30")).unwrap();
+        let a = src.add_item(LIST_INBOX, "with deadline").unwrap();
+        let _b = src.add_item(LIST_INBOX, "no deadline").unwrap();
+        src.set_item_deadline(&a, Some("2026-09-30")).unwrap();
 
         let export = src.export_json();
         // The raw dump carries the string.
@@ -7421,20 +7421,20 @@ mod tests {
             export
                 .items
                 .iter()
-                .any(|i| i.due_on.as_deref() == Some("2026-09-30"))
+                .any(|i| i.deadline.as_deref() == Some("2026-09-30"))
         );
 
         let dst = Doc::new().unwrap();
         dst.import_json(&export).unwrap();
         let imported: Vec<ItemView> = dst.iter_items().collect();
-        let with_due = imported.iter().find(|i| i.text == "with due").unwrap();
-        let no_due = imported.iter().find(|i| i.text == "no due").unwrap();
-        assert_eq!(with_due.due_on.as_deref(), Some("2026-09-30"));
-        assert_eq!(no_due.due_on, None);
+        let with_deadline = imported.iter().find(|i| i.text == "with deadline").unwrap();
+        let no_deadline = imported.iter().find(|i| i.text == "no deadline").unwrap();
+        assert_eq!(with_deadline.deadline.as_deref(), Some("2026-09-30"));
+        assert_eq!(no_deadline.deadline, None);
     }
 
     #[test]
-    fn due_on_converges_between_peers() {
+    fn deadline_converges_between_peers() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
         let id = a.add_item(LIST_INBOX, "sync me").unwrap();
@@ -7445,27 +7445,27 @@ mod tests {
         let _ = a.drain_events();
         let _ = b.drain_events();
 
-        // Set a due date on a, ship the frame to b.
-        a.set_item_due_on(&id, Some("2026-11-05")).unwrap();
+        // Set a deadline on a, ship the frame to b.
+        a.set_item_deadline(&id, Some("2026-11-05")).unwrap();
         let frame = a.pending_export(&dek).unwrap().unwrap();
         b.apply_remote(&dek, &frame).unwrap();
 
         assert_eq!(
-            b.get_item(&id).unwrap().due_on.as_deref(),
+            b.get_item(&id).unwrap().deadline.as_deref(),
             Some("2026-11-05")
         );
         assert_eq!(a.fingerprint(), b.fingerprint());
-        // b's consumer learns via a surgical ItemDueChanged event.
+        // b's consumer learns via a surgical ItemDeadlineChanged event.
         assert!(b.drain_events().iter().any(|e| matches!(
             e,
-            AppEvent::ItemDueChanged { id: eid, due_on: Some(d) } if eid == &id && d == "2026-11-05"
+            AppEvent::ItemDeadlineChanged { id: eid, deadline: Some(d) } if eid == &id && d == "2026-11-05"
         )));
 
         // Clearing also converges.
-        a.set_item_due_on(&id, None).unwrap();
+        a.set_item_deadline(&id, None).unwrap();
         let frame = a.pending_export(&dek).unwrap().unwrap();
         b.apply_remote(&dek, &frame).unwrap();
-        assert_eq!(b.get_item(&id).unwrap().due_on, None);
+        assert_eq!(b.get_item(&id).unwrap().deadline, None);
         assert_eq!(a.fingerprint(), b.fingerprint());
     }
 
@@ -7553,7 +7553,7 @@ mod tests {
                 notes: String::new(),
                 list_id: "no-such-list".to_string(),
                 live: false,
-                due_on: None,
+                deadline: None,
                 created_at: 1_700_000_000_000,
                 done_at: None,
                 binned_at: None,

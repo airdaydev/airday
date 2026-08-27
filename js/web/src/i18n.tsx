@@ -193,20 +193,20 @@ type Messages = {
     /** Disabled state of that action: this view already is the default. */
     savedAsDefault: string;
   };
-  due: {
-    /** Section label / accessible name for the due-date control. */
+  deadline: {
+    /** Section label / accessible name for the deadline control. */
     label: string;
-    /** Task-dialog badge label when no due date is set. */
+    /** Task-dialog badge label when no deadline is set. */
     unset: string;
-    /** Badge label when the due date is before today. */
+    /** Badge label when the deadline is before today. */
     overdue: string;
     /** Badge + quick-action label for today's date. */
     today: string;
     /** Badge + quick-action label for tomorrow's date. */
     tomorrow: string;
-    /** Quick action that removes the due date. */
+    /** Quick action that removes the deadline. */
     clear: string;
-    /** Context-menu action that removes the due date. */
+    /** Context-menu action that removes the deadline. */
     remove: string;
     /** Context-menu action that opens the calendar to pick a date. */
     setDate: string;
@@ -223,7 +223,7 @@ type Messages = {
     /** Footer toggle labels. */
     show: string;
     hide: string;
-    /** Rail body when no open item carries a due date. */
+    /** Rail body when no open item carries a deadline. */
     empty: string;
   };
   order: {
@@ -438,16 +438,16 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       saveAsDefault: "Guardar como predeterminada",
       savedAsDefault: "Vista predeterminada",
     },
-    due: {
-      label: "Fecha de vencimiento",
+    deadline: {
+      label: "Fecha límite",
       unset: "Fecha límite",
       overdue: "Vencido",
       today: "Hoy",
       tomorrow: "Mañana",
       clear: "Borrar",
-      remove: "Quitar fecha",
-      setDate: "Elegir fecha…",
-      dialogTitle: "Establecer fecha de vencimiento",
+      remove: "Quitar fecha límite",
+      setDate: "Elegir fecha límite…",
+      dialogTitle: "Establecer fecha límite",
       prevMonth: "Mes anterior",
       nextMonth: "Mes siguiente",
     },
@@ -656,16 +656,16 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       saveAsDefault: "Save as default",
       savedAsDefault: "Default view",
     },
-    due: {
-      label: "Due date",
+    deadline: {
+      label: "Deadline",
       unset: "Deadline",
       overdue: "Overdue",
       today: "Today",
       tomorrow: "Tomorrow",
       clear: "Clear",
-      remove: "Remove date",
-      setDate: "Set date…",
-      dialogTitle: "Set due date",
+      remove: "Remove deadline",
+      setDate: "Set deadline…",
+      dialogTitle: "Set deadline",
       prevMonth: "Previous month",
       nextMonth: "Next month",
     },

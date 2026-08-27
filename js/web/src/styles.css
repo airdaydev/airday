@@ -63,7 +63,7 @@
 }
 
 /* Shared badge pill. Every badge carries this class; the per-badge
-   classes below (.due-badge, .row-timestamp, .row-list, …) layer only
+   classes below (.deadline-badge, .row-timestamp, .row-list, …) layer only
    their deltas on top, so this rule must precede them in source order. */
 .badge {
   flex-shrink: 0;
@@ -874,8 +874,8 @@ input.task-check:hover {
 /* Static Focus-membership badge on list rows — a non-interactive pin
    pill, always visible (not hover-gated) so Focus membership is
    glanceable while scanning a list. Add / remove happens via the row
-   context menu. Styled to match the neutral `.due-badge` pill; being
-   icon-only it has no line box, so min-height pins it to the due badge's
+   context menu. Styled to match the neutral `.deadline-badge` pill; being
+   icon-only it has no line box, so min-height pins it to the deadline badge's
    text-driven height (1.3em line + 2px padding + 2px border). */
 .row-focus-badge {
   justify-content: center;
@@ -1727,7 +1727,7 @@ input.task-check:hover {
   pointer-events: none;
 }
 
-/* Trailing chevron on a submenu trigger (Due date ›). */
+/* Trailing chevron on a submenu trigger (Deadline ›). */
 .menu-sub-arrow {
   color: var(--text-faint);
   font-size: 15px;
@@ -1963,7 +1963,7 @@ input.task-check:hover {
 }
 
 /* The list name is the picker trigger — the first badge in the dialog's
-   badge row, sharing the `.due-badge` pill geometry, with a small caret
+   badge row, sharing the `.deadline-badge` pill geometry, with a small caret
    and a hover/open lift so it reads as clickable. */
 .task-dialog-list {
   appearance: none;
@@ -2111,8 +2111,8 @@ input.task-check:hover {
   cursor: pointer;
 }
 
-/* Badge row under the notes editor: the due-date trigger and the
-   pin-to-Focus toggle side by side. Owns the top gap the due trigger used
+/* Badge row under the notes editor: the deadline trigger and the
+   pin-to-Focus toggle side by side. Owns the top gap the deadline trigger used
    to carry alone. */
 .task-dialog-badges {
   display: flex;
@@ -2135,10 +2135,10 @@ input.task-check:hover {
   font-size: 14px;
 }
 
-/* The always-visible badge that opens the due-date quick popover (a faint
-   "Deadline" placeholder when unset). Button reset so the DueBadge inside
+/* The always-visible badge that opens the deadline quick popover (a faint
+   "Deadline" placeholder when unset). Button reset so the DeadlineBadge inside
    keeps its own look. */
-.task-dialog-due-trigger {
+.task-dialog-deadline-trigger {
   display: inline-flex;
   align-items: center;
   padding: 0;
@@ -2149,13 +2149,13 @@ input.task-check:hover {
   outline: none;
 }
 
-.task-dialog-due-trigger:focus-visible {
+.task-dialog-deadline-trigger:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
-/* Pin-to-Focus toggle beside the due-date badge: same pill geometry as
-   `.due-badge` / `.row-focus-badge`. Faint outline pin when unpinned,
+/* Pin-to-Focus toggle beside the deadline badge: same pill geometry as
+   `.deadline-badge` / `.row-focus-badge`. Faint outline pin when unpinned,
    muted filled pin when pressed (`aria-pressed`); disabled (Done / Binned
    items — no Focus refs, spec/focus.md) just loses the pointer. */
 .task-dialog-pin-toggle {
@@ -2206,15 +2206,15 @@ input.task-check:hover {
 /* ---------- calendar dialog (@corvu/calendar) ---------- */
 /* Nested modal opened from the task dialog, so its overlay / positioner sit
    above the task dialog's (z-index 100 / 101). */
-.due-dialog-overlay {
+.deadline-dialog-overlay {
   z-index: 120;
 }
 
-.due-dialog-positioner {
+.deadline-dialog-positioner {
   z-index: 121;
 }
 
-.due-dialog {
+.deadline-dialog {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -2224,18 +2224,18 @@ input.task-check:hover {
   color: var(--text);
 }
 
-[data-theme="dark"] .due-dialog {
+[data-theme="dark"] .deadline-dialog {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
 }
 
-.due-dialog-title {
+.deadline-dialog-title {
   margin: 0 0 10px;
   font-size: 14px;
   font-weight: 600;
   text-align: center;
 }
 
-.due-dialog-footer {
+.deadline-dialog-footer {
   display: flex;
   justify-content: center;
   margin-top: 8px;
@@ -2243,7 +2243,7 @@ input.task-check:hover {
   border-top: 1px solid var(--border-row);
 }
 
-.due-dialog-remove {
+.deadline-dialog-remove {
   font: inherit;
   font-size: 12px;
   color: var(--text-muted);
@@ -2254,12 +2254,12 @@ input.task-check:hover {
   cursor: pointer;
 }
 
-.due-dialog-remove:hover {
+.deadline-dialog-remove:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-.due-dialog-remove:focus-visible {
+.deadline-dialog-remove:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: 1px;
 }
@@ -3012,22 +3012,22 @@ input.task-check:hover {
   overflow: hidden;
 }
 
-/* Compact due-date pill — the shared `.badge` styles as-is, plus a
+/* Compact deadline pill — the shared `.badge` styles as-is, plus a
    `data-tone` urgency color role: overdue = danger, today = accent,
    future = neutral, muted = done/binned (no urgency). Shared by list
    rows and board cards. */
-.due-badge-icon {
+.deadline-badge-icon {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
 }
 
-.due-badge-icon svg {
+.deadline-badge-icon svg {
   width: 12px;
   height: 12px;
 }
 
-.due-badge[data-tone="muted"] {
+.deadline-badge[data-tone="muted"] {
   color: var(--text-badge-faint);
 }
 

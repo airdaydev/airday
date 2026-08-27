@@ -40,7 +40,7 @@ One child `LoroMap` under `items`, keyed by `ItemId`.
 | `notes` | string | optional free-form plain text; empty string when absent in simple clients. Same `LoroText` plan as `text` |
 | `location` | string | **atomic placement register** — encoded `"<list_id>:<placement_id>"`, see below |
 | `live` | bool? | lifecycle flag. Absent or `false` ≡ Backlog; `true` ≡ Live. New items omit it (Backlog). See "Lifecycle" below. |
-| `due_on` | string? | optional **date-only** due date, a floating local calendar date in `YYYY-MM-DD` format (no time, no timezone, not unix millis). Absent ≡ no due date; clearing deletes the key. Values that are not a well-formed `YYYY-MM-DD` calendar date are rejected by the mutation. |
+| `deadline` | string? | optional **date-only** deadline, a floating local calendar date in `YYYY-MM-DD` format (no time, no timezone, not unix millis). Absent ≡ no deadline; clearing deletes the key. Values that are not a well-formed `YYYY-MM-DD` calendar date are rejected by the mutation. |
 | `created_at` | i64 | unix millis (client clock) |
 | `done_at` | i64? | set when lifecycle → Done |
 | `binned_at` | i64? | set when lifecycle → Binned |
@@ -285,7 +285,7 @@ without destroying anything. It is a single-register write on the ListMeta row
 (`archived_at`), and **nothing else**:
 
 - Item `location` registers, placements, and order containers are untouched.
-- Item lifecycle, timestamps, notes, and due dates are untouched.
+- Item lifecycle, timestamps, notes, and deadlines are untouched.
 - Focus refs are untouched.
 - The list keeps its id, name, icon, saved view, `created_at`, and its position
   in the `lists` MovableList.
@@ -361,8 +361,8 @@ All mutations go through Loro APIs internally; the core exposes typed helpers:
   entry delete+insert). One commit either way.
 - `set_item_lifecycle(item_id, lifecycle)` / `set_items_lifecycle(item_ids, lifecycle)` — move one or many items to an `ItemLifecycle` (`Backlog | Live | Done | Binned`) in a single commit, writing `live` / `done_at` / `binned_at` per the transition table above. This is the primitive the board uses; the `done`/`bin`/`restore`/`un-done` helpers below are convenience wrappers over it.
 - `edit_item_text(item_id, text)`
-- `set_item_due_on(item_id, due_on)` — `Some(date)` validates a `YYYY-MM-DD`
-  calendar date and writes the `due_on` register; `None` deletes the key. One
+- `set_item_deadline(item_id, deadline)` — `Some(date)` validates a `YYYY-MM-DD`
+  calendar date and writes the `deadline` register; `None` deletes the key. One
   commit. Rejects malformed dates with `Invalid`.
 - `add_list(name) -> ListId`
 - `rename_list(list_id, name)`

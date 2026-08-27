@@ -126,9 +126,9 @@ export function formatRelative(ts: number, now: number, locale: string): string 
   return monthDayYearFmt.format(tsDate);
 }
 
-// ---------- date-only due dates ----------
+// ---------- date-only deadlines ----------
 //
-// Due dates are floating local calendar dates stored as raw `YYYY-MM-DD`
+// Deadlines are floating local calendar dates stored as raw `YYYY-MM-DD`
 // strings. Everything here works on local date *parts* — we never call
 // `new Date("YYYY-MM-DD")`, which parses as UTC midnight and shifts the
 // day backwards in negative-offset timezones.
@@ -166,11 +166,11 @@ export function parseLocalDateParts(stamp: string): Date | null {
 
 // Urgency drives the badge's color role; the component maps done/binned
 // items to a muted variant regardless of this value.
-export type DueUrgency = "overdue" | "today" | "future";
+export type DeadlineUrgency = "overdue" | "today" | "future";
 
-export interface DueBadgeInfo {
+export interface DeadlineBadgeInfo {
   label: string;
-  urgency: DueUrgency;
+  urgency: DeadlineUrgency;
 }
 
 // `Jul 12`, gaining the year only when it falls outside `ref`'s.
@@ -182,7 +182,7 @@ function compactDate(date: Date, ref: Date, locale: string): string {
   return new Intl.DateTimeFormat(locale, opts).format(date);
 }
 
-// Compact label + urgency for a due date, relative to `today` (both raw
+// Compact label + urgency for a deadline, relative to `today` (both raw
 // `YYYY-MM-DD`). Rules: before today → "Overdue"; today → "Today";
 // tomorrow → "Tomorrow"; within the next 7 days → short weekday; else a
 // compact `Jul 12` (with the year when it differs from today's). Labels
@@ -191,28 +191,28 @@ function compactDate(date: Date, ref: Date, locale: string): string {
 // `pastAsDate` swaps the "Overdue" label for that same compact date:
 // nothing is still owed on a done/binned item, so the useful fact is when
 // it was due, not that the deadline slipped.
-export function formatDueBadge(
-  dueOn: string,
+export function formatDeadlineBadge(
+  deadline: string,
   today: string,
   labels: { overdue: string; today: string; tomorrow: string },
   locale: string,
   opts?: { pastAsDate?: boolean },
-): DueBadgeInfo | null {
-  const due = parseLocalDateParts(dueOn);
+): DeadlineBadgeInfo | null {
+  const target = parseLocalDateParts(deadline);
   const ref = parseLocalDateParts(today);
-  if (!due || !ref) return null;
-  const days = calendarDayDiff(due, ref);
+  if (!target || !ref) return null;
+  const days = calendarDayDiff(target, ref);
   if (days < 0) {
-    const label = opts?.pastAsDate ? compactDate(due, ref, locale) : labels.overdue;
+    const label = opts?.pastAsDate ? compactDate(target, ref, locale) : labels.overdue;
     return { label, urgency: "overdue" };
   }
   if (days === 0) return { label: labels.today, urgency: "today" };
   if (days === 1) return { label: labels.tomorrow, urgency: "future" };
   if (days < 7) {
-    const weekday = new Intl.DateTimeFormat(locale, { weekday: "short" }).format(due);
+    const weekday = new Intl.DateTimeFormat(locale, { weekday: "short" }).format(target);
     return { label: weekday, urgency: "future" };
   }
-  return { label: compactDate(due, ref, locale), urgency: "future" };
+  return { label: compactDate(target, ref, locale), urgency: "future" };
 }
 
 // Done-view stamp: same calendar day as `now` → time of day; otherwise

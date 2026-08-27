@@ -142,12 +142,16 @@ impl Doc {
         self.inner.edit_item_notes(item_id, notes).map_err(js_err)
     }
 
-    /// Set (`Some`) or clear (`None`) an item's date-only due date. The
+    /// Set (`Some`) or clear (`None`) an item's date-only deadline. The
     /// value must be a `YYYY-MM-DD` calendar date or the call rejects.
-    #[wasm_bindgen(js_name = setItemDueOn)]
-    pub fn set_item_due_on(&self, item_id: &str, due_on: Option<String>) -> Result<(), JsError> {
+    #[wasm_bindgen(js_name = setItemDeadline)]
+    pub fn set_item_deadline(
+        &self,
+        item_id: &str,
+        deadline: Option<String>,
+    ) -> Result<(), JsError> {
         self.inner
-            .set_item_due_on(item_id, due_on.as_deref())
+            .set_item_deadline(item_id, deadline.as_deref())
             .map_err(js_err)
     }
 
@@ -1410,13 +1414,17 @@ impl SyncEngine {
             .map_err(js_err)
     }
 
-    /// Set (`Some`) or clear (`None`) an item's date-only due date. The
+    /// Set (`Some`) or clear (`None`) an item's date-only deadline. The
     /// value must be a `YYYY-MM-DD` calendar date or the call rejects.
-    #[wasm_bindgen(js_name = setItemDueOn)]
-    pub fn set_item_due_on(&self, item_id: &str, due_on: Option<String>) -> Result<(), JsError> {
+    #[wasm_bindgen(js_name = setItemDeadline)]
+    pub fn set_item_deadline(
+        &self,
+        item_id: &str,
+        deadline: Option<String>,
+    ) -> Result<(), JsError> {
         self.inner
             .doc()
-            .set_item_due_on(item_id, due_on.as_deref())
+            .set_item_deadline(item_id, deadline.as_deref())
             .map_err(js_err)
     }
 
@@ -1823,12 +1831,12 @@ impl From<CoreEvent> for EngineEvent {
 ///
 /// Variant → fields:
 /// - `fullResync` — no fields; rematerialize current state once
-/// - `itemAdded` — id, listId, text, notes, createdAt, live, doneAt?, binnedAt?, dueOn?, openIndex?
+/// - `itemAdded` — id, listId, text, notes, createdAt, live, doneAt?, binnedAt?, deadline?, openIndex?
 /// - `itemRemoved` — id
 /// - `itemMoved` — id, openIndex?
 /// - `itemTextChanged` — id, text
 /// - `itemNotesChanged` — id, notes
-/// - `itemDueChanged` — id, dueOn? (undefined = no due date)
+/// - `itemDeadlineChanged` — id, deadline? (undefined = no deadline)
 /// - `itemLifecycleChanged` — id, live, doneAt?, binnedAt?, openIndex?
 /// - `itemListChanged` — id, listId, openIndex?
 /// - `listAdded` — id, name, createdAt, archivedAt?, index
@@ -1859,9 +1867,9 @@ pub struct AppEventJs {
     /// Live, `false` ≡ Backlog underneath any done/binned mask. `None`
     /// on events that don't carry lifecycle.
     live: Option<bool>,
-    /// Date-only due date `YYYY-MM-DD` (`itemAdded` / `itemDueChanged`);
-    /// `None` means no due date.
-    due_on: Option<String>,
+    /// Date-only deadline `YYYY-MM-DD` (`itemAdded` / `itemDeadlineChanged`);
+    /// `None` means no deadline.
+    deadline: Option<String>,
     created_at: Option<i64>,
     done_at: Option<i64>,
     binned_at: Option<i64>,
@@ -1954,9 +1962,9 @@ impl AppEventJs {
     pub fn live(&self) -> Option<bool> {
         self.live
     }
-    #[wasm_bindgen(getter, js_name = dueOn)]
-    pub fn due_on(&self) -> Option<String> {
-        self.due_on.clone()
+    #[wasm_bindgen(getter, js_name = deadline)]
+    pub fn deadline(&self) -> Option<String> {
+        self.deadline.clone()
     }
 }
 
@@ -1972,7 +1980,7 @@ impl From<CoreAppEvent> for AppEventJs {
             icon: None,
             default_view: None,
             live: None,
-            due_on: None,
+            deadline: None,
             created_at: None,
             done_at: None,
             binned_at: None,
@@ -2000,7 +2008,7 @@ impl From<CoreAppEvent> for AppEventJs {
                 done_at,
                 binned_at,
                 live,
-                due_on,
+                deadline,
                 open_index,
             } => AppEventJs {
                 kind: "itemAdded",
@@ -2012,7 +2020,7 @@ impl From<CoreAppEvent> for AppEventJs {
                 done_at,
                 binned_at,
                 live: Some(live),
-                due_on,
+                deadline,
                 open_index,
                 ..blank
             },
@@ -2039,10 +2047,10 @@ impl From<CoreAppEvent> for AppEventJs {
                 notes: Some(notes),
                 ..blank
             },
-            CoreAppEvent::ItemDueChanged { id, due_on } => AppEventJs {
-                kind: "itemDueChanged",
+            CoreAppEvent::ItemDeadlineChanged { id, deadline } => AppEventJs {
+                kind: "itemDeadlineChanged",
                 id,
-                due_on,
+                deadline,
                 ..blank
             },
             CoreAppEvent::ItemLifecycleChanged {
@@ -2210,8 +2218,8 @@ fn item_to_json(it: &airday_core::ItemView) -> String {
     if it.live {
         s.push_str(",\"live\":true");
     }
-    if let Some(d) = &it.due_on {
-        s.push_str(",\"dueOn\":");
+    if let Some(d) = &it.deadline {
+        s.push_str(",\"deadline\":");
         s.push_str(&json_string(d));
     }
     s.push('}');

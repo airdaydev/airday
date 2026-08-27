@@ -74,7 +74,7 @@ export function Board(props: {
   app: DocApp;
   listId: string;
   onOpen: (id: string, focus?: "notes", caret?: number) => void;
-  onSetDue: (ids: readonly string[], initial: string | null) => void;
+  onSetDeadline: (ids: readonly string[], initial: string | null) => void;
   /** Row context-menu jump to the item's other appearance (the Focus
    *  lens). Forwarded to each card. */
   onReveal?: (id: string, where: "list" | "focus") => void;
@@ -538,7 +538,7 @@ export function Board(props: {
         registerHandle={registerHandle}
         autofocus
         onOpen={props.onOpen}
-        onSetDue={props.onSetDue}
+        onSetDeadline={props.onSetDeadline}
         onReveal={props.onReveal}
         onMoveToList={props.onMoveToList}
         openOnTap={props.openOnTap}
@@ -555,7 +555,7 @@ export function Board(props: {
         onAddItem={() => props.onAddItem(props.listId, true)}
         registerHandle={registerHandle}
         onOpen={props.onOpen}
-        onSetDue={props.onSetDue}
+        onSetDeadline={props.onSetDeadline}
         onReveal={props.onReveal}
         onMoveToList={props.onMoveToList}
         openOnTap={props.openOnTap}
@@ -579,7 +579,7 @@ export function Board(props: {
           onAddItem={() => props.onAddItem(props.listId, false, true)}
           registerHandle={registerHandle}
           onOpen={props.onOpen}
-          onSetDue={props.onSetDue}
+          onSetDeadline={props.onSetDeadline}
           onReveal={props.onReveal}
           onMoveToList={props.onMoveToList}
           openOnTap={props.openOnTap}
@@ -603,7 +603,7 @@ function BoardColumn(props: {
   /** Open the new-item dialog targeting this lane. */
   onAddItem: () => void;
   onOpen: (id: string, focus?: "notes", caret?: number) => void;
-  onSetDue: (ids: readonly string[], initial: string | null) => void;
+  onSetDeadline: (ids: readonly string[], initial: string | null) => void;
   onReveal?: (id: string, where: "list" | "focus") => void;
   onMoveToList?: (ids: readonly string[]) => void;
   openOnTap: () => boolean;
@@ -688,12 +688,12 @@ function BoardColumn(props: {
               duplicateBlock={props.duplicateBlock}
               copyBlock={props.copyBlock}
               onOpen={props.onOpen}
-              onSetDue={props.onSetDue}
+              onSetDeadline={props.onSetDeadline}
               onReveal={props.onReveal}
               onMoveToList={props.onMoveToList}
               openOnTap={props.openOnTap}
               scrollToKey={(k) => handle?.scrollToKey(k)}
-              dueInFooter
+              deadlineInFooter
             />
           )}
         </Dnd>

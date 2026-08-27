@@ -32,7 +32,7 @@ import trashSvg from "./icons/trash.svg?raw";
 import { Board, type BoardImperative } from "./Board.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Deadlines } from "./Deadlines.tsx";
-import { DueCalendarDialog } from "./DueCalendarDialog.tsx";
+import { DeadlineCalendarDialog } from "./DeadlineCalendarDialog.tsx";
 import { FindPalette, type FindResult } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { ListIconPicker } from "./ListIconPicker.tsx";
@@ -213,16 +213,16 @@ export function Workspace(props: {
   // or a row context menu's target set) so the pick acts on what the user
   // saw, not on whatever the selection is by commit time.
   const [moveIds, setMoveIds] = createSignal<string[] | null>(null);
-  // Shared due-date calendar, opened from a row/board context menu's "Set
+  // Shared deadline calendar, opened from a row/board context menu's "Set
   // date". Holds the target item ids and the stamp to seed the calendar
-  // with (the clicked row's current due date, or null); one modal serves
+  // with (the clicked row's current deadline, or null); one modal serves
   // every row rather than mounting a Dialog per row.
-  const [dueTarget, setDueTarget] = createSignal<{
+  const [deadlineTarget, setDeadlineTarget] = createSignal<{
     ids: readonly string[];
     initial: string | null;
   } | null>(null);
-  const openDueCalendar = (ids: readonly string[], initial: string | null) => {
-    if (ids.length > 0) setDueTarget({ ids, initial });
+  const openDeadlineCalendar = (ids: readonly string[], initial: string | null) => {
+    if (ids.length > 0) setDeadlineTarget({ ids, initial });
   };
   // New-item capture target for the detail dialog (board "+" buttons), or
   // null when not capturing. Mutually exclusive with `openItemId`.
@@ -1015,15 +1015,15 @@ export function Workspace(props: {
   // bottom-most source row — same shape as paste — rather than each
   // clone sitting under its own original. Shared by Cmd+D and the row
   // context menu's Duplicate action so both behave identically.
-  // A clone is a full copy, not just the title: carry the notes and due
-  // date across. Both are no-ops when the source has neither, so the
+  // A clone is a full copy, not just the title: carry the notes and
+  // deadline across. Both are no-ops when the source has neither, so the
   // batch stays a single undo step either way.
   const copyItemDetails = (
     id: string,
-    src: { notes: string; dueOn: string | undefined },
+    src: { notes: string; deadline: string | undefined },
   ): void => {
     if (src.notes) app.editItemNotes(id, src.notes);
-    if (src.dueOn) app.setItemDueOn(id, src.dueOn);
+    if (src.deadline) app.setItemDeadline(id, src.deadline);
   };
 
   const duplicateBlock = (sourceIds: readonly string[]): void => {
@@ -1041,7 +1041,7 @@ export function Workspace(props: {
         idx: number;
         text: string;
         notes: string;
-        dueOn: string | undefined;
+        deadline: string | undefined;
         live: boolean;
         listId: string;
       }[] = [];
@@ -1055,7 +1055,7 @@ export function Workspace(props: {
           idx,
           text: it.text,
           notes: it.notes,
-          dueOn: it.dueOn,
+          deadline: it.deadline,
           live: it.live,
           listId,
         });
@@ -1101,7 +1101,7 @@ export function Workspace(props: {
       idx: number;
       text: string;
       notes: string;
-      dueOn: string | undefined;
+      deadline: string | undefined;
       live: boolean;
     }[] = [];
     visible.forEach((id, idx) => {
@@ -1112,7 +1112,7 @@ export function Workspace(props: {
         idx,
         text: it.text,
         notes: it.notes,
-        dueOn: it.dueOn,
+        deadline: it.deadline,
         live: it.live,
       });
     });
@@ -1683,19 +1683,19 @@ export function Workspace(props: {
           if (boardListId() !== null) setBoardRevealIds([id]);
         }}
       />
-      <DueCalendarDialog
-        open={() => dueTarget() !== null}
+      <DeadlineCalendarDialog
+        open={() => deadlineTarget() !== null}
         setOpen={(o) => {
-          if (!o) setDueTarget(null);
+          if (!o) setDeadlineTarget(null);
         }}
-        value={() => dueTarget()?.initial ?? null}
+        value={() => deadlineTarget()?.initial ?? null}
         onPick={(stamp) => {
-          const t = dueTarget();
-          if (t) for (const id of t.ids) app.setItemDueOn(id, stamp);
+          const t = deadlineTarget();
+          if (t) for (const id of t.ids) app.setItemDeadline(id, stamp);
         }}
         onRemove={() => {
-          const t = dueTarget();
-          if (t) for (const id of t.ids) app.setItemDueOn(id, null);
+          const t = deadlineTarget();
+          if (t) for (const id of t.ids) app.setItemDeadline(id, null);
         }}
       />
       <ShortcutsDialog
@@ -2035,7 +2035,7 @@ export function Workspace(props: {
                           if (caret != null) setOpenCaret(caret);
                           setOpenItemId(id);
                         }}
-                        onSetDue={openDueCalendar}
+                        onSetDeadline={openDeadlineCalendar}
                         onReveal={revealItemIn}
                         onMoveToList={openMovePalette}
                         openOnTap={itemsIsMobile}
@@ -2057,7 +2057,7 @@ export function Workspace(props: {
                 if (caret != null) setOpenCaret(caret);
                 setOpenItemId(id);
               }}
-              onSetDue={openDueCalendar}
+              onSetDeadline={openDeadlineCalendar}
               onReveal={revealItemIn}
               onMoveToList={openMovePalette}
               openOnTap={itemsIsMobile}

@@ -42,9 +42,9 @@ pub enum AppEvent {
         /// ≡ Backlog. Combined with `done_at`/`binned_at` (precedence
         /// Binned > Done > Live > Backlog) it resolves the item's lane.
         live: bool,
-        /// Date-only due date (`YYYY-MM-DD`) or `None`. Floating local
+        /// Date-only deadline (`YYYY-MM-DD`) or `None`. Floating local
         /// calendar date — consumers format without timezone conversion.
-        due_on: Option<String>,
+        deadline: Option<String>,
         open_index: Option<usize>,
     },
     /// Item removed from the doc (deleteBinned / emptyBin). Toggling
@@ -71,13 +71,13 @@ pub enum AppEvent {
         id: String,
         notes: String,
     },
-    /// Item's date-only due date changed. The payload is the raw
+    /// Item's date-only deadline changed. The payload is the raw
     /// `YYYY-MM-DD` value after the write — `None` when cleared. The
     /// value is a floating local calendar date; consumers format it
     /// locally without timezone conversion.
-    ItemDueChanged {
+    ItemDeadlineChanged {
         id: String,
-        due_on: Option<String>,
+        deadline: Option<String>,
     },
     /// Lifecycle changed (`spec/data-model.md`). The three stored fields
     /// are independent — an event is emitted whenever any of `live`,

@@ -1,7 +1,7 @@
-// Due-date coverage across the two JS layers the feature touches:
-//  - the workspace store hydrates `dueOn` from the initial ItemAdded
-//    burst and patches it on live itemDueChanged events;
-//  - `formatDueBadge` produces the spec's overdue/today/tomorrow/weekday/
+// Deadline coverage across the two JS layers the feature touches:
+//  - the workspace store hydrates `deadline` from the initial ItemAdded
+//    burst and patches it on live itemDeadlineChanged events;
+//  - `formatDeadlineBadge` produces the spec's overdue/today/tomorrow/weekday/
 //    compact-date labels from local date parts.
 
 import { expect, test, describe } from "bun:test";
@@ -12,7 +12,7 @@ import { MemEngineStorage } from "../../core/test/mem-engine-storage.ts";
 import { createSyncedApp } from "../src/sync/store.ts";
 import {
   addDaysToStamp,
-  formatDueBadge,
+  formatDeadlineBadge,
   localDateStamp,
   todayStamp,
 } from "../src/format.tsx";
@@ -31,27 +31,27 @@ function engineFrom(doc: Doc): SyncEngine {
   );
 }
 
-describe("store dueOn", () => {
-  test("hydrates dueOn from the attach burst", () => {
+describe("store deadline", () => {
+  test("hydrates deadline from the attach burst", () => {
     const doc = Doc.create();
-    const id = doc.addItem("inbox", "with a due date");
-    doc.setItemDueOn(id, "2026-07-15");
+    const id = doc.addItem("inbox", "with a deadline");
+    doc.setItemDeadline(id, "2026-07-15");
 
     const app = createSyncedApp(engineFrom(doc));
-    expect(app.state.itemsById[id]?.dueOn).toBe("2026-07-15");
+    expect(app.state.itemsById[id]?.deadline).toBe("2026-07-15");
   });
 
-  test("patches dueOn on set, then clears it", () => {
+  test("patches deadline on set, then clears it", () => {
     const doc = Doc.create();
     const id = doc.addItem("inbox", "task");
     const app = createSyncedApp(engineFrom(doc));
-    expect(app.state.itemsById[id]?.dueOn).toBeUndefined();
+    expect(app.state.itemsById[id]?.deadline).toBeUndefined();
 
-    app.setItemDueOn(id, "2026-12-01");
-    expect(app.state.itemsById[id]?.dueOn).toBe("2026-12-01");
+    app.setItemDeadline(id, "2026-12-01");
+    expect(app.state.itemsById[id]?.deadline).toBe("2026-12-01");
 
-    app.setItemDueOn(id, null);
-    expect(app.state.itemsById[id]?.dueOn).toBeUndefined();
+    app.setItemDeadline(id, null);
+    expect(app.state.itemsById[id]?.deadline).toBeUndefined();
   });
 });
 
@@ -69,39 +69,39 @@ describe("date-part helpers", () => {
   });
 });
 
-describe("formatDueBadge", () => {
+describe("formatDeadlineBadge", () => {
   const labels = { overdue: "Overdue", today: "Today", tomorrow: "Tomorrow" };
   const today = "2026-07-07"; // a Tuesday
 
   test("before today is overdue", () => {
-    expect(formatDueBadge("2026-07-06", today, labels, "en-US")).toEqual({
+    expect(formatDeadlineBadge("2026-07-06", today, labels, "en-US")).toEqual({
       label: "Overdue",
       urgency: "overdue",
     });
-    expect(formatDueBadge("2020-01-01", today, labels, "en-US")?.urgency).toBe(
+    expect(formatDeadlineBadge("2020-01-01", today, labels, "en-US")?.urgency).toBe(
       "overdue",
     );
   });
 
   test("pastAsDate shows the date instead of Overdue", () => {
     expect(
-      formatDueBadge("2026-07-06", today, labels, "en-US", { pastAsDate: true }),
+      formatDeadlineBadge("2026-07-06", today, labels, "en-US", { pastAsDate: true }),
     ).toEqual({ label: "Jul 6", urgency: "overdue" });
     expect(
-      formatDueBadge("2020-01-01", today, labels, "en-US", { pastAsDate: true })?.label,
+      formatDeadlineBadge("2020-01-01", today, labels, "en-US", { pastAsDate: true })?.label,
     ).toBe("Jan 1, 2020");
     // Only the past branch changes; today/tomorrow keep their labels.
     expect(
-      formatDueBadge(today, today, labels, "en-US", { pastAsDate: true })?.label,
+      formatDeadlineBadge(today, today, labels, "en-US", { pastAsDate: true })?.label,
     ).toBe("Today");
   });
 
   test("today and tomorrow", () => {
-    expect(formatDueBadge(today, today, labels, "en-US")).toEqual({
+    expect(formatDeadlineBadge(today, today, labels, "en-US")).toEqual({
       label: "Today",
       urgency: "today",
     });
-    expect(formatDueBadge("2026-07-08", today, labels, "en-US")).toEqual({
+    expect(formatDeadlineBadge("2026-07-08", today, labels, "en-US")).toEqual({
       label: "Tomorrow",
       urgency: "future",
     });
@@ -109,18 +109,18 @@ describe("formatDueBadge", () => {
 
   test("within the next 7 days shows a weekday", () => {
     // 2026-07-10 is a Friday.
-    const r = formatDueBadge("2026-07-10", today, labels, "en-US");
+    const r = formatDeadlineBadge("2026-07-10", today, labels, "en-US");
     expect(r?.urgency).toBe("future");
     expect(r?.label).toBe("Fri");
   });
 
   test("further out shows a compact date", () => {
-    const r = formatDueBadge("2026-07-20", today, labels, "en-US");
+    const r = formatDeadlineBadge("2026-07-20", today, labels, "en-US");
     expect(r?.urgency).toBe("future");
     expect(r?.label).toBe("Jul 20");
   });
 
   test("null on a malformed stamp", () => {
-    expect(formatDueBadge("nope", today, labels, "en-US")).toBeNull();
+    expect(formatDeadlineBadge("nope", today, labels, "en-US")).toBeNull();
   });
 });

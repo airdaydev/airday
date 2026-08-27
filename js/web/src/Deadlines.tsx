@@ -1,6 +1,6 @@
 import { createMemo, For, Show } from "solid-js";
-import { DueBadge } from "./DueBadge.tsx";
-import { formatDueBadge, nowMs, todayStamp } from "./format.tsx";
+import { DeadlineBadge } from "./DeadlineBadge.tsx";
+import { formatDeadlineBadge, nowMs, todayStamp } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { isOpen, type DocApp, type ItemView } from "./sync/store.ts";
 
@@ -14,7 +14,7 @@ interface DeadlineGroup {
 }
 
 /** Right-hand deadline rail (desktop only): every Open item carrying a
- *  due date, soonest first, grouped by calendar day. Overdue items fold
+ *  deadline, soonest first, grouped by calendar day. Overdue items fold
  *  into a single leading group since they're all equally "owed now".
  *  Done / binned items never appear — nothing is still due on them.
  *  Clicking a row reveals the item in its home list. */
@@ -27,22 +27,22 @@ export function Deadlines(props: {
   const groups = createMemo<DeadlineGroup[]>(() => {
     const today = todayStamp(nowMs());
     const dated = Object.values(props.app.state.itemsById)
-      .filter((it) => isOpen(it) && it.dueOn)
+      .filter((it) => isOpen(it) && it.deadline)
       .sort(
         (a, b) =>
-          a.dueOn!.localeCompare(b.dueOn!) ||
+          a.deadline!.localeCompare(b.deadline!) ||
           a.createdAt - b.createdAt,
       );
     const labels = {
-      overdue: m().due.overdue,
-      today: m().due.today,
-      tomorrow: m().due.tomorrow,
+      overdue: m().deadline.overdue,
+      today: m().deadline.today,
+      tomorrow: m().deadline.tomorrow,
     };
     const out: DeadlineGroup[] = [];
     for (const it of dated) {
-      const info = formatDueBadge(it.dueOn!, today, labels, locale());
+      const info = formatDeadlineBadge(it.deadline!, today, labels, locale());
       if (!info) continue;
-      const key = info.urgency === "overdue" ? "overdue" : it.dueOn!;
+      const key = info.urgency === "overdue" ? "overdue" : it.deadline!;
       const last = out[out.length - 1];
       if (last && last.key === key) {
         last.items.push(it);
@@ -86,7 +86,7 @@ export function Deadlines(props: {
                             only overdue rows (header: "Overdue") carry a
                             badge, showing the date that slipped. */}
                         <Show when={g.urgency === "overdue"}>
-                          <DueBadge dueOn={it.dueOn!} muted />
+                          <DeadlineBadge deadline={it.deadline!} muted />
                         </Show>
                       </span>
                     </button>

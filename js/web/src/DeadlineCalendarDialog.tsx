@@ -1,5 +1,5 @@
 // Centered modal wrapping corvu's headless `@corvu/calendar`, used to pick a
-// due date. Fully controlled + triggerless so it can be driven from anywhere
+// deadline. Fully controlled + triggerless so it can be driven from anywhere
 // (the task dialog's badge/menu, a list/board row's context menu). A Kobalte
 // Dialog rather than a Popover: opened from a closing menu, a popover fights
 // the menu's focus-restore and instantly dismisses; a modal doesn't.
@@ -10,7 +10,7 @@ import { createMemo, For, Show } from "solid-js";
 import { localDateStamp, parseLocalDateParts } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 
-export function DueCalendarDialog(props: {
+export function DeadlineCalendarDialog(props: {
   open: () => boolean;
   setOpen: (v: boolean) => void;
   /** Currently-set stamp to preselect / open the calendar on, or null. */
@@ -18,7 +18,7 @@ export function DueCalendarDialog(props: {
   /** Fired with the picked `YYYY-MM-DD` (never null — removal is the button
    *  below); the dialog closes itself after. */
   onPick: (stamp: string) => void;
-  /** Clear the due date. When provided and a date is set, a "Remove date"
+  /** Clear the deadline. When provided and a date is set, a "Remove date"
    *  button shows at the bottom of the dialog. */
   onRemove?: () => void;
 }) {
@@ -42,11 +42,11 @@ export function DueCalendarDialog(props: {
   return (
     <Dialog open={props.open()} onOpenChange={props.setOpen} modal>
       <Dialog.Portal>
-        <Dialog.Overlay class="dialog-overlay due-dialog-overlay" />
-        <div class="dialog-positioner due-dialog-positioner">
-          <Dialog.Content class="due-dialog">
-            <Dialog.Title class="due-dialog-title">
-              {m().due.dialogTitle}
+        <Dialog.Overlay class="dialog-overlay deadline-dialog-overlay" />
+        <div class="dialog-positioner deadline-dialog-positioner">
+          <Dialog.Content class="deadline-dialog">
+            <Dialog.Title class="deadline-dialog-title">
+              {m().deadline.dialogTitle}
             </Dialog.Title>
             <Calendar
               mode="single"
@@ -63,7 +63,7 @@ export function DueCalendarDialog(props: {
                     <Calendar.Nav
                       action="prev-month"
                       class="calendar-nav"
-                      aria-label={m().due.prevMonth}
+                      aria-label={m().deadline.prevMonth}
                     >
                       ‹
                     </Calendar.Nav>
@@ -73,7 +73,7 @@ export function DueCalendarDialog(props: {
                     <Calendar.Nav
                       action="next-month"
                       class="calendar-nav"
-                      aria-label={m().due.nextMonth}
+                      aria-label={m().deadline.nextMonth}
                     >
                       ›
                     </Calendar.Nav>
@@ -115,16 +115,16 @@ export function DueCalendarDialog(props: {
               )}
             </Calendar>
             <Show when={props.onRemove && props.value()}>
-              <div class="due-dialog-footer">
+              <div class="deadline-dialog-footer">
                 <button
                   type="button"
-                  class="due-dialog-remove"
+                  class="deadline-dialog-remove"
                   onClick={() => {
                     props.onRemove?.();
                     props.setOpen(false);
                   }}
                 >
-                  {m().due.remove}
+                  {m().deadline.remove}
                 </button>
               </div>
             </Show>

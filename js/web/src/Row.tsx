@@ -5,7 +5,7 @@ import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import noteSvg from "./icons/note.svg?raw";
 import { DndSelection } from "./dnd/solid";
 import { trackOverlay } from "./overlay.ts";
-import { DueBadge } from "./DueBadge.tsx";
+import { DeadlineBadge } from "./DeadlineBadge.tsx";
 import {
   addDaysToStamp,
   formatDateTime,
@@ -64,17 +64,17 @@ export function Row(props: {
   /** When true (mobile), a plain tap on the row opens the dialog instead
    *  of only selecting — inline editing is unpleasant on touch. */
   openOnTap?: () => boolean;
-  /** Board cards pin the due badge to a footer at the bottom of the card;
+  /** Board cards pin the deadline badge to a footer at the bottom of the card;
    *  list rows show it inline after the title instead. */
-  dueInFooter?: boolean;
+  deadlineInFooter?: boolean;
   /** Done / Focus views: when true, badge the row with its origin list name.
    *  Resolved via `listLabel` so `main` shows the Home label. */
   showList?: () => boolean;
   /** Resolves a list id to its display label (see Workspace `listLabel`). */
   listLabel?: (listId: string) => string;
-  /** Open the shared calendar modal to set a due date on the target set.
-   *  `initial` seeds the calendar (this row's current due date, or null). */
-  onSetDue?: (ids: readonly string[], initial: string | null) => void;
+  /** Open the shared calendar modal to set a deadline on the target set.
+   *  `initial` seeds the calendar (this row's current deadline, or null). */
+  onSetDeadline?: (ids: readonly string[], initial: string | null) => void;
   /** Jump to the item's other appearance and select it there: from the
    *  Focus lens to its home list, or from a list / board to the Focus
    *  lens. Only offered for items that appear in both (`spec/focus.md`). */
@@ -147,12 +147,12 @@ export function Row(props: {
   // slot of the row's gap.
   const showInlineBadges = () =>
     Boolean(originList()) ||
-    (!props.dueInFooter &&
+    (!props.deadlineInFooter &&
       (Boolean(lifecycleTimestamp(props.item())) ||
         (!props.expanded() &&
           (hasNotes() ||
             (canPinToFocus() && focused()) ||
-            (isOpen(props.item()) && Boolean(props.item().dueOn))))));
+            (isOpen(props.item()) && Boolean(props.item().deadline))))));
   let textRef!: HTMLSpanElement;
   // Set by the Enter keydown handler before it dispatches the synthetic
   // Escape that drives collapse. The collapse effect reads (and resets)
@@ -344,17 +344,17 @@ export function Row(props: {
   const onCopy = () => {
     props.copyBlock(targetIds());
   };
-  // Due-date actions apply to the whole target set (the selection when the
+  // Deadline actions apply to the whole target set (the selection when the
   // row is part of it, else this row alone), matching the done/bin actions.
-  const onDueTomorrow = () => {
+  const onDeadlineTomorrow = () => {
     const stamp = addDaysToStamp(todayStamp(nowMs()), 1);
-    for (const id of targetIds()) props.app.setItemDueOn(id, stamp);
+    for (const id of targetIds()) props.app.setItemDeadline(id, stamp);
   };
-  const onDueRemove = () => {
-    for (const id of targetIds()) props.app.setItemDueOn(id, null);
+  const onDeadlineRemove = () => {
+    for (const id of targetIds()) props.app.setItemDeadline(id, null);
   };
   const onSetDate = () => {
-    props.onSetDue?.(targetIds(), props.item().dueOn ?? null);
+    props.onSetDeadline?.(targetIds(), props.item().deadline ?? null);
   };
   // Move the target set to the top / bottom of the item's list Open order,
   // preserving the targets' relative order. `moveItem`'s index is applied
@@ -429,7 +429,7 @@ export function Row(props: {
   return (
     <ContextMenu onOpenChange={onOpenChange}>
       <ContextMenu.Trigger
-        class={props.dueInFooter ? "row row-card" : "row"}
+        class={props.deadlineInFooter ? "row row-card" : "row"}
         data-done={isDone(props.item()) ? "" : undefined}
         data-binned={isBinned(props.item()) ? "" : undefined}
         data-expanded={props.expanded() ? "" : undefined}
@@ -594,13 +594,13 @@ export function Row(props: {
             a direct child of the card so the badges start at the card's
             left padding edge (under the checkbox), not the title. List
             rows show them inline after the title instead. Once an item
-            leaves Open its due date stops mattering — done/binned cards
+            leaves Open its deadline stops mattering — done/binned cards
             show only their lifecycle timestamp. */}
         <Show
           when={
-            props.dueInFooter &&
+            props.deadlineInFooter &&
             !props.expanded() &&
-            ((isOpen(props.item()) && props.item().dueOn) ||
+            ((isOpen(props.item()) && props.item().deadline) ||
               (canPinToFocus() && focused()) ||
               hasNotes() ||
               lifecycleTimestamp(props.item()))
@@ -618,8 +618,8 @@ export function Row(props: {
                 innerHTML={drawingPinSvg}
               />
             </Show>
-            <Show when={isOpen(props.item()) && props.item().dueOn}>
-              {(due) => <DueBadge dueOn={due()} />}
+            <Show when={isOpen(props.item()) && props.item().deadline}>
+              {(d) => <DeadlineBadge deadline={d()} />}
             </Show>
             <Show when={lifecycleTimestamp(props.item())}>
               {(ts) => (
@@ -645,7 +645,7 @@ export function Row(props: {
           <div class="row-badges">
             {/* Has-notes badge: a corner-fold glyph that opens the dialog
                 straight to the notes editor. */}
-            <Show when={!props.dueInFooter && !props.expanded() && hasNotes()}>
+            <Show when={!props.deadlineInFooter && !props.expanded() && hasNotes()}>
               <NotesBadge />
             </Show>
             {/* Focus-membership badge — a static, non-interactive pin glyph
@@ -654,7 +654,7 @@ export function Row(props: {
                 context menu (spec/focus.md). */}
             <Show
               when={
-                !props.dueInFooter && canPinToFocus() && focused() && !props.expanded()
+                !props.deadlineInFooter && canPinToFocus() && focused() && !props.expanded()
               }
             >
               <span
@@ -666,13 +666,13 @@ export function Row(props: {
             </Show>
             <Show
               when={
-                !props.dueInFooter &&
+                !props.deadlineInFooter &&
                 !props.expanded() &&
                 isOpen(props.item()) &&
-                props.item().dueOn
+                props.item().deadline
               }
             >
-              {(due) => <DueBadge dueOn={due()} />}
+              {(d) => <DeadlineBadge deadline={d()} />}
             </Show>
             <Show when={originList()}>
               {(name) => (
@@ -681,7 +681,7 @@ export function Row(props: {
                 </span>
               )}
             </Show>
-            <Show when={!props.dueInFooter && lifecycleTimestamp(props.item())}>
+            <Show when={!props.deadlineInFooter && lifecycleTimestamp(props.item())}>
               {(ts) => (
                 <span class="badge row-timestamp" title={formatDateTime(ts(), locale())}>
                   <Show when={props.viewKind === "done"}>
@@ -756,39 +756,39 @@ export function Row(props: {
               <span>{m().focus.showInFocus}</span>
             </ContextMenu.Item>
           </Show>
-          {/* Due date only matters while the item is open (the badge hides
+          {/* Deadline only matters while the item is open (the badge hides
               for done/binned rows too, see above). */}
           <Show when={isOpen(props.item())}>
             <ContextMenu.Sub gutter={4}>
               <ContextMenu.SubTrigger class="context-menu-item">
-                <span>{m().due.label}</span>
+                <span>{m().deadline.label}</span>
                 <span class="menu-sub-arrow" aria-hidden="true">
                   ›
                 </span>
               </ContextMenu.SubTrigger>
               <ContextMenu.Portal>
                 <ContextMenu.SubContent class="context-menu-content">
-                  <Show when={props.item().dueOn}>
+                  <Show when={props.item().deadline}>
                     <ContextMenu.Item
                       class="context-menu-item"
-                      onSelect={onDueRemove}
+                      onSelect={onDeadlineRemove}
                     >
-                      <span>{m().due.remove}</span>
+                      <span>{m().deadline.remove}</span>
                     </ContextMenu.Item>
                   </Show>
-                  <Show when={props.onSetDue}>
+                  <Show when={props.onSetDeadline}>
                     <ContextMenu.Item
                       class="context-menu-item"
                       onSelect={onSetDate}
                     >
-                      <span>{m().due.setDate}</span>
+                      <span>{m().deadline.setDate}</span>
                     </ContextMenu.Item>
                   </Show>
                   <ContextMenu.Item
                     class="context-menu-item"
-                    onSelect={onDueTomorrow}
+                    onSelect={onDeadlineTomorrow}
                   >
-                    <span>{m().due.tomorrow}</span>
+                    <span>{m().deadline.tomorrow}</span>
                   </ContextMenu.Item>
                 </ContextMenu.SubContent>
               </ContextMenu.Portal>
