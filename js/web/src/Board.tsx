@@ -526,7 +526,7 @@ export function Board(props: {
   };
 
   return (
-    <div class="board" role="group" ref={boardRef} onKeyDown={onBoardKeyDown}>
+    <div class="board" role="group" tabIndex={-1} ref={boardRef} onKeyDown={onBoardKeyDown}>
       <BoardColumn
         app={app}
         laneKey={BACKLOG_LANE}
@@ -654,6 +654,7 @@ function BoardColumn(props: {
         <button
           type="button"
           class="board-col-add-btn"
+          tabIndex={-1}
           aria-label={isDoneCol ? m().workspace.logCompleted : m().board.addItem}
           onClick={() => props.onAddItem()}
           innerHTML={plusSvg}

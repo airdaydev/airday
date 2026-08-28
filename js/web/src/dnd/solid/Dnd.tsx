@@ -466,7 +466,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
           ref={listboxEl}
           role="listbox"
           aria-multiselectable={ariaMulti()}
-          tabindex="0"
+          tabindex="-1"
           style={listboxStyle()}
         >
           <For each={renderKeys()}>

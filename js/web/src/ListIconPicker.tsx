@@ -22,6 +22,7 @@ export function ListIconPicker(props: {
     <Popover open={open()} onOpenChange={setOpen} placement="bottom-start" gutter={6}>
       <Popover.Trigger
         class="list-icon-trigger"
+        tabIndex={-1}
         aria-label={m().workspace.listIcon}
       >
         <Show when={props.icon} fallback={<span innerHTML={fileSvg} />}>

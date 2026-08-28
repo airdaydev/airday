@@ -203,7 +203,7 @@ export class PrimaveraDnd extends HTMLElement {
     this.listbox = document.createElement("div");
     this.listbox.setAttribute("role", "listbox");
     this.listbox.setAttribute("aria-multiselectable", String(this.multi));
-    this.listbox.setAttribute("tabindex", "0");
+    this.listbox.setAttribute("tabindex", "-1");
     this.listbox.style.cssText = `position:relative;outline:none;${fill ? "min-height:100%;" : ""}`;
 
     this.parentEl.appendChild(this.listbox);

@@ -162,6 +162,7 @@ function ConnectionStatusPopover(props: {
         <Tooltip.Trigger
           as={Popover.Trigger}
           class={props.class ? `connection-indicator ${props.class}` : "connection-indicator"}
+          tabIndex={-1}
           aria-label={statusLabel()}
         >
           <Show
@@ -243,6 +244,7 @@ export function StatusSlot(props: {
         <button
           type="button"
           class={props.class ? `connection-indicator ${props.class}` : "connection-indicator"}
+          tabIndex={-1}
           aria-label={m().auth.signIn}
           title={m().auth.signIn}
           onClick={() => setAuthOpen(true)}
@@ -383,7 +385,7 @@ export function Nav(props: {
   };
   return (
     <nav class="nav" onKeyDown={onNavKeyDown}>
-      <div class="nav-scroll">
+      <div class="nav-scroll" tabIndex={-1}>
       <div class="nav-group">
         {/* Focus: a reserved lens (spec/focus.md), not a `ListMeta` row, so
             it's a static entry with a fixed icon — like Done / Bin. Sits at
@@ -394,6 +396,7 @@ export function Nav(props: {
           class="nav-item"
           data-active={props.view.kind === "focus" ? "" : undefined}
           data-drop-focus=""
+          tabIndex={-1}
           onClick={() => props.setView({ kind: "focus" })}
         >
           <span class="nav-item-icon" innerHTML={drawingPinSvg} />
@@ -414,6 +417,7 @@ export function Nav(props: {
               : undefined
           }
           data-drop-list-id="inbox"
+          tabIndex={-1}
           onClick={() => props.setView({ kind: "list", id: "inbox" })}
         >
           <span class="nav-item-icon" innerHTML={archiveSvg} />
@@ -428,6 +432,7 @@ export function Nav(props: {
           type="button"
           class="nav-item"
           data-active={props.view.kind === "done" ? "" : undefined}
+          tabIndex={-1}
           onClick={() => props.setView({ kind: "done" })}
         >
           <span class="nav-item-icon" innerHTML={checkSvg} />
@@ -441,6 +446,7 @@ export function Nav(props: {
               class="nav-item"
               data-active={props.view.kind === "bin" ? "" : undefined}
               data-drop-bin=""
+              tabIndex={-1}
               onClick={() => props.setView({ kind: "bin" })}
             >
               <span class="nav-item-icon" innerHTML={crumpledPaperSvg} />
@@ -503,6 +509,7 @@ export function Nav(props: {
                         : undefined
                     }
                     data-drop-list-id={l().id}
+                    tabIndex={-1}
                     onClick={(e) => onNavItemClick(e, l().id)}
                   >
                     <Show
@@ -564,7 +571,7 @@ export function Nav(props: {
         <Show
           when={adding()}
           fallback={
-            <button type="button" class="nav-item" onClick={() => setAdding(true)}>
+            <button type="button" class="nav-item" tabIndex={-1} onClick={() => setAdding(true)}>
               {m().nav.newList}
             </button>
           }
@@ -695,6 +702,7 @@ export function NavMenu(props: {
           <Tooltip.Trigger
             as={DropdownMenu.Trigger}
             class="nav-menu-trigger"
+            tabIndex={-1}
             aria-label={m().common.menu}
             innerHTML={dotsVerticalSvg}
           />

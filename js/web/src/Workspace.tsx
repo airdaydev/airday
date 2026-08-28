@@ -29,7 +29,7 @@ import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import listBulletSvg from "./icons/list-bullet.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
 import viewVerticalSvg from "./icons/view-vertical.svg?raw";
-import plusSvg from "./icons/plus.svg?raw";
+import plusSvg from "./icons/card-stack-plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
 import { Board, type BoardImperative } from "./Board.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
@@ -171,6 +171,7 @@ function DisplayOptionsPopover(props: { children: JSX.Element }) {
         <Tooltip.Trigger
           as={Popover.Trigger}
           class="add-button view-mode-trigger"
+          tabIndex={-1}
           aria-label={m().workspace.displayOptions}
           innerHTML={mixerHzSvg}
         />
@@ -1725,7 +1726,7 @@ export function Workspace(props: {
         onOpenChange={setShortcutsOpen}
       />
       <div class="content">
-      <main class="main">
+      <main class="main" tabIndex={-1}>
         <header class="main-header">
           {/* Title group at the left edge; .main-header's space-between
               keeps the action buttons on the right regardless of group
@@ -1789,6 +1790,7 @@ export function Workspace(props: {
                 <DropdownMenu>
                   <DropdownMenu.Trigger
                     class="nav-menu-trigger"
+                    tabIndex={-1}
                     aria-label={m().common.menu}
                     innerHTML={dotsHorizontalSvg}
                   />
@@ -1821,6 +1823,7 @@ export function Workspace(props: {
               <button
                 type="button"
                 class="add-button"
+                tabIndex={-1}
                 onClick={() => setEmptyBinConfirmOpen(true)}
               >
                 <span class="add-button-icon" innerHTML={trashSvg} />
@@ -1933,6 +1936,7 @@ export function Workspace(props: {
                   as="button"
                   type="button"
                   class="add-button"
+                  tabIndex={-1}
                   aria-label={m().workspace.log}
                   onClick={() =>
                     setNewItemTarget({
@@ -1975,6 +1979,7 @@ export function Workspace(props: {
                 as="button"
                 type="button"
                 class="add-button"
+                tabIndex={-1}
                 onClick={(e) => {
                   // The dnd controller has a document-level click listener
                   // that collapses any expansion when a click lands outside
@@ -2140,6 +2145,7 @@ export function Workspace(props: {
           <Tooltip openDelay={200} closeDelay={0} placement="top">
               <Tooltip.Trigger
                 class="nav-menu-trigger"
+                tabIndex={-1}
                 aria-label={navHidden() ? m().nav.showSidebar : m().nav.hideSidebar}
                 aria-expanded={!navHidden()}
                 onClick={() => setNavHidden(!navHidden())}
@@ -2164,6 +2170,7 @@ export function Workspace(props: {
             <Tooltip openDelay={200} closeDelay={0} placement="top">
               <Tooltip.Trigger
                 class="nav-menu-trigger deadlines-toggle"
+                tabIndex={-1}
                 aria-label={
                   deadlinesOpen() ? m().deadlines.hide : m().deadlines.show
                 }

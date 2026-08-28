@@ -61,7 +61,7 @@ export function Deadlines(props: {
   return (
     <aside class="deadlines" aria-label={m().deadlines.title}>
       <div class="deadlines-header">{m().deadlines.title}</div>
-      <div class="deadlines-scroll">
+      <div class="deadlines-scroll" tabIndex={-1}>
         <Show
           when={groups().length > 0}
           fallback={<div class="deadlines-empty">{m().deadlines.empty}</div>}
@@ -75,6 +75,7 @@ export function Deadlines(props: {
                     <button
                       type="button"
                       class="deadlines-row"
+                      tabIndex={-1}
                       onClick={() => props.onReveal(it.id)}
                     >
                       <span class="deadlines-row-text">{it.text}</span>

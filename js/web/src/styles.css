@@ -34,9 +34,9 @@
 
 [data-theme="dark"] {
   --bg: #1a1a1d;
-  --bg-board-col: #121214;
+  --bg-board-col: #171718;
   --bg-elevated: #1a1a1c;
-  --surface: #151414;
+  --surface: #1a1a1d;
   --bg-hover: rgba(255, 255, 255, 0.05);
   --bg-active: #2a2a2e;
   --bg-badge: #24232a;
@@ -46,7 +46,7 @@
   --text-muted: #aaa;
   --text-faint: #636364;
   --text-empty: #666;
-  --border: #2a2a2a;
+  --border: #272727;
   --border-surface: #1f1f1f;
   --border-input: #333;
   --border-row: #222;
@@ -3047,7 +3047,7 @@ input.task-check:hover {
 
 [data-theme="dark"] .row.row-card {
   background: #1b1b1f;
-  border-color: #1b1b1b;
+  border-color: #1f1f1f;
 }
 
 /* Keep the selection highlight winning over the card bg above (its

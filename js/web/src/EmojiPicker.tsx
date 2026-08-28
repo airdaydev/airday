@@ -198,6 +198,7 @@ export function EmojiPicker(props: {
                 type="button"
                 class="emoji-picker__tab"
                 role="tab"
+                tabIndex={-1}
                 aria-selected={tab() === t}
                 aria-label={groupLabel(t)}
                 title={groupLabel(t)}
@@ -216,6 +217,7 @@ export function EmojiPicker(props: {
         id="emoji-picker-grid"
         role="listbox"
         aria-label={m().emoji.search}
+        tabIndex={-1}
         ref={gridEl}
       >
         <Show
@@ -276,6 +278,7 @@ export function EmojiPicker(props: {
             <button
               type="button"
               class="emoji-picker__clear"
+              tabIndex={-1}
               disabled={props.selected === undefined}
               onClick={() => onClear()()}
             >
