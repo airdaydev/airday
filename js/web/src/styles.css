@@ -3251,3 +3251,123 @@ input.task-check:hover {
     transform: scale(0.92);
   }
 }
+
+/* Mobile Find sheet (FindSheet.tsx): the phone's list switcher. A full-
+   screen surface in the palette's z band (above the pills, which stay
+   hidden beneath it), a search field beside an explicit Close, then the
+   palette's row anatomy at thumb scale. The row for the current view
+   carries a trailing check. */
+.find-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  color: var(--text);
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.find-sheet__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* 16px floor so iOS doesn't zoom the page on focus. */
+.find-sheet__input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.find-sheet__input:focus {
+  outline: none;
+  border-color: var(--text-faint);
+}
+
+.find-sheet__close {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.find-sheet__results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 8px calc(24px + env(safe-area-inset-bottom));
+}
+
+/* Buttons rather than option divs — plain tap targets, no listbox
+   semantics. Reset the button chrome so `.palette__item` styling reads
+   through; taller than the desktop row to match the nav drawer's mobile
+   bump. */
+.find-sheet__row {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.find-sheet__row:active {
+  background: var(--palette-select-bg);
+}
+
+.find-sheet__row[aria-current="true"] {
+  font-weight: 500;
+}
+
+.find-sheet__row .palette__item-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.find-sheet__row .palette__item-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.find-sheet__row .palette__item-icon-emoji {
+  font-size: 16px;
+}
+
+.find-sheet__row .palette__item-list {
+  font-size: 14px;
+}
+
+.find-sheet__current {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.find-sheet__current svg {
+  width: 16px;
+  height: 16px;
+}

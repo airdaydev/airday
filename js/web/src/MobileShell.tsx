@@ -1,9 +1,9 @@
 // Mobile chrome: two floating glass pills along the bottom edge.
 //
 // On phones the desktop sidebar + footer are not rendered at all (see
-// Workspace.tsx). The left pill carries Find (which doubles as the list
-// switcher: the palette lists every view on an empty query) and
-// Settings; the right pill is Add. The sync indicator moves into the
+// Workspace.tsx). The left pill carries Find (FindSheet.tsx, which
+// doubles as the list switcher: it lists every view on an empty query
+// and marks the current one) and Settings; the right pill is Add. The sync indicator moves into the
 // main header's action slot. No custom drawer: the DOM can't fake a
 // native sheet convincingly, so we don't try.
 

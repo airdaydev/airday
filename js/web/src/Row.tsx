@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import checkSvg from "./icons/check.svg?raw";
-import drawingPinSvg from "./icons/drawing-pin.svg?raw";
+import drawingPinFilledSvg from "./icons/drawing-pin-filled.svg?raw";
 import noteSvg from "./icons/note.svg?raw";
 import { DndSelection } from "./dnd/solid";
 import { trackOverlay } from "./overlay.ts";
@@ -615,7 +615,7 @@ export function Row(props: {
                 class="badge row-focus-badge"
                 title={m().focus.badge}
                 aria-label={m().focus.badge}
-                innerHTML={drawingPinSvg}
+                innerHTML={drawingPinFilledSvg}
               />
             </Show>
             <Show when={isOpen(props.item()) && props.item().deadline}>
@@ -661,7 +661,7 @@ export function Row(props: {
                 class="badge row-focus-badge"
                 title={m().focus.badge}
                 aria-label={m().focus.badge}
-                innerHTML={drawingPinSvg}
+                innerHTML={drawingPinFilledSvg}
               />
             </Show>
             <Show

@@ -33,7 +33,9 @@ import { Board, type BoardImperative } from "./Board.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Deadlines } from "./Deadlines.tsx";
 import { DeadlineCalendarDialog } from "./DeadlineCalendarDialog.tsx";
-import { FindPalette, type FindResult } from "./FindPalette.tsx";
+import { FindPalette } from "./FindPalette.tsx";
+import { FindSheet } from "./FindSheet.tsx";
+import type { FindResult } from "./findResults.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { ListIconPicker } from "./ListIconPicker.tsx";
 import { restoreCapturedPositions } from "./linger.ts";
@@ -1486,6 +1488,25 @@ export function Workspace(props: {
     );
   };
 
+  // Shared by both Find surfaces (desktop palette / mobile sheet).
+  const onFindOpenChange = (open: boolean) => {
+    setFindOpen(open);
+    if (open) return;
+    // Hand keyboard focus back to the items listbox on close (Escape
+    // or a pick) — the palette stole it into its search input and
+    // the view's shortcuts are keyed off the listbox having focus.
+    // A pick may also switch views, so defer past the <Show keyed>
+    // remount like the nav's onSelect does.
+    requestAnimationFrame(() => restoreItemsFocus());
+  };
+  const onFindPick = (r: FindResult) => {
+    // A pick navigates the workspace behind any open item's page
+    // (mobile pills can open Find over it); close the item so the
+    // result is actually visible.
+    setOpenItemId(null);
+    onFindSelect(r);
+  };
+
   // Row context menu: hop an item between its home list and the Focus lens,
   // landing selected on the other side. "list" resolves the item's owning
   // list (falling back to the inbox if the id has gone stale); "focus" is
@@ -1520,7 +1541,8 @@ export function Workspace(props: {
   onCleanup(() => document.removeEventListener("contextmenu", onContextMenu, true));
 
   // Mobile shell: at narrow viewports the sidebar + footer are replaced
-  // by MobileBars (MobileShell.tsx); Find doubles as the list switcher.
+  // by MobileBars (MobileShell.tsx), and the Find palette by FindSheet, a
+  // tap-first list switcher over the same result set.
   const mobileMq = window.matchMedia("(max-width: 768px) and (pointer: coarse)");
   const [isMobile, setIsMobile] = createSignal(mobileMq.matches);
   const onMqChange = (e: MediaQueryListEvent) => {
@@ -1605,27 +1627,25 @@ export function Workspace(props: {
         setView={navigateTo}
       />
       </Show>
-      <FindPalette
-        app={app}
-        open={findOpen()}
-        onOpenChange={(open) => {
-          setFindOpen(open);
-          if (open) return;
-          // Hand keyboard focus back to the items listbox on close (Escape
-          // or a pick) — the palette stole it into its search input and
-          // the view's shortcuts are keyed off the listbox having focus.
-          // A pick may also switch views, so defer past the <Show keyed>
-          // remount like the nav's onSelect does.
-          requestAnimationFrame(() => restoreItemsFocus());
-        }}
-        onSelect={(r) => {
-          // A pick navigates the workspace behind any open item's page
-          // (mobile pills can open the palette over it); close the item
-          // so the result is actually visible.
-          setOpenItemId(null);
-          onFindSelect(r);
-        }}
-      />
+      <Show
+        when={isMobile()}
+        fallback={
+          <FindPalette
+            app={app}
+            open={findOpen()}
+            onOpenChange={onFindOpenChange}
+            onSelect={onFindPick}
+          />
+        }
+      >
+        <FindSheet
+          app={app}
+          open={findOpen()}
+          view={view()}
+          onOpenChange={onFindOpenChange}
+          onSelect={onFindPick}
+        />
+      </Show>
       <MovePalette
         open={moveIds() !== null}
         onOpenChange={(open) => {

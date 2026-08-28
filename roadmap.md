@@ -76,3 +76,6 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 - Remove "Notes" placeholder and have a button (+ or badge?) instead
 - Known bug - checking and unchecking contiguous tasks allowing them to linger causes confusion
 - Themes + change theme palette
+- Location based tasks?
+- ui idea - you should probably be able to click on the first empty slot of a list to add an item?
+- Consider SVG emojis that fit the theme
