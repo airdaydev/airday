@@ -268,6 +268,11 @@ them above the engine's results:
   CRDT order. The palette doubles as a jump-to-view switcher before the
   user types anything. Archived lists are omitted from the default menu
   but remain reachable by query (they stay indexed).
+- **Archived marker:** a result that is an archived list, or an item
+  whose owning list is archived, renders the localized "Archived" badge (plain `.badge` style)
+  between its title and the owning-list column, so a hit in an archived
+  list is never mistaken for live work. The engine stays unaware of
+  archive state; the surface resolves it from the list projection by id.
 - **Non-empty query:** each built-in view whose localized label matches
   the query (same tokenizer / prefix semantics as list-name matching) is
   prepended above the engine's results. Selecting one navigates to that

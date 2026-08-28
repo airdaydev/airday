@@ -10,6 +10,7 @@ import { Dek, Doc, SyncEngine } from "@airday/core/wasm";
 import type { EngineStorage } from "@airday/core/wasm";
 import { MemEngineStorage } from "../../core/test/mem-engine-storage.ts";
 import { createSyncedApp } from "../src/sync/store.ts";
+import { findResultArchived } from "../src/findResults.tsx";
 
 const DOC_ID = "00000000-0000-0000-0000-000000000000";
 
@@ -97,6 +98,48 @@ describe("store archived lists", () => {
     const results = app.search.query("errands");
     expect(results.some((r) => r.kind === "list" && r.id === id)).toBe(true);
     expect(results.some((r) => r.kind === "item" && r.id === open)).toBe(true);
+  });
+
+  test("find rows flag an archived list and the items living in it", () => {
+    const doc = Doc.create();
+    const work = doc.addList("Work");
+    const home = doc.addList("Home");
+    const inWork = doc.addItem(work, "ship it");
+    const inHome = doc.addItem(home, "ship it too");
+    const inInbox = doc.addItem("inbox", "ship it three");
+    const app = createSyncedApp(engineFrom(doc));
+
+    const rowFor = (id: string) => {
+      const r = app.search.query("ship").find((x) => x.id === id);
+      if (!r) throw new Error(`no result for ${id}`);
+      return r;
+    };
+    const listRow = (id: string) => {
+      const r = app.search.query(id === work ? "work" : "home").find((x) => x.id === id);
+      if (!r) throw new Error(`no result for ${id}`);
+      return r;
+    };
+
+    // Nothing archived yet: no row carries the marker.
+    expect(findResultArchived(app, listRow(work))).toBe(false);
+    expect(findResultArchived(app, rowFor(inWork))).toBe(false);
+
+    app.setListArchived(work, true);
+    // The list's own row and every item it owns are flagged; unrelated
+    // lists, inbox items and built-in views are not.
+    expect(findResultArchived(app, listRow(work))).toBe(true);
+    expect(findResultArchived(app, rowFor(inWork))).toBe(true);
+    expect(findResultArchived(app, listRow(home))).toBe(false);
+    expect(findResultArchived(app, rowFor(inHome))).toBe(false);
+    expect(findResultArchived(app, rowFor(inInbox))).toBe(false);
+    expect(
+      findResultArchived(app, { kind: "view", id: "focus", title: "Focus" }),
+    ).toBe(false);
+
+    // Unarchiving clears the marker again.
+    app.setListArchived(work, false);
+    expect(findResultArchived(app, listRow(work))).toBe(false);
+    expect(findResultArchived(app, rowFor(inWork))).toBe(false);
   });
 
   test("no user-facing list delete remains on the store API", () => {

@@ -3072,18 +3072,6 @@ input.task-check:hover {
   background: transparent;
 }
 
-/* ---------- Archived lists (spec/data-model.md "Archived lists") ---------- */
-
-/* Header pill marking the currently-viewed list as archived. */
-.archived-badge {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
 /* ---- Mobile shell: floating glass pills ---------------------------- */
 
 :root {

@@ -14,6 +14,7 @@ import {
   type DndOp,
 } from "./dnd/solid";
 import type { DndDragEventDetail } from "./dnd";
+import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Popover } from "@kobalte/core/popover";
 import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { Switch } from "@kobalte/core/switch";
@@ -23,6 +24,7 @@ import calendarSvg from "./icons/calendar.svg?raw";
 import cardStackSvg from "./icons/card-stack.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
+import dotsHorizontalSvg from "./icons/dots-horizontal.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import listBulletSvg from "./icons/list-bullet.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
@@ -585,8 +587,8 @@ export function Workspace(props: {
   });
 
   // The currently-viewed list's id iff that list is archived — drives
-  // the header's Archived indicator + Unarchive action, which keep
-  // restoration discoverable even with the sidebar collapsed.
+  // the header's Archived badge and flips the list menu's Archive /
+  // Unarchive action.
   const archivedViewListId = createMemo((): string | null => {
     const v = view();
     if (v.kind !== "list") return null;
@@ -1761,7 +1763,7 @@ export function Workspace(props: {
             </Show>
           </h1>
             <Show when={archivedViewListId()}>
-              <span class="badge archived-badge">{m().nav.archived}</span>
+              <span class="badge">{m().nav.archived}</span>
             </Show>
           </div>
           <div class="main-header-actions">
@@ -1778,15 +1780,36 @@ export function Workspace(props: {
                 onSession={session.swapSession}
               />
             </Show>
-            <Show when={archivedViewListId()}>
+            {/* List actions menu: the same Archive / Unarchive the nav's
+                context menu offers, kept here so restoring an archived
+                list stays discoverable with the sidebar collapsed. Only
+                user lists — `inbox` can't be archived. */}
+            <Show when={editableListId()}>
               {(listId) => (
-                <button
-                  type="button"
-                  class="add-button"
-                  onClick={() => app.setListArchived(listId(), false)}
-                >
-                  {m().nav.unarchiveList}
-                </button>
+                <DropdownMenu>
+                  <DropdownMenu.Trigger
+                    class="nav-menu-trigger"
+                    aria-label={m().common.menu}
+                    innerHTML={dotsHorizontalSvg}
+                  />
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content class="dropdown-menu-content">
+                      <DropdownMenu.Item
+                        class="dropdown-menu-item"
+                        onSelect={() =>
+                          app.setListArchived(
+                            listId(),
+                            archivedViewListId() === null,
+                          )
+                        }
+                      >
+                        {archivedViewListId() !== null
+                          ? m().nav.unarchiveList
+                          : m().nav.archiveList}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu>
               )}
             </Show>
             <Show

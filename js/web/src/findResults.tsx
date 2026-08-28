@@ -115,6 +115,18 @@ export function findResultListLabel(
   return app.state.listsById[listId]?.name ?? "";
 }
 
+/** Whether a result denotes, or lives in, an archived list
+ *  (`spec/data-model.md` "Archived lists"). Archived lists stay indexed
+ *  and keep labelling their items, so both surfaces flag the row: a
+ *  list result that is itself archived, or an item whose owning list
+ *  is. Built-in views and the reserved `inbox` can't be archived. */
+export function findResultArchived(app: DocApp, item: FindResult): boolean {
+  if (item.kind === "view") return false;
+  const listId = item.kind === "list" ? item.id : item.listId;
+  if (!listId) return false;
+  return app.state.listsById[listId]?.archivedAt != null;
+}
+
 /** Lifecycle of an item result ("" for other kinds) — union-safe access
  *  for the binned strike-through and the done checkbox mirror. */
 export function findResultLifecycle(item: FindResult): string {
@@ -140,6 +152,7 @@ export function FindResultBody(props: { app: DocApp; item: FindResult }) {
   const viewIcon = (): string | undefined =>
     props.item.kind === "view" ? VIEW_ICONS[props.item.id] : undefined;
   const listLabel = () => findResultListLabel(props.app, m().nav.inbox, props.item);
+  const archived = () => findResultArchived(props.app, props.item);
   return (
     <>
       <Show
@@ -183,6 +196,12 @@ export function FindResultBody(props: { app: DocApp; item: FindResult }) {
         </Show>
       </Show>
       <span class="palette__item-name">{props.item.title}</span>
+      {/* Archived marker sits between the title and the owning-list
+          column: "Task … Archived Work" for an item, "Work … Archived"
+          for the list itself. Plain .badge, like the row badges. */}
+      <Show when={archived()}>
+        <span class="badge">{m().nav.archived}</span>
+      </Show>
       <Show when={listLabel()}>
         {(label) => <span class="palette__item-list">{label()}</span>}
       </Show>

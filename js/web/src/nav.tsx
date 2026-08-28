@@ -271,7 +271,7 @@ export function Nav(props: {
   app: DocApp;
   /** Active (non-archived) lists — the draggable main section. Archived
    *  lists render no nav section for now; they stay reachable through
-   *  search and restorable via the header's Unarchive action. */
+   *  search and restorable via the header's list menu (Unarchive). */
   lists: { id: string; name: string; icon?: string }[];
   binCount: number;
   /** Number of visible Focus refs — the Focus nav entry's count badge, and

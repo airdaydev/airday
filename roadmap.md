@@ -79,3 +79,5 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 - Location based tasks?
 - ui idea - you should probably be able to click on the first empty slot of a list to add an item?
 - Consider SVG emojis that fit the theme
+- habit tracking?!
+- foreign keyboard shortcuts?
