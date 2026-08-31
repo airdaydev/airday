@@ -52,6 +52,8 @@ pub enum SyncError {
     Boot(#[from] airday_core::BootError),
     #[error("storage: {0}")]
     Storage(#[from] airday_core::StorageError),
+    #[error(transparent)]
+    Peer(#[from] crate::peer::PeerError),
     #[error("ws: {0}")]
     Ws(String),
     #[error("engine: {0}")]
@@ -80,6 +82,10 @@ pub struct Session {
     store: SqliteStorage,
     engine: SyncEngine,
     ws: Option<WsStream>,
+    /// Exclusive claim on the doc's peer id — held for the session's
+    /// lifetime so no concurrent invocation can commit under the same
+    /// peer (see `crate::peer`). Dropping the session releases it.
+    _peer: crate::peer::PeerLease,
 }
 
 impl Session {
@@ -104,7 +110,12 @@ impl Session {
         let storage = crate::storage::open_storage(&profile)?;
         let account = storage.read_account()?;
         let doc_id = account.primary_doc_id;
-        let (doc, boot_meta) = crate::storage::boot_doc(&storage, &dek, doc_id)?;
+        // Claim the device's peer id before the doc exists, so every
+        // local commit this process makes carries the leased peer
+        // (spec/peer-id-plan.md).
+        let peer = crate::peer::claim(&profile.dir, &storage)?;
+        let (doc, boot_meta) =
+            crate::storage::boot_doc(&storage, &dek, doc_id, Some(peer.peer_id))?;
         // `store` shares the engine's connection (see `SqliteStorage`'s
         // `Clone`) — used only for the `last_sync_at` stamp; the engine
         // persists the resume cursor itself.
@@ -134,6 +145,7 @@ impl Session {
             store,
             engine,
             ws: None,
+            _peer: peer,
         };
 
         if !sync_requested(sync) {

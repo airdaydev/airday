@@ -135,6 +135,28 @@ impl SqliteStorage {
         Ok(())
     }
 
+    /// Read slot's peer id, minting `mint` as its permanent value on
+    /// the slot's first claim (see `peer_slots` in `001_init.sql` and
+    /// `spec/peer-id-plan.md`). Stored as an i64 bit-cast of the u64.
+    /// The caller holds the slot's flock, so there is no same-slot
+    /// race; `INSERT OR IGNORE` + re-read is belt and braces.
+    pub fn read_or_mint_peer_slot(&self, slot: u32, mint: u64) -> Result<u64, StorageError> {
+        let conn = self.conn().lock().expect("SqliteStorage mutex poisoned");
+        conn.execute(
+            "INSERT OR IGNORE INTO peer_slots (slot, peer_id) VALUES (?1, ?2)",
+            params![slot, mint as i64],
+        )
+        .map_err(backend)?;
+        let peer: i64 = conn
+            .query_row(
+                "SELECT peer_id FROM peer_slots WHERE slot = ?1",
+                [slot],
+                |r| r.get(0),
+            )
+            .map_err(backend)?;
+        Ok(peer as u64)
+    }
+
     /// Read the per-doc sync cursor. Returns the zero cursor for a doc
     /// with no row yet.
     pub fn read_sync_cursor(&self, doc_id: DocId) -> Result<SyncCursor, StorageError> {

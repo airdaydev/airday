@@ -379,14 +379,24 @@ pub enum BootError {
 ///
 /// A doc the storage has never seen yields `BootState::default()`, so the
 /// result is a fresh empty `Doc` — the first-boot happy path.
+///
+/// `peer_id` is the leased local peer for this process (`None` = Loro's
+/// default random peer, one fresh peer per construction). Set before the
+/// replay import, so Loro resumes that peer's counter from the imported
+/// oplog high-water and new commits extend it. The caller must guarantee
+/// single ownership across live docs — see `spec/peer-id-plan.md`.
 pub fn boot_doc<S: LocalStorage + ?Sized>(
     storage: &S,
     dek: &Dek,
     doc_id: DocId,
+    peer_id: Option<u64>,
 ) -> Result<(Doc, BootMeta), BootError> {
     let boot = storage.boot(doc_id)?;
     let meta = boot.meta();
-    let mut doc = Doc::empty();
+    let mut doc = match peer_id {
+        Some(peer) => Doc::empty_with_peer(peer)?,
+        None => Doc::empty(),
+    };
     let mut blobs: Vec<EncryptedBlob> = Vec::with_capacity(1 + boot.replay.len());
     if let Some(snap) = boot.snapshot {
         blobs.push(snap.payload);
@@ -407,7 +417,7 @@ pub fn load_doc<S: LocalStorage + ?Sized>(
     dek: &Dek,
     doc_id: DocId,
 ) -> Result<Doc, BootError> {
-    Ok(boot_doc(storage, dek, doc_id)?.0)
+    Ok(boot_doc(storage, dek, doc_id, None)?.0)
 }
 
 /// True when the local doc holds operations the server has no proof of:
@@ -420,7 +430,7 @@ pub fn has_unsynced_ops<S: LocalStorage + ?Sized>(
     dek: &Dek,
     doc_id: DocId,
 ) -> Result<bool, BootError> {
-    let (doc, meta) = boot_doc(storage, dek, doc_id)?;
+    let (doc, meta) = boot_doc(storage, dek, doc_id, None)?;
     if meta.in_flight_push.is_some() {
         return Ok(true);
     }

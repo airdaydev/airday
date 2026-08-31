@@ -158,7 +158,7 @@ impl AirdayStore {
         let dek = Dek::from_bytes(&dek)?;
         let path = PathBuf::from(dir).join(DB_FILE);
         let storage = SqliteStorage::open(&path)?;
-        let (doc, _boot_meta) = boot_doc(&storage, &dek, FFI_DOC_ID)?;
+        let (doc, _boot_meta) = boot_doc(&storage, &dek, FFI_DOC_ID, None)?;
         Ok(Arc::new(AirdayStore {
             doc_id: FFI_DOC_ID,
             dek,

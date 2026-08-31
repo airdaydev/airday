@@ -1041,7 +1041,22 @@ impl Doc {
     /// first open. Device-2 bootstrap via snapshot bypasses this path
     /// entirely.
     pub fn new() -> Result<Self, DocError> {
+        Self::new_inner(LoroDoc::new())
+    }
+
+    /// As [`new`](Self::new), but with an explicit Loro peer id instead
+    /// of the default random one. The peer is set before builtin
+    /// seeding (so any seeded op would carry it) and before the
+    /// `UndoManager` binds to the local peer. The caller must guarantee
+    /// single ownership of `peer` across live docs — see
+    /// `spec/peer-id-plan.md`. `u64::MAX` is reserved by Loro.
+    pub fn new_with_peer(peer: u64) -> Result<Self, DocError> {
         let inner = LoroDoc::new();
+        inner.set_peer_id(peer)?;
+        Self::new_inner(inner)
+    }
+
+    fn new_inner(inner: LoroDoc) -> Result<Self, DocError> {
         if seed_builtins(&inner)? {
             inner.commit();
         }
@@ -1062,7 +1077,20 @@ impl Doc {
 
     /// Empty doc — used by device 2 before snapshot import.
     pub fn empty() -> Self {
+        Self::empty_inner(LoroDoc::new())
+    }
+
+    /// As [`empty`](Self::empty), but with an explicit Loro peer id —
+    /// same contract as [`new_with_peer`](Self::new_with_peer). Used by
+    /// `boot_doc` so replayed history and subsequent local commits share
+    /// the device's leased peer.
+    pub fn empty_with_peer(peer: u64) -> Result<Self, DocError> {
         let inner = LoroDoc::new();
+        inner.set_peer_id(peer)?;
+        Ok(Self::empty_inner(inner))
+    }
+
+    fn empty_inner(inner: LoroDoc) -> Self {
         let undo = Mutex::new(make_undo_manager(&inner));
         let item_index = Mutex::new(ProjectionIndex::default());
         let diff_capture = Arc::new(Mutex::new(DiffCapture::default()));
@@ -1145,6 +1173,11 @@ impl Doc {
     /// committed *during* the append isn't silently skipped.
     pub fn oplog_vv(&self) -> VersionVector {
         self.inner.oplog_vv()
+    }
+
+    /// The Loro peer id local commits are minted under.
+    pub fn peer_id(&self) -> u64 {
+        self.inner.peer_id()
     }
 
     /// True iff there are commits not yet captured into the local WAL.
@@ -4689,6 +4722,23 @@ mod tests {
             guard.visible_counts, fresh.visible_counts,
             "visible-entry counts out of sync with doc"
         );
+    }
+
+    /// spec/peer-id-plan.md: the `_with_peer` constructors bind the
+    /// explicit peer, local commits carry it, and Loro's reserved
+    /// `u64::MAX` is rejected.
+    #[test]
+    fn constructors_bind_explicit_peer() {
+        let doc = Doc::new_with_peer(7).unwrap();
+        assert_eq!(doc.peer_id(), 7);
+        doc.add_item(LIST_INBOX, "carried by peer 7").unwrap();
+        assert!(
+            doc.oplog_vv().get(&7).copied().unwrap_or(0) > 0,
+            "local commits must carry the explicit peer"
+        );
+        let doc = Doc::empty_with_peer(9).unwrap();
+        assert_eq!(doc.peer_id(), 9);
+        assert!(Doc::empty_with_peer(u64::MAX).is_err());
     }
 
     /// Not a correctness test — a quick order-of-magnitude probe for

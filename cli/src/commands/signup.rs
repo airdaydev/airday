@@ -118,7 +118,11 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     // goes in the same db; secrets.toml is written last — the "logged in"
     // marker.
     let storage = crate::storage::open_storage(&profile)?;
-    let doc = Doc::new()?;
+    // The seed below is real committed ops, so it must carry the leased
+    // peer id — `peer` stays in scope (lock held) until the snapshot is
+    // durably written (spec/peer-id-plan.md).
+    let peer = crate::peer::claim(&profile.dir, &storage)?;
+    let doc = Doc::new_with_peer(peer.peer_id)?;
     let welcome = doc.add_list("Welcome")?;
     doc.set_list_icon(&welcome, "👋")?;
     // Same onboarding content the web client seeds (see runtime.ts): a few

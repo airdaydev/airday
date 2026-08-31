@@ -97,7 +97,7 @@ fn offline_mutations_stay_bounded_and_restart_exactly() {
 
     // "Restart": fresh connection over the same file, full boot replay.
     let storage = SqliteStorage::open(&path).unwrap();
-    let (doc, meta) = boot_doc(&storage, &dek, doc_id()).unwrap();
+    let (doc, meta) = boot_doc(&storage, &dek, doc_id(), None).unwrap();
     assert_eq!(doc.fingerprint(), fingerprint, "exact state after restart");
     assert!(
         !doc.has_uncaptured_ops(),
@@ -242,4 +242,49 @@ fn complete_push_is_scoped_to_its_push_id() {
     let boot = storage.boot(doc_id()).unwrap();
     assert_eq!(boot.server_known_vv, b"vv2");
     assert!(boot.in_flight_push.is_none());
+}
+
+/// spec/peer-id-plan.md: a doc booted with the leased peer id resumes
+/// that peer's counter from replayed history, so sequential invocations
+/// leave exactly one peer entry in the version vector instead of one
+/// per invocation.
+#[test]
+fn leased_peer_is_stable_across_restarts() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("peer.sqlite");
+    let dek = Dek::generate();
+    const PEER: u64 = 42;
+
+    // Invocation 1: fresh profile, seeded doc, one mutation, persisted.
+    let counter_first = {
+        let storage = SqliteStorage::open(&path).unwrap();
+        let mut eng = engine_over(
+            storage,
+            dek.clone(),
+            Doc::new_with_peer(PEER).unwrap(),
+            &BootMeta::default(),
+        );
+        eng.doc_mut().add_item("inbox", "first run").unwrap();
+        eng.capture_local_ops().unwrap();
+        eng.doc().oplog_vv().get(&PEER).copied().unwrap()
+    };
+    assert!(counter_first > 0);
+
+    // Invocation 2: boot from storage under the same peer, mutate again.
+    let storage = SqliteStorage::open(&path).unwrap();
+    let (doc, meta) = boot_doc(&storage, &dek, doc_id(), Some(PEER)).unwrap();
+    assert_eq!(doc.peer_id(), PEER);
+    let mut eng = engine_over(storage, dek, doc, &meta);
+    eng.doc_mut().add_item("inbox", "second run").unwrap();
+    eng.capture_local_ops().unwrap();
+    let vv = eng.doc().oplog_vv();
+    assert!(
+        vv.get(&PEER).copied().unwrap() > counter_first,
+        "counter resumes past replayed history, never rewinds"
+    );
+    assert_eq!(
+        vv.iter().count(),
+        1,
+        "sequential invocations add no new peers"
+    );
 }
