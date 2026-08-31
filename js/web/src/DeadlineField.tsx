@@ -1,6 +1,7 @@
 // The task dialog's deadline control: an always-visible badge (clock icon +
 // "Deadline" when unset) that opens a small popover with quick actions —
-// Set date… (calendar modal), Tomorrow, and Remove date when one is set.
+// Set date… (calendar modal), Today, Tomorrow, and Remove date when one is
+// set.
 
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Show } from "solid-js";
@@ -58,6 +59,12 @@ export function DeadlineField(props: {
               }}
             >
               <span>{m().deadline.setDate}</span>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              class="dropdown-menu-item"
+              onSelect={() => props.onChange(todayStamp(nowMs()))}
+            >
+              <span>{m().deadline.today}</span>
             </DropdownMenu.Item>
             <DropdownMenu.Item
               class="dropdown-menu-item"

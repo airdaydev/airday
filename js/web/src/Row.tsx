@@ -346,6 +346,10 @@ export function Row(props: {
   };
   // Deadline actions apply to the whole target set (the selection when the
   // row is part of it, else this row alone), matching the done/bin actions.
+  const onDeadlineToday = () => {
+    const stamp = todayStamp(nowMs());
+    for (const id of targetIds()) props.app.setItemDeadline(id, stamp);
+  };
   const onDeadlineTomorrow = () => {
     const stamp = addDaysToStamp(todayStamp(nowMs()), 1);
     for (const id of targetIds()) props.app.setItemDeadline(id, stamp);
@@ -784,6 +788,12 @@ export function Row(props: {
                       <span>{m().deadline.setDate}</span>
                     </ContextMenu.Item>
                   </Show>
+                  <ContextMenu.Item
+                    class="context-menu-item"
+                    onSelect={onDeadlineToday}
+                  >
+                    <span>{m().deadline.today}</span>
+                  </ContextMenu.Item>
                   <ContextMenu.Item
                     class="context-menu-item"
                     onSelect={onDeadlineTomorrow}

@@ -2335,6 +2335,12 @@ input.task-check:hover {
   background: var(--bg-hover);
 }
 
+/* Spill-over days from adjacent months: dimmed but still pickable.
+   Sits before the today/selected rules so those states keep their color. */
+.calendar-cell-trigger[data-outside] {
+  color: var(--text-faint);
+}
+
 .calendar-cell-trigger[data-today] {
   font-weight: 700;
   color: var(--link);

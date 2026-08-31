@@ -52,6 +52,10 @@ export function DeadlineCalendarDialog(props: {
               mode="single"
               value={value()}
               initialMonth={value() ?? undefined}
+              // Adjacent months' spill-over days are real dates; corvu's
+              // default renders them but makes them inert, which reads as
+              // broken. Keep them pickable, just dimmed (see data-outside).
+              disableOutsideDays={false}
               onValueChange={(d) => {
                 if (d) props.onPick(localDateStamp(d));
                 props.setOpen(false);
@@ -100,6 +104,11 @@ export function DeadlineCalendarDialog(props: {
                                   <Calendar.CellTrigger
                                     day={day}
                                     class="calendar-cell-trigger"
+                                    data-outside={
+                                      day.getMonth() !== cal.month.getMonth()
+                                        ? ""
+                                        : undefined
+                                    }
                                   >
                                     {day.getDate()}
                                   </Calendar.CellTrigger>
