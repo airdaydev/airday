@@ -1,5 +1,5 @@
 # Roadmap
-- another one - we probably want to remove 'done' items positions in the main lists!
+- another one - we probably want to remove 'done' items positions in the main lists! - is this not done?
 - bug: mark multiple items as done then mark one of those as not done and list position changes!
 - onAuthFailed → logout() → dekVault.clear() - a little bit blunt and not quite in local-first spirit, wipe-dek-to-anonymous the wrong response
 - Themes
@@ -36,10 +36,6 @@ the per-impl `.slice()` discipline (and the calls themselves) can go. Cost: one 
 per call (negligible vs crypto + IDB). Before committing, verify wasm-bindgen's generated glue for the new
 signature actually yields an owned copy, not another view. Cross-ref: `spec/local-storage.md`
 §"Web boot + the bytes-copy gotcha".
-
-## Web app
-- Touch / mobile drag-and-drop support; current primavera DnD is desktop-first.
-- Browser automation harness. Manual smoke is still doing the job, but Playwright becomes worthwhile as a sanity check.
 
 ## Native clients
 - UniFFI bridge for iOS / Android over the existing `core` crate.
@@ -81,3 +77,4 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 - Consider SVG emojis that fit the theme
 - habit tracking?!
 - foreign keyboard shortcuts?
+- indexeddb smoke tests? do we have an in-mem storage adapter? via playwright?

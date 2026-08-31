@@ -156,12 +156,29 @@ Other sites:
 
 ## Out of scope (future)
 
-- Web: same shape - slot mapping in IndexedDB, lease via
+- Web (next up): same shape - slot mapping in IndexedDB, lease via
   `navigator.locks.request('airday-peer-<slot>', {ifAvailable: true})`,
   which the browser auto-releases on tab close/crash; acquisition in JS
-  before wasm doc construction, peer passed in as u64. A SharedWorker
-  owning a single doc instance would collapse web to one peer per
-  browser profile; the slot design does not fight that future.
+  before wasm doc construction, peer passed in as u64. Prod already
+  enforces one tab (`BrowserTabGate.tsx`, Web Lock `airday-single-tab`,
+  `!DEV` only), so the minimum web version is just stable slot 0 - the
+  pool only matters once multi-tab lands. Note the gate's escape
+  hatches (`?multiTab=1`, missing `navigator.locks` -> gate disabled):
+  today those are safe because peers are random per load; with a stable
+  peer they become corruption paths, so tie the peer claim to the same
+  lock acquisition that gates the tab (no lock held -> random peer).
+- Multi-tab web (later, decided direction): NOT a SharedWorker owning
+  the db (fights the platform: OPFS sync handles are dedicated-worker
+  only, SharedWorker support history is poor, and it turns every doc op
+  into RPC - tried before, rejected). Instead: every tab owns its own
+  wasm doc + slot peer; IndexedDB readwrite transactions serialise
+  cross-tab appends (derive `local_seq` inside the txn, not from
+  memory); commits fan out tab-to-tab over BroadcastChannel into
+  `apply_remote` (idempotent import, remote-origin undo exclusion both
+  already handle it); one leader per browser - Web Lock *without*
+  `ifAvailable`, auto-handover on close - owns the single WS, snapshot
+  folding, and acks. VV-derived push means the leader ships follower
+  ops with no forwarding protocol; the server still sees one device.
 - Hoisting the slot table/claim helper into `airday-storage-sqlite` for
   the Apple FFI build (trivial move under the one-migration rule).
 - Shallow-snapshot/gc trimming of ancient peers as a compaction-era
