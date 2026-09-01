@@ -116,6 +116,9 @@ export type Messages = {
     duplicate: string;
     moveToBin: string;
     moveToList: string;
+    /** Accessible name for the task dialog's lifecycle status badge —
+     *  opens the workflow-state menu. */
+    changeStatus: string;
     /** Placeholder / accessible name for the filter box in the move-to-list
      *  picker's popover. */
     searchLists: string;
@@ -397,6 +400,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       duplicate: "Duplicar",
       moveToBin: "Mover a la papelera",
       moveToList: "Mover a la lista",
+      changeStatus: "Cambiar estado",
       searchLists: "Buscar listas",
       moveItem: "Mover elemento",
       noMatchingLists: "No hay listas coincidentes",
@@ -617,6 +621,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       duplicate: "Duplicate",
       moveToBin: "Move to bin",
       moveToList: "Move to list",
+      changeStatus: "Change status",
       searchLists: "Search lists",
       moveItem: "Move item",
       noMatchingLists: "No matching lists",

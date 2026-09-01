@@ -8,9 +8,12 @@
 
 import { Dialog } from "@kobalte/core/dialog";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { laneLabel } from "./Board.tsx";
 import { DeadlineField } from "./DeadlineField.tsx";
 import { ListPicker, type ListOption } from "./ListPicker.tsx";
+import caretSortSvg from "./icons/caret-sort.svg?raw";
+import checkSvg from "./icons/check.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import drawingPinFilledSvg from "./icons/drawing-pin-filled.svg?raw";
@@ -30,6 +33,7 @@ import { trackOverlay } from "./overlay.ts";
 import {
   isBinned,
   isDone,
+  OPEN_STATES,
   type DocApp,
   type ItemView,
   type ListView,
@@ -159,6 +163,15 @@ export function TaskDialog(props: {
     const nw = newItemTarget();
     if (!nw) return;
     props.setNewItem?.({ ...nw, done });
+  };
+  // Re-target a new capture's lifecycle from the status badge. Done routes
+  // through the `done` flag (create open, mark done on commit — same as the
+  // header checkbox); an open state re-targets the lane and clears it.
+  const setNewItemState = (state: WorkflowState) => {
+    const nw = newItemTarget();
+    if (!nw) return;
+    if (state === "done") props.setNewItem?.({ ...nw, done: true });
+    else props.setNewItem?.({ ...nw, state, done: false });
   };
 
   const [text, setText] = createSignal("");
@@ -526,6 +539,13 @@ export function TaskDialog(props: {
               value={() => newItemListOption()?.id ?? null}
               onChange={setNewItemList}
             />
+            <LifecycleBadge
+              value={() => {
+                const nw = newItemTarget();
+                return nw?.done ? "done" : (nw?.state ?? "backlog");
+              }}
+              onChange={setNewItemState}
+            />
             <DeadlineField
               deadline={newDeadline}
               muted={() => newItemTarget()?.done ?? false}
@@ -652,6 +672,14 @@ export function TaskDialog(props: {
               value={() => it().listId}
               onChange={(id) => moveItemToList(id, it().listId)}
             />
+            {/* Lifecycle status badge: hidden while binned (the bin mask
+                overrides the workflow state; Restore is the way out). */}
+            <Show when={!isBinned(it())}>
+              <LifecycleBadge
+                value={() => it().state}
+                onChange={(state) => props.app.setLifecycle(it().id, state)}
+              />
+            </Show>
             <DeadlineField
               deadline={() => it().deadline ?? null}
               muted={() => isDone(it()) || isBinned(it())}
@@ -801,6 +829,66 @@ export function TaskDialog(props: {
         </Dialog.Portal>
       </Dialog>
     </Show>
+  );
+}
+
+/** The five pickable workflow states, in ladder order (the bin is not a
+ *  state — it's reached from the header menu, not from here). */
+const LIFECYCLE_CHOICES: readonly WorkflowState[] = [...OPEN_STATES, "done"];
+
+/** Lifecycle status badge beside the list picker: shows the item's current
+ *  workflow state and opens a menu of all five to move it in one commit.
+ *  Backed by `setLifecycle` for open items and by the new-item target
+ *  buffer in capture mode. */
+function LifecycleBadge(props: {
+  value: () => WorkflowState;
+  onChange: (state: WorkflowState) => void;
+}) {
+  const { m } = useAppI18n();
+  return (
+    <DropdownMenu>
+      <DropdownMenu.Trigger
+        class="badge task-dialog-lifecycle"
+        aria-label={m().workspace.changeStatus}
+        title={m().workspace.changeStatus}
+      >
+        <span class="task-dialog-lifecycle-value">
+          {laneLabel(m(), props.value())}
+        </span>
+        <span
+          class="task-dialog-list-caret"
+          aria-hidden="true"
+          innerHTML={caretSortSvg}
+        />
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content class="dropdown-menu-content task-dialog-lifecycle-menu">
+          <DropdownMenu.RadioGroup
+            value={props.value()}
+            onChange={(v) => props.onChange(v as WorkflowState)}
+          >
+            <For each={LIFECYCLE_CHOICES}>
+              {(state) => (
+                <DropdownMenu.RadioItem
+                  value={state}
+                  class="dropdown-menu-item task-dialog-lifecycle-item"
+                  // Radio items keep the menu open by default (built for
+                  // toggling); picking a state is a one-shot move, so close.
+                  closeOnSelect
+                >
+                  <span>{laneLabel(m(), state)}</span>
+                  <DropdownMenu.ItemIndicator
+                    class="task-dialog-lifecycle-check"
+                    aria-hidden="true"
+                    innerHTML={checkSvg}
+                  />
+                </DropdownMenu.RadioItem>
+              )}
+            </For>
+          </DropdownMenu.RadioGroup>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu>
   );
 }
 

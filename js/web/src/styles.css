@@ -1970,8 +1970,10 @@ input.task-check:hover {
 
 /* The ⋮ menu is portaled to <body>; lift it above the dialog overlay /
    positioner (z-index 100 / 101) so it doesn't render behind the dialog —
-   same fix as .device-menu-content in Settings. */
-.task-dialog-menu-content {
+   same fix as .device-menu-content in Settings. The lifecycle status menu
+   is portaled the same way and needs the same lift. */
+.task-dialog-menu-content,
+.task-dialog-lifecycle-menu {
   z-index: 110;
 }
 
@@ -2036,6 +2038,38 @@ input.task-check:hover {
 .task-dialog-list-caret svg {
   width: 12px;
   height: 12px;
+}
+
+/* Lifecycle status badge beside the list picker: same pill geometry and
+   hover/open lift as `.task-dialog-list`; opens the workflow-state menu. */
+.task-dialog-lifecycle {
+  appearance: none;
+  -webkit-appearance: none;
+  width: fit-content;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.task-dialog-lifecycle:hover,
+.task-dialog-lifecycle[data-expanded] {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.task-dialog-lifecycle-value {
+  white-space: nowrap;
+}
+
+/* Trailing check marking the current state in the menu. */
+.task-dialog-lifecycle-check {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.task-dialog-lifecycle-check svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* Created / completed stamp: sits in the header, right of the checkbox. */
