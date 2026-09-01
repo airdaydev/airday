@@ -72,6 +72,18 @@ impl Doc {
         })
     }
 
+    /// As [`create`](Doc::create), but minting under an explicit Loro
+    /// peer id (the device's slot peer, `spec/peer-id-plan.md`) instead
+    /// of a random one — set before the builtin seed commits, so even
+    /// the first ops carry it. The caller must hold the slot's Web Lock
+    /// for the life of this doc. `u64::MAX` is reserved by Loro.
+    #[wasm_bindgen(js_name = createWithPeer)]
+    pub fn create_with_peer(peer: u64) -> Result<Doc, JsError> {
+        Ok(Doc {
+            inner: CoreDoc::new_with_peer(peer).map_err(js_err)?,
+        })
+    }
+
     /// Empty doc — used when bootstrapping a second device that will
     /// receive the seed via the op stream.
     #[wasm_bindgen(js_name = empty)]
@@ -79,6 +91,23 @@ impl Doc {
         Doc {
             inner: CoreDoc::empty(),
         }
+    }
+
+    /// As [`empty`](Doc::empty), but with an explicit Loro peer id —
+    /// same contract as [`createWithPeer`](Doc::create_with_peer). The
+    /// peer is bound before the replay import so Loro resumes its
+    /// counter from the imported history.
+    #[wasm_bindgen(js_name = emptyWithPeer)]
+    pub fn empty_with_peer(peer: u64) -> Result<Doc, JsError> {
+        Ok(Doc {
+            inner: CoreDoc::empty_with_peer(peer).map_err(js_err)?,
+        })
+    }
+
+    /// The Loro peer id local commits are minted under (BigInt in JS).
+    #[wasm_bindgen(js_name = peerId)]
+    pub fn peer_id(&self) -> u64 {
+        self.inner.peer_id()
     }
 
     /// Decode a doc previously written via [`Doc::save`].

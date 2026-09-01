@@ -9,7 +9,7 @@
 
 import { createEffect, createSignal, onMount, Show } from "solid-js";
 import { Dek, Doc, EncryptedBlob } from "@airday/core/wasm";
-import { IdbStorage } from "@airday/core";
+import { IdbStorage, readOrMintPeerSlot } from "@airday/core";
 import { loadPrefs } from "./prefs.ts";
 import { api } from "./api.ts";
 import { dekVault } from "./sync/dekVault.ts";
@@ -20,7 +20,11 @@ import { createWorkspaceRuntime, type BootInfo } from "./sync/runtime.ts";
 import { SessionProvider, useSession } from "./SessionContext.tsx";
 import { clearAuthPromptDismissed } from "./nav.tsx";
 
-export function App() {
+export function App(props: {
+  /** True when this tab holds the `airday-single-tab` Web Lock — the
+   *  claim on peer slot 0. Without it, boot minted a random peer. */
+  singleTabLockHeld: boolean;
+}) {
   const { m, locale, direction } = useAppI18n();
   createEffect(() => {
     document.documentElement.lang = locale();
@@ -122,6 +126,7 @@ export function App() {
           >
             <BootGate
               session={s}
+              singleTabLockHeld={props.singleTabLockHeld}
               boot={boot()}
               bootError={bootError()}
               setBoot={setBoot}
@@ -169,6 +174,7 @@ async function createAnonymousSession(): Promise<Session> {
 
 function BootGate(props: {
   session: Session;
+  singleTabLockHeld: boolean;
   boot: BootInfo | null;
   bootError: string | null;
   setBoot: (b: BootInfo | null) => void;
@@ -192,16 +198,32 @@ function BootGate(props: {
       // falls back to defaults.
       const prefsPromise = loadPrefs(props.session.accountId).catch(() => null);
       const dek = props.session.dek;
-      const storage = await IdbStorage.open(props.session.primaryDocId);
+      // The slot-0 peer claim rides the storage open — holding the
+      // single-tab Web Lock (checked by `BrowserTabGate` before this
+      // mounts) IS the claim, so all that's left is reading the minted
+      // peer id. No lock → random peer, so a gate-disabled second tab
+      // can never share a peer with the holder.
+      const [storage, peerId] = await Promise.all([
+        IdbStorage.open(props.session.primaryDocId),
+        props.singleTabLockHeld ? readOrMintPeerSlot(0) : Promise.resolve(null),
+      ]);
       const rows = storage.bootRows();
+
+      // The peer must be bound at construction — before `Doc.create`'s
+      // builtin seed commits and before the replay import (Loro resumes
+      // the slot peer's counter from the imported history).
+      const create = () =>
+        peerId !== null ? Doc.createWithPeer(peerId) : Doc.create();
+      const empty = () =>
+        peerId !== null ? Doc.emptyWithPeer(peerId) : Doc.empty();
 
       let doc: Doc;
       let seeded = false;
       if (props.session.freshSignup) {
-        doc = Doc.create();
+        doc = create();
         seeded = true;
       } else if (rows.snapshot || rows.replay.length > 0) {
-        doc = Doc.empty();
+        doc = empty();
         if (rows.snapshot) {
           doc.replayOplogUpdate(
             dek.open(new EncryptedBlob(rows.snapshot.nonce, rows.snapshot.ciphertext)),
@@ -214,11 +236,11 @@ function BootGate(props: {
         doc.markPersisted();
       } else if (props.session.anonymous) {
         // Brand-new (or wiped) local-only doc — seed the built-ins.
-        doc = Doc.create();
+        doc = create();
         seeded = true;
       } else {
         // Authed device, empty local store — sync will send a snapshot.
-        doc = Doc.empty();
+        doc = empty();
       }
 
       props.setBoot({

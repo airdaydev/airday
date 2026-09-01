@@ -11,6 +11,7 @@ export {
   type InFlightPushJs,
 } from "./storage/idb-storage.ts";
 export { openAirdayDb, _resetAirdayDbForTests } from "./storage/web-db.ts";
+export { readOrMintPeerSlot } from "./storage/peer-slots.ts";
 export { getDevice, putDevice } from "./storage/device-store.ts";
 export {
   DekVault,

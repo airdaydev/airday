@@ -1,7 +1,8 @@
 # Peer id plan (CLI minimum version)
 
-Status: built (CLI). Scope here is the CLI only; the web analogue
-(Web Locks + IndexedDB) is sketched at the end but explicitly out of scope.
+Status: built (CLI; web single-tab slot 0, Sep 2026). The web interim
+version is described under "Web (built, interim)" at the end; the
+multi-slot pool and multi-tab remain future work.
 
 Note for existing dev profiles: `peer_slots` was added to
 `cli/migrations/001_init.sql` in place (pre-release rule), so a profile
@@ -154,20 +155,33 @@ Other sites:
 - Integration (`spec/testing.md` CLI driver): run N sequential mutating
   commands, assert the doc's VV has exactly one CLI peer entry.
 
-## Out of scope (future)
+## Web (built, interim: single-tab slot 0)
 
-- Web (next up): same shape - slot mapping in IndexedDB, lease via
-  `navigator.locks.request('airday-peer-<slot>', {ifAvailable: true})`,
-  which the browser auto-releases on tab close/crash; acquisition in JS
-  before wasm doc construction, peer passed in as u64. Prod already
-  enforces one tab (`BrowserTabGate.tsx`, Web Lock `airday-single-tab`,
-  `!DEV` only), so the minimum web version is just stable slot 0 - the
-  pool only matters once multi-tab lands. The `?multiTab=1` escape
-  hatch is removed; the remaining gate-disabled paths (DEV /
-  `VITE_ENFORCE_SINGLE_TAB=0`, missing `navigator.locks`) are safe
-  today because peers are random per load, but with a stable peer they
-  become corruption paths, so tie the peer claim to the same lock
-  acquisition that gates the tab (no lock held -> random peer).
+Same shape as the CLI, holding the pool at one slot until multi-tab
+lands:
+
+- Slot -> peer mapping in IndexedDB: `peer_slots` store (`web-db.ts`
+  v10, a pure additive upgrade - the v9 WAL survives; the v9 `ops`
+  drop/recreate is now gated on `oldVersion < 9`). Read-or-mint in one
+  readwrite transaction (`peer-slots.ts`), mirroring the CLI's
+  `read_or_mint_peer_slot`.
+- The claim IS the single-tab Web Lock: `BrowserTabGate.tsx` now
+  always requests `airday-single-tab` (ifAvailable) when the API
+  exists, gates rendering only when enforcing, and passes `lockHeld`
+  into `App`. Boot (`App.tsx`) reads the slot-0 peer concurrently with
+  `IdbStorage.open` and constructs via `Doc.createWithPeer` /
+  `Doc.emptyWithPeer` (new wasm exports, u64 as BigInt) only when the
+  lock is held; no lock -> random peer, exactly the pre-slot behavior.
+  So a gate-disabled tab (DEV second tab, `VITE_ENFORCE_SINGLE_TAB=0`,
+  missing `navigator.locks`) can never share a peer with the holder.
+  The `?multiTab=1` escape hatch is removed.
+- The peer binds at construction - before `create`'s builtin seed
+  commits and before the replay import (counter resume). There is
+  deliberately no set-peer-later API: the UndoManager binds to the
+  local peer at construction, and fresh-signup seed ops would otherwise
+  mint under a throwaway random peer on every new device.
+
+## Out of scope (future)
 - Multi-tab web (later, decided direction): NOT a SharedWorker owning
   the db (fights the platform: OPFS sync handles are dedicated-worker
   only, SharedWorker support history is poor, and it turns every doc op

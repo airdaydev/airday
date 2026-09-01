@@ -1,9 +1,19 @@
-// Single-tab gate. Airday assumes one active tab per browser (the
-// engine + IDB op log aren't built for concurrent writers), so we grab
-// a Web Lock on mount and only render `App` once we hold it. A second
-// tab fails to acquire the lock and shows a "already open elsewhere"
-// notice instead. The lock releases on cleanup, so closing the holding
-// tab lets a waiting one take over on its next mount.
+// Single-tab gate + slot-0 peer anchor. Airday assumes one active tab
+// per browser (the engine + IDB op log aren't built for concurrent
+// writers), so we grab a Web Lock on mount and only render `App` once
+// the outcome is known. In prod a second tab fails to acquire the lock
+// and shows an "already open elsewhere" notice; in dev (or with
+// `VITE_ENFORCE_SINGLE_TAB=0`) it renders anyway. The lock releases on
+// cleanup, so closing the holding tab lets a waiting one take over on
+// its next mount.
+//
+// The same lock acquisition anchors the stable Loro peer id
+// (`spec/peer-id-plan.md`): holding `airday-single-tab` is the claim
+// on peer slot 0, so `lockHeld` flows into boot and decides between
+// `Doc.createWithPeer` (slot peer) and `Doc.create` (random peer).
+// This coupling is deliberate — a tab that renders without the lock
+// (dev second tab, no `navigator.locks`) MUST mint under a random
+// peer, or two live docs share a peer and corrupt the CRDT.
 
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { useAppI18n } from "./i18n.tsx";
@@ -16,14 +26,14 @@ export function BrowserTabGate() {
   const [gate, setGate] = createSignal<"checking" | "allowed" | "blocked">(
     "checking",
   );
+  const [lockHeld, setLockHeld] = createSignal(false);
 
   onMount(() => {
-    if (!shouldEnforceSingleTab()) {
-      setGate("allowed");
-      return;
-    }
+    const enforce = shouldEnforceSingleTab();
     if (!("locks" in navigator) || !navigator.locks) {
-      console.warn("navigator.locks unavailable; single-tab gate disabled");
+      if (enforce) {
+        console.warn("navigator.locks unavailable; single-tab gate disabled");
+      }
       setGate("allowed");
       return;
     }
@@ -34,9 +44,10 @@ export function BrowserTabGate() {
       { ifAvailable: true },
       async (lock) => {
         if (!lock) {
-          setGate("blocked");
+          setGate(enforce ? "blocked" : "allowed");
           return;
         }
+        setLockHeld(true);
         setGate("allowed");
         await new Promise<void>((resolve) => {
           release = resolve;
@@ -59,7 +70,7 @@ export function BrowserTabGate() {
           </div>
         }
       >
-        <App />
+        <App singleTabLockHeld={lockHeld()} />
       </Show>
     </Show>
   );

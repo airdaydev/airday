@@ -33,11 +33,13 @@ const DB_NAME = "airday-web";
 // stores (`docs` / `ops` / `snapshots`) were created here, and
 // `airday-engine` abandoned. v9 is the WAL/VV separation
 // (spec/vv-wal-separation.md): `ops` becomes the pure crash-recovery
-// WAL (no more `clientOpId` / outbox role — it's recreated fresh, its
-// v8 rows abandoned; authed devices re-pull, and the snapshot baseline
-// carries anonymous docs), the `docs` row gains `serverKnownVv`, and
-// the new `inflight` store holds the single durable in-flight push.
-const DB_VERSION = 9;
+// WAL (no more `clientOpId` / outbox role — it was recreated fresh at
+// v9, its v8 rows abandoned; authed devices re-pull, and the snapshot
+// baseline carries anonymous docs), the `docs` row gains
+// `serverKnownVv`, and the `inflight` store holds the single durable
+// in-flight push. v10 adds `peer_slots` (stable Loro peer id per tab
+// slot, `spec/peer-id-plan.md`) — a pure addition; v9's WAL survives.
+const DB_VERSION = 10;
 
 // Config-plane stores.
 export const STORE_VAULT = "vault";
@@ -49,6 +51,7 @@ export const STORE_DOCS = "docs";
 export const STORE_OPS = "ops";
 export const STORE_SNAPSHOTS = "snapshots";
 export const STORE_INFLIGHT = "inflight";
+export const STORE_PEER_SLOTS = "peer_slots";
 export const INDEX_OPS_SERVER_SEQ = "docIdServerSeq";
 
 // Pre-v7 oplog/OPFS stores, deleted on upgrade if present. `ops` is in
@@ -79,6 +82,17 @@ export interface SnapshotRow {
   upToLocalSeq: number;
   ciphertext: Uint8Array;
   nonce: Uint8Array;
+  createdAt: number;
+}
+
+/** One row in the `peer_slots` store — the stable Loro peer id for one
+ *  tab slot (`spec/peer-id-plan.md`), the web analogue of the CLI's
+ *  sqlite `peer_slots` table. `peerIdHex` is the u64 as 16 lowercase
+ *  hex digits (IDB numbers can't hold a u64; BigInt can't be compared
+ *  as a key). Minted once per slot, then read forever. */
+export interface PeerSlotRow {
+  slot: number;
+  peerIdHex: string;
   createdAt: number;
 }
 
@@ -137,12 +151,16 @@ export function openAirdayDb(): Promise<IDBDatabase> {
 function openOnce(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (ev) => {
       const db = req.result;
-      // Drop the retired pre-v7 oplog/OPFS stores. The legacy `ops` store
-      // shares a name with the engine `ops` store created below, so it
-      // MUST be deleted before the engine store is (re)created.
-      for (const name of [...LEGACY_STORES, STORE_OPS]) {
+      // Drop the retired pre-v7 oplog/OPFS stores. Pre-v9 the `ops`
+      // store also carried outbox-era rows under the engine store's
+      // name, so upgrades from before v9 delete it too (its rows are
+      // abandoned — see the version history above) before the engine
+      // store is recreated. From v9 on `ops` is the crash-recovery WAL
+      // and MUST survive upgrades.
+      const dropOps = ev.oldVersion < 9;
+      for (const name of dropOps ? [...LEGACY_STORES, STORE_OPS] : LEGACY_STORES) {
         if (db.objectStoreNames.contains(name)) {
           db.deleteObjectStore(name);
         }
@@ -168,25 +186,29 @@ function openOnce(): Promise<IDBDatabase> {
       // Engine-data-plane stores. The logical model mirrors
       // `SqliteStorage` (CLI): one `docs` row per doc, an append-only
       // WAL (`ops`) keyed by `(docId, localSeq)`, one `snapshots` row
-      // per doc, one `inflight` push row per doc. `ops` is always
-      // created fresh here (the delete above cleared any prior-version
-      // store of the same name — v8's outbox-era rows are abandoned).
+      // per doc, one `inflight` push row per doc, one `peer_slots` row
+      // per tab slot.
       if (!db.objectStoreNames.contains(STORE_DOCS)) {
         db.createObjectStore(STORE_DOCS, { keyPath: "id" });
       }
-      const ops = db.createObjectStore(STORE_OPS, {
-        keyPath: ["docId", "localSeq"],
-      });
-      // Partial-unique by IDB's undefined-skipping rule (see header):
-      // serverSeq set on server-delivered rows → uniqueness among them.
-      ops.createIndex(INDEX_OPS_SERVER_SEQ, ["docId", "serverSeq"], {
-        unique: true,
-      });
+      if (!db.objectStoreNames.contains(STORE_OPS)) {
+        const ops = db.createObjectStore(STORE_OPS, {
+          keyPath: ["docId", "localSeq"],
+        });
+        // Partial-unique by IDB's undefined-skipping rule (see header):
+        // serverSeq set on server-delivered rows → uniqueness among them.
+        ops.createIndex(INDEX_OPS_SERVER_SEQ, ["docId", "serverSeq"], {
+          unique: true,
+        });
+      }
       if (!db.objectStoreNames.contains(STORE_SNAPSHOTS)) {
         db.createObjectStore(STORE_SNAPSHOTS, { keyPath: "docId" });
       }
       if (!db.objectStoreNames.contains(STORE_INFLIGHT)) {
         db.createObjectStore(STORE_INFLIGHT, { keyPath: "docId" });
+      }
+      if (!db.objectStoreNames.contains(STORE_PEER_SLOTS)) {
+        db.createObjectStore(STORE_PEER_SLOTS, { keyPath: "slot" });
       }
     };
     req.onsuccess = () => resolve(req.result);
