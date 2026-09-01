@@ -17,16 +17,25 @@ on right now", drawn from across every list, in one hand-curated order.
   top, and it's there when you sit down. Deferring to a date is a separate,
   deliberately un-prominent future feature (hard-landscape items only), out of
   scope here.
-- **A lens, not a home.** Acting on an item in Focus (mark Live/Done) mutates the
-  item everywhere, because it *is* the same item.
+- **A lens, not a home.** Acting on an item in Focus (a lifecycle change, mark
+  Done) mutates the item everywhere, because it *is* the same item.
 - **Flat, not a board.** Focus renders as one ordered flat list of Open items.
-  You can flip an item Live/Done from within it, but there are **no lanes** (no
-  Backlog/Live/Done split, no board lens). Keeping it flat is the point.
+  You can change an item's lifecycle from within it, but there are **no lanes**
+  (no per-state split, no board lens). Keeping it flat is the point.
 - **Feels finite.** Focus is kept small by construction — single-tier, flat, and
   auto-compacting on Done — not by a cap or a nag. Focus that grows without bound
   is Focus that has stopped meaning anything. (An earlier soft-threshold colour
   nudge on the nav count was tried and dropped; the count renders plainly, like
   every other list.)
+- **Focus is not In Progress.** With the v3 workflow ladder
+  (`spec/data-model.md`) it is tempting to derive Focus from
+  `state == InProgress` and delete the container. Rejected (Sep 2026), because
+  the concepts only *almost* coincide: workflow state is **contextual and
+  item-owned** — a stalled project legitimately holds In Progress items that
+  are nobody's current focus — and once sharing ships, state is shared truth
+  while Focus is personal attention. Focus also needs its own hand-curated
+  order, which a state-derived lens cannot carry. In Progress = the item's
+  position in its list's workflow; Focus = curated attention across lists.
 
 ## Why Focus can't reuse the list/order machinery
 
@@ -77,7 +86,7 @@ placeholder).
 visible(ref in focus) :=
      ref resolves to the local doc
   && items[ref.item_id] exists
-  && items[ref.item_id] is Open           # done_at == null && binned_at == null
+  && items[ref.item_id] is Open           # state <= Review && binned_at == null
   && no earlier visible ref has the same item_id     # dedup, first wins
 ```
 
@@ -192,7 +201,7 @@ event — so the web store must re-derive `focus_view` on **item events too**
   I working on now" entry. The count renders plainly, like every other list count
   (no special colour treatment).
 - The Focus view is a flat ordered list of `focus_view()`; drag-to-reorder reuses
-  the existing DnD infrastructure. Per-row actions: toggle Live, mark Done, and
+  the existing DnD infrastructure. Per-row actions: set lifecycle, mark Done, and
   **remove-from-focus as a single cheap gesture** (× / swipe). Removing must be as
   frictionless as adding — that's what keeps Focus lean.
 - A pinned list row carries a **static, non-interactive "Focus" badge** when it

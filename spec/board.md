@@ -5,68 +5,89 @@ Every list (including the reserved `inbox`) can be viewed as a board. Archiving
 a list (`spec/data-model.md` "Archived lists") changes nothing here: an
 archived list's board — lanes, order, saved view — remains intact and renders
 normally when the list is opened from the archived section. The board
-has **three fixed lanes** driven by item lifecycle — there are no user-created,
+has **five fixed lanes** driven by item lifecycle — there are no user-created,
 renamed, reordered, or deleted lanes:
 
 ```
-Backlog | Live | Done
+Backlog | Todo | In Progress | Review | Done
 ```
 
 Bin is **not** a lane. Binned items are the existing global discarded-items
 view (`spec/data-model.md`), reachable from the nav, not the board.
 
+The lane *set* is fixed; lane *visibility* is not. A client may hide lanes
+(see "Lane visibility" below) — a small board can render as few as two. Hiding
+is display-only and never changes any item's state.
+
 The flat list view and the board share one order. The list view shows the
-list's **Open** projection (Backlog + Live) in their single manual order;
-the board splits that same Open order into the Backlog and Live lanes and adds
-a Done lane. Moving an item between lanes changes its lifecycle
-(`spec/data-model.md` "Lifecycle"); it does not reorder anything by itself.
+list's **Open** projection (the four open states) in their single manual
+order — the list view is the binary done | other lens: everything Open, with
+Done and Binned elsewhere. The board splits that same Open order into the four
+open lanes by lifecycle state and adds a Done lane. Moving an item between
+lanes changes its lifecycle (`spec/data-model.md` "Lifecycle"); it does not
+reorder anything by itself.
 
 ## Lanes
 
-- **Backlog** — the list's Open items with `live != true`, in list order.
-- **Live** — the list's Open items with `live == true`, in list order.
-- **Done** — the list's items that are done-but-not-binned
-  (`done_at != null && binned_at == null`), sorted by `done_at` **descending**
+- **Backlog / Todo / In Progress / Review** — the list's Open items with the
+  matching lifecycle state, in list order.
+- **Done** — the list's done-but-not-binned items (`state == Done &&
+  binned_at == null`), sorted by the workflow register's `at` **descending**
   (id asc tiebreak). Scoped to the current list. This is the per-list slice of
   the global Done view.
 
-Backlog and Live **preserve relative order** from the list's Open projection:
+The open lanes **preserve relative order** from the list's Open projection:
 an item's position is the same whether you read `order/<list-id>` linearly or
-read the two lanes top-to-bottom. Flipping `live` moves an item between the two
-lanes without changing its underlying order entry.
+read the open lanes left-to-right, top-to-bottom. A lifecycle change moves an
+item between lanes without changing its underlying order entry.
+
+## Lane visibility
+
+Clients may hide any lane except one (at least one lane always renders).
+Hiding is a client-local display preference (it travels with neither the doc
+nor the saved default view — see "Default view" for the one synced exception,
+`board:nodone`):
+
+- A hidden lane's items keep their state and their place in the shared Open
+  order; they simply don't render on this client.
+- A hidden lane is not a drop target; drags land only on visible lanes.
+- Whether a hidden lane shows a collapsed stub (name + count) or vanishes
+  entirely is a client presentation choice, not spec'd here.
+
+This is what keeps five states from imposing five columns: a solo user can run
+`Backlog | In Progress | Done`, or even just `In Progress | Done`, while a
+team list shows all five.
 
 ## Projection
 
 - The board reads the list's Open projection (the core's per-list `open`
-  index — see `spec/data-model.md`) and partitions it by the `live` flag on
-  each `ItemView`. No new core projection is needed; Backlog and Live are two
-  views of one ordered array.
+  index — see `spec/data-model.md`) and partitions it by
+  `ItemView::lifecycle()` into the four open lanes. No new core projection is
+  needed; the open lanes are four views of one ordered array.
 - Done is a timestamp sort over the list's done-but-not-binned items, exactly
   the global Done view filtered to this `list_id`.
-- `ItemView` carries `live`, `done_at`, `binned_at`; `ItemView::lifecycle()`
-  resolves the displayed lane by precedence.
+- `ItemView` carries the lifecycle state and its `at` timestamp; the state is
+  the displayed lane.
 
 ## Interactions
 
-Every lane move is one `set_item_lifecycle` commit (`spec/data-model.md`):
+Every lane move is one `set_item_lifecycle` commit (`spec/data-model.md`) —
+the target lane *is* the target state, uniformly:
 
-- **Drop into Backlog** — set lifecycle Backlog (clear `live`, `done_at`,
-  `binned_at`). If the drop names a target position in the shared Open order,
-  fold a `move_item` reorder into the same commit.
-- **Drop into Live** — set lifecycle Live (`live = true`; clear `done_at`,
-  `binned_at`), same optional reorder.
-- **Drop into Done** — set lifecycle Done (set `done_at`; clear `binned_at`;
-  **preserve `live`**), so un-doing later reveals the correct Backlog/Live
-  lane. Done is timestamp-ordered, so a drop position within Done is ignored.
-- **Drop from Done into Backlog / Live** — the target lane explicitly selects
-  the lifecycle (Backlog clears `live`, Live sets it); `done_at` clears.
+- **Drop into an open lane** (Backlog / Todo / In Progress / Review) — set
+  that lifecycle state. If the drop names a target position in the shared
+  Open order, fold a `move_item` reorder into the same commit.
+- **Drop into Done** — set lifecycle Done. Done is timestamp-ordered, so a
+  drop position within Done is ignored.
+- **Drop from Done into an open lane** — set that state; the item reappears in
+  the Open order at its preserved entry position (drops naming a position fold
+  the reorder in, as above).
 
 ## Capture
 
-- Adding in the **Backlog** lane creates the item directly as Backlog (normal
-  `add_item` — `live` omitted).
-- Adding in the **Live** lane creates the item directly as Live (`add_item`
-  then set Live, or an add variant that sets `live` in the same commit).
+- Adding in an **open lane** creates the item directly in that lane's state
+  (`add_item` — the `lifecycle` field omitted for Backlog; an add variant sets
+  `[state, now]` in the same commit for the other three).
 - The list view's capture creates Backlog items (`add` default).
 
 ## Default view
@@ -86,6 +107,13 @@ concurrent save on another device replaces it atomically rather than merging a
 mode from one device with a lane flag from another (same rationale as
 `Location`). The list lens carries no Done-lane state — it always encodes as
 bare `"list"` — so two specs that render identically also compare identically.
+
+`"board:nodone"` (hide the Done lane) remains the only lane-visibility state
+that syncs. Open-lane visibility is **client-local only** for now (see "Lane
+visibility"); whether the saved default should some day carry a full visible-
+lane set (e.g. `"board:backlog,inprogress,done"`) is an **open question** —
+the register's unparseable ⇒ absent rule means such an extension degrades
+safely on older clients, so nothing needs deciding before it's wanted.
 
 Resolution, per list, on every client:
 
@@ -121,14 +149,17 @@ local override (if any)  →  saved default (if any)  →  built-in flat list
   doc and clears this client's override for that list (it now follows the
   default it just set). The action is disabled when the current view already is
   the saved default.
-- Board renders three fixed lanes; there are no lane CRUD, rename, reorder, or
-  menu affordances. The generic drag-and-drop infrastructure (placeholder,
-  nudge, foreign-lane drop targets, one-transaction remove+insert) is retained;
-  only custom-column-specific behaviour is removed.
-- A Backlog↔Live drag is a same-list lifecycle change: the item is **not**
-  spliced out of the list's Open array (`listOpen`), it stays in place and its
-  lane is recomputed from `live`. Only Done/Binned transitions remove it from
-  `listOpen`.
+- Board renders the five fixed lanes (minus locally hidden ones); there are no
+  lane CRUD, rename, reorder, or menu affordances. The generic drag-and-drop
+  infrastructure (placeholder, nudge, foreign-lane drop targets,
+  one-transaction remove+insert) is retained; only custom-column-specific
+  behaviour is removed.
+- Open-lane visibility lives beside the view override in `localStorage`
+  (client-local, per list). Hiding never mutates the doc.
+- A drag between open lanes is a same-list lifecycle change: the item is
+  **not** spliced out of the list's Open array (`listOpen`), it stays in place
+  and its lane is recomputed from the lifecycle state. Only Done/Binned
+  transitions remove it from `listOpen`.
 
 ## Future
 
