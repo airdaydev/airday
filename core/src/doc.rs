@@ -1236,6 +1236,32 @@ impl Doc {
         }
     }
 
+    /// Oplog counter end of the local peer — how many ops this peer id
+    /// has ever committed, imported history included.
+    fn local_peer_counter(&self) -> i32 {
+        self.inner
+            .oplog_vv()
+            .get(&self.inner.peer_id())
+            .copied()
+            .unwrap_or(0)
+    }
+
+    /// Re-bind the per-session UndoManager at the current oplog frontier.
+    ///
+    /// Loro's UndoManager advances its internal "next counter" only on
+    /// Local-triggered events; an *import* that carries ops for the
+    /// local peer (boot replay under a stable leased peer id, or a
+    /// snapshot minted under a reused peer slot — see
+    /// `spec/peer-id-plan.md`) leaves it stale, so the next local commit
+    /// would record one undo span stretching back through the imported
+    /// history. Recreating the manager clears both stacks, which is
+    /// sound: same-peer ops arriving by import were never produced by
+    /// this session and must not be undoable here.
+    fn rearm_undo(&self) {
+        let mut um = self.undo.lock().expect("undo mutex poisoned");
+        *um = make_undo_manager(&self.inner);
+    }
+
     fn begin_diff_capture(&self, mode: DiffCaptureMode) {
         let mut capture = self.diff_capture.lock().expect("diff capture poisoned");
         capture.diffs.clear();
@@ -3257,6 +3283,10 @@ impl Doc {
     /// domain events: historical state is materialized explicitly by the
     /// attaching UI, not presented as live mutations.
     pub fn finish_oplog_replay(&self) {
+        // Replayed rows may carry the local leased peer's own history;
+        // re-bind the UndoManager at the post-replay frontier so the
+        // first local commit's undo span starts here, not at counter 0.
+        self.rearm_undo();
         self.rebuild_index();
         if let Ok(mut capture) = self.diff_capture.lock() {
             capture.mode = DiffCaptureMode::None;
@@ -3323,6 +3353,7 @@ impl Doc {
     {
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
+        let pre_peer_counter = self.local_peer_counter();
         self.begin_diff_capture(DiffCaptureMode::Import);
 
         let mut imported_vv = VersionVector::new();
@@ -3332,6 +3363,14 @@ impl Doc {
             Ok::<(), DocError>(())
         });
         let diffs = self.finish_diff_capture();
+        // A blob advancing the *local* peer's counter is this device's
+        // own history arriving by import (boot replay, reused peer
+        // slot); the UndoManager must re-bind past it or the next local
+        // commit's undo step swallows it. Applies on the error path too:
+        // earlier blobs in the batch may have landed.
+        if self.local_peer_counter() != pre_peer_counter {
+            self.rearm_undo();
+        }
         if let Err(e) = result {
             // A batch may have applied earlier blobs before a later one
             // failed — resync events for whatever landed, then surface
@@ -7952,6 +7991,60 @@ mod tests {
         assert!(!doc.can_undo());
         assert!(!doc.can_redo());
         assert!(!doc.undo().unwrap());
+    }
+
+    #[test]
+    fn undo_after_same_peer_oplog_replay_spares_replayed_history() {
+        // Stable leased peer ids mean boot replay carries the *same*
+        // peer the live UndoManager is bound to. Loro only advances the
+        // manager's internal counter on Local events, so without the
+        // finish_oplog_replay re-arm the first local commit after boot
+        // records one span stretching back to counter 0 — a single undo
+        // would revert the entire replayed history (e.g. a whole JSON
+        // import from the previous session).
+        const PEER: u64 = 7;
+        let source = Doc::new_with_peer(PEER).unwrap();
+        let kept_a = source.add_item(LIST_INBOX, "imported a").unwrap();
+        let kept_b = source.add_item(LIST_INBOX, "imported b").unwrap();
+        let updates = source.export_updates_after_bytes(&[]).unwrap();
+
+        let mut restored = Doc::empty_with_peer(PEER).unwrap();
+        restored.replay_oplog_update(&updates).unwrap();
+        restored.finish_oplog_replay();
+        assert!(!restored.can_undo());
+
+        let fresh = restored.add_item(LIST_INBOX, "post-boot").unwrap();
+        assert!(restored.undo().unwrap());
+
+        assert!(restored.get_item(&fresh).is_none());
+        assert_eq!(restored.get_item(&kept_a).unwrap().text, "imported a");
+        assert_eq!(restored.get_item(&kept_b).unwrap().text, "imported b");
+        assert!(!restored.can_undo());
+    }
+
+    #[test]
+    fn undo_after_same_peer_remote_blob_spares_imported_history() {
+        // Same hazard through the encrypted-blob path (native boot_doc
+        // replay, or a mid-session snapshot minted under a reused peer
+        // slot): an import that advances the local peer's counter must
+        // re-arm the UndoManager so the next local commit's undo span
+        // starts after the imported ops.
+        const PEER: u64 = 11;
+        let dek = Dek::generate();
+        let mut source = Doc::new_with_peer(PEER).unwrap();
+        let kept = source.add_item(LIST_INBOX, "imported").unwrap();
+        let blob = source.pending_export(&dek).unwrap().unwrap();
+
+        let mut restored = Doc::empty_with_peer(PEER).unwrap();
+        restored.apply_remote(&dek, &blob).unwrap();
+        restored.drain_events();
+
+        let fresh = restored.add_item(LIST_INBOX, "post-import").unwrap();
+        assert!(restored.undo().unwrap());
+
+        assert!(restored.get_item(&fresh).is_none());
+        assert_eq!(restored.get_item(&kept).unwrap().text, "imported");
+        assert!(!restored.can_undo());
     }
 
     #[test]
