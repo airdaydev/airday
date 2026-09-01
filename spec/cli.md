@@ -18,17 +18,19 @@ Single binary `airday`. Subcommands:
 - `airday devices revoke <device_id>`
 
 ### Items
-- `airday add <text> [--list <list>]` — `<text>` of `-` reads from stdin; one item per non-blank line. New items are created in **Backlog** (the `live` flag is omitted).
+- `airday add <text> [--list <list>]` — `<text>` of `-` reads from stdin; one item per non-blank line. New items are created in **Backlog** (the workflow register is omitted).
 - `airday ls [--list <list>]`
-- `airday backlog <item_id>` — lifecycle → Backlog (clear `live`, `done_at`, `binned_at`)
-- `airday live <item_id>` — lifecycle → Live (set `live`; clear `done_at`, `binned_at`)
-- `airday done <item_id>` — lifecycle → Done (preserves the underlying Backlog/Live state)
-- `airday bin <item_id>` — lifecycle → Binned (preserves the underlying state)
-- `airday restore <item_id>` — clear the bin overlay only; reveals the preserved lifecycle (Backlog / Live / Done)
+- `airday backlog <item_id>` — workflow → Backlog
+- `airday todo <item_id>` — workflow → Todo
+- `airday start <item_id>` — workflow → In Progress (stamps `started_at` on first entry)
+- `airday review <item_id>` — workflow → Review
+- `airday done <item_id>` — workflow → Done (stamps `done_at`)
+- `airday bin <item_id>` — set the bin mask (`binned_at`); the workflow register is preserved
+- `airday restore <item_id>` — clear the bin mask only; reveals the preserved workflow state (Backlog / Todo / In Progress / Review / Done)
 - `airday mv <item_id> <list>`
 - `airday edit <item_id> <text>`
 
-Lifecycle is derived by precedence (Binned > Done > Live > Backlog) from the stored `live` flag plus `done_at` / `binned_at` timestamps — see `spec/data-model.md`. Each transition is a single commit.
+Lifecycle is the atomic `lifecycle` workflow register (`[state, at]`, states Backlog | Todo | In Progress | Review | Done) masked by the orthogonal `binned_at` bin flag — see `spec/data-model.md` "Lifecycle". Each workflow command writes the register `[state, now]` (and clears any bin mask) in a single commit; re-applying the current resolved state is a no-op. `ls` boxes carry a one-character state mark (` ` backlog, `-` todo, `>` in progress, `?` review, `x` done, `~` binned).
 
 ### Focus
 The curated single-tier Focus lens (`spec/focus.md`). References items across lists; the item stays in its home list.

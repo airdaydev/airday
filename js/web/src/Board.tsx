@@ -1,24 +1,27 @@
 // Board view of one list (spec/board.md). A second lens over the same
-// Open projection the list view renders: three fixed lanes driven by
-// item lifecycle — Backlog | Live | Done — with no user-created,
-// renamed, reordered, or deleted lanes.
+// Open projection the list view renders: five fixed lanes driven by
+// item lifecycle — Backlog | Todo | In Progress | Review | Done — with
+// no user-created, renamed, reordered, or deleted lanes. The lane *set*
+// is fixed; lane *visibility* is not: a client may hide lanes (all but
+// one), a display-only local preference owned by the workspace.
 //
-// Backlog and Live are two views of the list's single Open order,
-// partitioned by each item's `live` flag; Done is the list's
-// done-but-not-binned items, timestamp-sorted. Every lane hosts its own
-// Dnd instance, so within-lane reorders use the standard
-// placeholder/nudge machinery. Cross-lane drops ride the dnd's
+// The four open lanes are views of the list's single Open order,
+// partitioned by each item's workflow register state; Done is the list's
+// done-but-not-binned items, sorted by the register's transition time.
+// Every lane hosts its own Dnd instance, so within-lane reorders use the
+// standard placeholder/nudge machinery. Cross-lane drops ride the dnd's
 // foreign-drop-zone contract: each lane carries a `data-drop-column-id`,
 // a document-level `primavera-dnd-dragend` listener hit-tests the
 // pointer and consumes the drag (preventDefault suppresses the source
 // lane's snap-back reorder), and the move maps to a `setItemLifecycle`
-// (Backlog/Live/Done) — the lane-drop primitive — plus an optional
-// same-commit reorder within the shared Open order.
+// (the target lane *is* the target state) — the lane-drop primitive —
+// plus an optional same-commit reorder within the shared Open order.
 
 import {
   createEffect,
   createMemo,
   createSignal,
+  For,
   onCleanup,
   Show,
 } from "solid-js";
@@ -26,24 +29,40 @@ import { Dnd, DndSelection, type DndImperative, type DndOp } from "./dnd/solid";
 import type { DndDragEventDetail } from "./dnd";
 import checkSvg from "./icons/check.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
-import { useAppI18n } from "./i18n.tsx";
+import { useAppI18n, type Messages } from "./i18n.tsx";
 import { isOverlayOpen } from "./overlay.ts";
 import { Row } from "./Row.tsx";
 import { planReorderMoves } from "./reorder.ts";
 import {
   isBinned,
   isDone,
+  OPEN_STATES,
   type DocApp,
   type ItemView,
-  type Lifecycle,
+  type WorkflowState,
 } from "./sync/store.ts";
 
-/** Fixed lane keys — used as DOM `data-drop-column-id` attributes and as
- *  the keys of the per-lane handle / selection maps. Item ids are uuid-v7
- *  hex or `main`, so these plain words can never collide with one. */
-const BACKLOG_LANE = "backlog";
-const LIVE_LANE = "live";
-const DONE_LANE = "done";
+/** Fixed lane keys — the workflow state names plus `done`; used as DOM
+ *  `data-drop-column-id` attributes and as the keys of the per-lane
+ *  handle / selection maps. Item ids are uuid-v7 hex or `inbox`, so
+ *  these plain words can never collide with one. */
+const DONE_LANE: WorkflowState = "done";
+
+/** Localized lane header label for a lane key. */
+export function laneLabel(m: Messages, lane: WorkflowState): string {
+  switch (lane) {
+    case "backlog":
+      return m.board.backlogLane;
+    case "todo":
+      return m.board.todoLane;
+    case "in_progress":
+      return m.board.inProgressLane;
+    case "review":
+      return m.board.reviewLane;
+    case "done":
+      return m.board.doneLane;
+  }
+}
 
 /** Imperative handle the workspace holds to steer focus back into the
  *  board (e.g. after the detail dialog closes), mirroring the list view's
@@ -84,18 +103,24 @@ export function Board(props: {
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
-  /** Open the new-item dialog targeting a lane (`live` = Live lane,
-   *  otherwise Backlog). */
-  onAddItem: (listId: string, live: boolean, done?: boolean) => void;
+  /** Open the new-item dialog targeting a lane: an open workflow state,
+   *  or `done: true` for the Done lane's log-a-completion capture. */
+  onAddItem: (listId: string, state: WorkflowState, done?: boolean) => void;
   /** Ids to select and scroll into view once they land in their (shared)
    *  lane — a "+" capture, a duplicated block, or a find pick; `null`
    *  when nothing pending. */
   revealIds?: () => string[] | null;
   /** Called by the board once it has revealed `revealIds`. */
   clearReveal?: () => void;
-  /** Whether the Done lane is shown (local per-list preference owned by
-   *  the workspace). Defaults to shown when absent. */
+  /** Whether the Done lane is shown (per-list view preference owned by
+   *  the workspace; the one lane-visibility bit that can sync via the
+   *  saved default view). Defaults to shown when absent. */
   showDoneColumn?: () => boolean;
+  /** Which *open* lanes render — client-local, display-only lane hiding
+   *  (spec/board.md "Lane visibility"), owned by the workspace. Hidden
+   *  lanes don't render and are not drop targets. Defaults to all four.
+   *  The workspace guarantees at least one lane stays visible. */
+  visibleOpenLanes?: () => readonly WorkflowState[];
   /** Publishes the board's active (most recently populated) lane
    *  selection, or `null` when nothing is selected, so the workspace's
    *  global item shortcuts can act on it. */
@@ -108,26 +133,31 @@ export function Board(props: {
   const app = props.app;
   const state = app.state;
 
-  // Open projection partitioned by the `live` flag into the Backlog and
-  // Live lanes. One walk of the list's Open array; both lanes preserve
-  // the shared relative order (spec/board.md).
-  const laneMembers = createMemo((): { backlog: ItemView[]; live: ItemView[] } => {
-    const backlog: ItemView[] = [];
-    const live: ItemView[] = [];
+  // Open projection partitioned by each item's workflow register state
+  // into the four open lanes. One walk of the list's Open array; every
+  // lane preserves the shared relative order (spec/board.md).
+  const laneMembers = createMemo((): Record<WorkflowState, ItemView[]> => {
+    const lanes: Record<WorkflowState, ItemView[]> = {
+      backlog: [],
+      todo: [],
+      in_progress: [],
+      review: [],
+      done: [],
+    };
     for (const id of state.listOpen[props.listId] ?? []) {
       const it = state.itemsById[id];
       if (!it) continue;
-      (it.live ? live : backlog).push(it);
+      lanes[it.state].push(it);
     }
-    return { backlog, live };
+    return lanes;
   });
 
   // Members of the Done lane: this list's done-but-not-binned items,
-  // newest-done first — the same slice (and sort) the list view's Done
-  // filter and the global Done view use. Not order-container backed: the
-  // board's Open projection only covers open items, so this is a
-  // timestamp scan of `itemsById` scoped to the list. Runs only while a
-  // board is mounted.
+  // newest-done first (the workflow register's `at`) — the same slice
+  // (and sort) the list view's Done filter and the global Done view use.
+  // Not order-container backed: the board's Open projection only covers
+  // open items, so this is a scan of `itemsById` scoped to the list.
+  // Runs only while a board is mounted.
   const doneMembers = createMemo((): ItemView[] => {
     const out: ItemView[] = [];
     for (const it of Object.values(state.itemsById)) {
@@ -135,28 +165,28 @@ export function Board(props: {
         out.push(it);
       }
     }
-    out.sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
+    out.sort((a, b) => b.lifecycleAt - a.lifecycleAt);
     return out;
   });
 
   // Resolve a lane key to its member list.
-  const membersOf = (laneKey: string): ItemView[] => {
-    if (laneKey === DONE_LANE) return doneMembers();
-    if (laneKey === LIVE_LANE) return laneMembers().live;
-    return laneMembers().backlog;
-  };
+  const membersOf = (laneKey: WorkflowState): ItemView[] =>
+    laneKey === DONE_LANE ? doneMembers() : laneMembers()[laneKey];
 
-  // Whether the Done lane is rendered (workspace preference).
+  // Which lanes render, in fixed left-to-right order. Open-lane hiding is
+  // client-local and display-only; the Done lane bit can ride the saved
+  // default view ("board:nodone").
   const doneVisible = (): boolean => props.showDoneColumn?.() ?? true;
+  const visibleOpen = (): readonly WorkflowState[] =>
+    props.visibleOpenLanes?.() ?? OPEN_STATES;
 
   // Which lane a card currently lives in. A done card's home is the Done
-  // lane regardless of its (preserved) `live` flag, so drops back onto its
-  // own lane no-op and drops elsewhere un-done it.
-  const sourceLaneOf = (id: string): string => {
+  // lane; a binned card never renders here.
+  const sourceLaneOf = (id: string): WorkflowState => {
     const it = state.itemsById[id];
-    if (!it) return BACKLOG_LANE;
+    if (!it) return "backlog";
     if (isDone(it) && !isBinned(it)) return DONE_LANE;
-    return it.live ? LIVE_LANE : BACKLOG_LANE;
+    return it.state;
   };
 
   // End-of-lane drops have no `beforeKey`; anchor on the first Open item
@@ -181,8 +211,8 @@ export function Board(props: {
   };
 
   // Within-lane reorder: map the lane-local drop to moves in the shared
-  // Open order. The `live` flag is untouched — same lane, same lifecycle.
-  const reorderWithin = (laneKey: string, op: DndOp<ItemView>): void => {
+  // Open order. The register is untouched — same lane, same lifecycle.
+  const reorderWithin = (laneKey: WorkflowState, op: DndOp<ItemView>): void => {
     if (op.type !== "move") return;
     const moved = op.keys.map(String);
     const memberIds = membersOf(laneKey).map((it) => it.id);
@@ -206,8 +236,8 @@ export function Board(props: {
   // reads back the previewed insertion slot at drop time — so the drop
   // lands exactly where the preview showed. This is the shared
   // "DragContext": the board coordinates its lanes.
-  const laneHandles = new Map<string, DndImperative>();
-  const registerHandle = (laneKey: string, handle: DndImperative | null) => {
+  const laneHandles = new Map<WorkflowState, DndImperative>();
+  const registerHandle = (laneKey: WorkflowState, handle: DndImperative | null) => {
     if (handle) laneHandles.set(laneKey, handle);
     else laneHandles.delete(laneKey);
   };
@@ -225,7 +255,7 @@ export function Board(props: {
   // recently populated one) and publishes it upward, so the workspace's
   // global item shortcuts (Enter/open, x/done, ⌫/bin, ⌘C, ⌘D) act on the
   // board selection just as they do on the list view's single selection.
-  const laneSelections = new Map<string, DndSelection>();
+  const laneSelections = new Map<WorkflowState, DndSelection>();
   const [activeSelection, setActiveSelection] =
     createSignal<DndSelection | null>(null);
   // Bring a lane's column fully into the board strip's horizontal view.
@@ -233,12 +263,12 @@ export function Board(props: {
   // column no-ops, a partly-clipped one slides just past its near edge
   // (plus `.board-col`'s scroll-margin gutter), and one wider than the
   // viewport aligns its near edge — the "if possible" case.
-  const ensureLaneVisible = (laneKey: string): void => {
+  const ensureLaneVisible = (laneKey: WorkflowState): void => {
     boardRef
       ?.querySelector(`[data-drop-column-id="${laneKey}"]`)
       ?.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
   };
-  const selectionFor = (laneKey: string): DndSelection => {
+  const selectionFor = (laneKey: WorkflowState): DndSelection => {
     let s = laneSelections.get(laneKey);
     if (!s) {
       const sel = new DndSelection();
@@ -273,7 +303,7 @@ export function Board(props: {
   // actually landed (their order is then known, so the block ranges are
   // correct regardless of effect timing).
   const [pendingSelect, setPendingSelect] = createSignal<{
-    laneKey: string;
+    laneKey: WorkflowState;
     ids: string[];
   } | null>(null);
   createEffect(() => {
@@ -331,6 +361,17 @@ export function Board(props: {
       .querySelectorAll<HTMLElement>(".board-col[data-drop-active]")
       .forEach((el) => delete el.dataset.dropActive);
   };
+  // Resolve a hovered element's lane key; anything unexpected reads as
+  // Backlog (the keys are our own dataset values).
+  const laneKeyOf = (el: HTMLElement): WorkflowState => {
+    const raw = el.dataset.dropColumnId;
+    return raw === "todo" ||
+      raw === "in_progress" ||
+      raw === "review" ||
+      raw === "done"
+      ? raw
+      : "backlog";
+  };
   const onDragMove = (e: Event) => {
     const ce = e as CustomEvent<DndDragEventDetail>;
     if (!isItemDrag(ce.detail)) return;
@@ -352,11 +393,8 @@ export function Board(props: {
     // The hovered lane is a *foreign* drop target only when it's a
     // different lane from where the dragged rows currently live.
     const targetLane =
-      el &&
-      !keys.every(
-        (k) => sourceLaneOf(k) === (el.dataset.dropColumnId ?? BACKLOG_LANE),
-      )
-        ? (el.dataset.dropColumnId ?? BACKLOG_LANE)
+      el && !keys.every((k) => sourceLaneOf(k) === laneKeyOf(el))
+        ? laneKeyOf(el)
         : null;
     // Preview the drop in the hovered foreign lane; clear every other
     // lane (including the source, whose own controller suppresses its
@@ -375,7 +413,7 @@ export function Board(props: {
       return;
     }
     const el = findLaneAt(ce.detail.x, ce.detail.y);
-    const laneKey = el ? (el.dataset.dropColumnId ?? BACKLOG_LANE) : null;
+    const laneKey = el ? laneKeyOf(el) : null;
     const keys = ce.detail.keys.map(String);
     // Same-lane (or off-board) drop → the source lane's internal reorder
     // owns it; nothing to consume here. (Done→Done lands here too: the
@@ -406,20 +444,21 @@ export function Board(props: {
     if (inOrder.length === 0) return;
 
     if (laneKey === DONE_LANE) {
-      // Drop into Done → mark the (open) rows done. Their `live` flag is
-      // preserved by the core, so un-doning later returns them to their
-      // Backlog/Live lane (spec/board.md).
+      // Drop into Done → mark the (open) rows done. Done is
+      // timestamp-ordered, so the drop position is ignored
+      // (spec/board.md).
       app.setLifecycleMany(inOrder, "done");
     } else if (sourceIsDone) {
-      // Drop a done row onto Backlog/Live → the target lane selects the
-      // lifecycle (clears done). Its order entry was preserved, so it
-      // reappears at its former Open slot; precise vertical placement
-      // within the lane is out of scope here.
-      app.setLifecycleMany(inOrder, laneKey === LIVE_LANE ? "live" : "backlog");
+      // Drop a done row onto an open lane → that lane *is* the target
+      // state. Its order entry was preserved, so it reappears at its
+      // former Open slot; precise vertical placement within the lane is
+      // out of scope here.
+      app.setLifecycleMany(inOrder, laneKey);
     } else {
-      // Backlog↔Live cross-lane drop: flip `live` and place the rows
-      // before the previewed anchor in the shared Open order, one commit.
-      const target: Lifecycle = laneKey === LIVE_LANE ? "live" : "backlog";
+      // Open→open cross-lane drop: write the target lane's state and
+      // place the rows before the previewed anchor in the shared Open
+      // order, one commit.
+      const target = laneKey;
       const memberIds = membersOf(laneKey).map((it) => it.id);
       const remaining = memberIds.filter((id) => !keySet.has(id));
       const anchor =
@@ -458,13 +497,12 @@ export function Board(props: {
 
   // ArrowLeft / ArrowRight: hop the selection to the nearest lane in that
   // direction that holds cards, keeping the same vertical slot (clamped to
-  // the target lane's length). Lanes render Backlog, Live, then Done. No
-  // wrap — left/right is spatial. Empty lanes are skipped (nothing to land
-  // on); with nothing selected, → enters at the first non-empty lane and ←
-  // at the last.
-  const orderedLaneKeys = (): string[] => [
-    BACKLOG_LANE,
-    LIVE_LANE,
+  // the target lane's length). Lanes render in the fixed ladder order
+  // (visible ones only). No wrap — left/right is spatial. Empty lanes are
+  // skipped (nothing to land on); with nothing selected, → enters at the
+  // first non-empty lane and ← at the last.
+  const orderedLaneKeys = (): WorkflowState[] => [
+    ...visibleOpen(),
     ...(doneVisible() ? [DONE_LANE] : []),
   ];
   const jumpLane = (dir: -1 | 1): void => {
@@ -527,46 +565,35 @@ export function Board(props: {
 
   return (
     <div class="board" role="group" tabIndex={-1} ref={boardRef} onKeyDown={onBoardKeyDown}>
-      <BoardColumn
-        app={app}
-        laneKey={BACKLOG_LANE}
-        name={m().board.backlogLane}
-        selection={selectionFor(BACKLOG_LANE)}
-        members={() => laneMembers().backlog}
-        onReorder={(op) => reorderWithin(BACKLOG_LANE, op)}
-        onAddItem={() => props.onAddItem(props.listId, false)}
-        registerHandle={registerHandle}
-        autofocus
-        onOpen={props.onOpen}
-        onSetDeadline={props.onSetDeadline}
-        onReveal={props.onReveal}
-        onMoveToList={props.onMoveToList}
-        openOnTap={props.openOnTap}
-        duplicateBlock={props.duplicateBlock}
-        copyBlock={props.copyBlock}
-      />
-      <BoardColumn
-        app={app}
-        laneKey={LIVE_LANE}
-        name={m().board.liveLane}
-        selection={selectionFor(LIVE_LANE)}
-        members={() => laneMembers().live}
-        onReorder={(op) => reorderWithin(LIVE_LANE, op)}
-        onAddItem={() => props.onAddItem(props.listId, true)}
-        registerHandle={registerHandle}
-        onOpen={props.onOpen}
-        onSetDeadline={props.onSetDeadline}
-        onReveal={props.onReveal}
-        onMoveToList={props.onMoveToList}
-        openOnTap={props.openOnTap}
-        duplicateBlock={props.duplicateBlock}
-        copyBlock={props.copyBlock}
-      />
+      {/* The four open lanes (minus locally hidden ones), in fixed ladder
+          order. The first visible lane claims the mount autofocus. */}
+      <For each={visibleOpen()}>
+        {(lane, i) => (
+          <BoardColumn
+            app={app}
+            laneKey={lane}
+            name={laneLabel(m(), lane)}
+            selection={selectionFor(lane)}
+            members={() => laneMembers()[lane]}
+            onReorder={(op) => reorderWithin(lane, op)}
+            onAddItem={() => props.onAddItem(props.listId, lane)}
+            registerHandle={registerHandle}
+            autofocus={i() === 0}
+            onOpen={props.onOpen}
+            onSetDeadline={props.onSetDeadline}
+            onReveal={props.onReveal}
+            onMoveToList={props.onMoveToList}
+            openOnTap={props.openOnTap}
+            duplicateBlock={props.duplicateBlock}
+            copyBlock={props.copyBlock}
+          />
+        )}
+      </For>
       {/* Fixed Done lane: this list's done items, newest first. A drop
           target (drag a card in to mark it done) and a drag source (drag a
-          card out to un-done it), but never internally reordered — it has
-          no linear order of its own. Toggled by a per-list preference from
-          the view-mode popover. */}
+          card out to move it back to an open state), but never internally
+          reordered — it has no linear order of its own. Toggled by a
+          per-list preference from the view-mode popover. */}
       <Show when={doneVisible()}>
         <BoardColumn
           app={app}
@@ -576,7 +603,7 @@ export function Board(props: {
           selection={selectionFor(DONE_LANE)}
           members={() => doneMembers()}
           onReorder={() => {}}
-          onAddItem={() => props.onAddItem(props.listId, false, true)}
+          onAddItem={() => props.onAddItem(props.listId, "backlog", true)}
           registerHandle={registerHandle}
           onOpen={props.onOpen}
           onSetDeadline={props.onSetDeadline}
@@ -593,8 +620,8 @@ export function Board(props: {
 
 function BoardColumn(props: {
   app: DocApp;
-  /** Fixed lane key: `backlog`, `live`, or `done`. */
-  laneKey: string;
+  /** Fixed lane key: a workflow state name (`done` = the Done lane). */
+  laneKey: WorkflowState;
   name: string;
   /** Selection model for this lane, owned by the board. */
   selection: DndSelection;
@@ -611,7 +638,7 @@ function BoardColumn(props: {
   copyBlock: (sourceIds: readonly string[]) => void;
   /** Publish this lane's Dnd handle to the board so the cross-lane drag
    *  listener can drive its foreign-drop preview. */
-  registerHandle: (laneKey: string, handle: DndImperative | null) => void;
+  registerHandle: (laneKey: WorkflowState, handle: DndImperative | null) => void;
   /** Focus this lane's listbox on mount, so arrow-key nav works the moment
    *  the board opens — the Backlog lane claims it (matches how the list
    *  view autofocuses). Only one lane should set this. */

@@ -2,6 +2,7 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  For,
   on,
   onCleanup,
   Show,
@@ -31,7 +32,7 @@ import mixerHzSvg from "./icons/mixer-hz.svg?raw";
 import viewVerticalSvg from "./icons/view-vertical.svg?raw";
 import plusSvg from "./icons/card-stack-plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
-import { Board, type BoardImperative } from "./Board.tsx";
+import { Board, laneLabel, type BoardImperative } from "./Board.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Deadlines } from "./Deadlines.tsx";
 import { DeadlineCalendarDialog } from "./DeadlineCalendarDialog.tsx";
@@ -59,10 +60,12 @@ import {
   isBinned,
   isDone,
   isOpen,
+  OPEN_STATES,
   type DocApp,
   type ItemView,
   type ListView,
   type RecentDoneEntry,
+  type WorkflowState,
 } from "./sync/store.ts";
 import { createTheme, type ThemePreference } from "./theme.ts";
 import {
@@ -96,6 +99,32 @@ function loadViewPrefs(): Record<string, string> {
   try {
     const raw = localStorage.getItem(VIEW_PREF_KEY);
     return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+// Per-list *local* open-lane visibility for the board (spec/board.md
+// "Lane visibility"): which of the four open lanes this browser renders.
+// Client-local and display-only — hiding never mutates the doc and never
+// syncs (the Done lane's bit is the one exception, riding the saved view
+// as "board:nodone"). Absent ≡ all four lanes; only lists with hidden
+// lanes get a key, stored as the *visible* lane names in ladder order.
+const LANES_PREF_KEY = "airday:board-lanes";
+function loadLanePrefs(): Record<string, WorkflowState[]> {
+  try {
+    const raw = localStorage.getItem(LANES_PREF_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const out: Record<string, WorkflowState[]> = {};
+    for (const [listId, lanes] of Object.entries(parsed)) {
+      if (!Array.isArray(lanes)) continue;
+      const visible = OPEN_STATES.filter((s) => lanes.includes(s));
+      if (visible.length > 0 && visible.length < OPEN_STATES.length) {
+        out[listId] = visible;
+      }
+    }
+    return out;
   } catch {
     return {};
   }
@@ -233,9 +262,9 @@ export function Workspace(props: {
   // null when not capturing. Mutually exclusive with `openItemId`.
   const [newItemTarget, setNewItemTarget] = createSignal<{
     listId: string;
-    /** Which board lane to capture into: `true` = Live, `false` =
-     *  Backlog (also the list view's default). */
-    live: boolean;
+    /** Which open board lane to capture into (`backlog` is also the list
+     *  view's default). */
+    state: WorkflowState;
     /** Open-projection index to insert at (Space capture below a selected
      *  board card, or at the top). Omitted for "+" captures, which append
      *  to the lane. */
@@ -330,8 +359,43 @@ export function Workspace(props: {
   };
   const showDoneColumn = (listId: string): boolean => listView(listId).showDone;
   const setShowDoneColumn = (listId: string, show: boolean) => {
+    // At least one lane must stay visible (spec/board.md "Lane
+    // visibility"): refuse to hide Done while it is the only lane left.
+    if (!show && visibleOpenLanes(listId).length === 0) return;
     setLocalView(listId, { ...listView(listId), showDone: show });
   };
+
+  // Client-local open-lane visibility per list (spec/board.md "Lane
+  // visibility"). Display-only: hiding never mutates the doc, and a
+  // hidden lane simply doesn't render (so it is not a drop target).
+  const [lanePrefs, setLanePrefs] = createSignal<Record<string, WorkflowState[]>>(
+    loadLanePrefs(),
+  );
+  const visibleOpenLanes = (listId: string): WorkflowState[] =>
+    lanePrefs()[listId] ?? [...OPEN_STATES];
+  const setLaneVisible = (listId: string, lane: WorkflowState, show: boolean) => {
+    const cur = visibleOpenLanes(listId);
+    const next = show
+      ? OPEN_STATES.filter((s) => s === lane || cur.includes(s))
+      : cur.filter((s) => s !== lane);
+    // At least one lane always renders: refuse to hide the last open
+    // lane unless the Done lane is still on.
+    if (next.length === 0 && !showDoneColumn(listId)) return;
+    const map = { ...lanePrefs() };
+    if (next.length === OPEN_STATES.length) delete map[listId];
+    else map[listId] = next;
+    setLanePrefs(map);
+    try {
+      localStorage.setItem(LANES_PREF_KEY, JSON.stringify(map));
+    } catch {
+      // Quota/private-mode failures just lose the preference.
+    }
+  };
+  // Default capture lane for a board: its first visible open lane
+  // (Backlog unless hidden), falling back to Backlog when only the Done
+  // lane renders.
+  const defaultCaptureLane = (listId: string): WorkflowState =>
+    visibleOpenLanes(listId)[0] ?? "backlog";
   // Save what this client is looking at as the list's default view for
   // every device, and drop the local override so this client follows the
   // default it just set.
@@ -539,9 +603,10 @@ export function Workspace(props: {
     if (v.kind === "done") {
       // Done view excludes binned items: a done-then-binned item lives
       // in the Bin (see context menu — Bin owns the next transition).
+      // Sorted by the workflow register's transition time desc.
       return Object.values(state.itemsById)
         .filter((it) => isDone(it) && !isBinned(it))
-        .sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
+        .sort((a, b) => b.lifecycleAt - a.lifecycleAt);
     }
     return Object.values(state.itemsById)
       .filter(isBinned)
@@ -687,13 +752,15 @@ export function Workspace(props: {
       if (idx >= 0) insertIndex = idx + 1;
     }
     const id = `${DRAFT_ID_PREFIX}${crypto.randomUUID()}`;
+    const now = Date.now();
     const draftItem: ItemView = {
       id,
       listId,
       text: "",
       notes: "",
-      live: false,
-      createdAt: Date.now(),
+      state: "backlog",
+      lifecycleAt: now,
+      createdAt: now,
     };
     setDraft({ item: draftItem, insertIndex, listId, focus: isFocus });
     setExpandedKey(id);
@@ -783,7 +850,9 @@ export function Workspace(props: {
         );
         // Created as Backlog; flip to the anchor's lane in the same undo
         // step, which keeps the just-assigned Open position (spec/board.md).
-        if (anchor?.live) app.setLifecycleMany(created, "live");
+        if (anchor && anchor.state !== "backlog") {
+          app.setLifecycleMany(created, anchor.state);
+        }
         return created;
       });
       if (boardIds.length === 0) return;
@@ -1047,7 +1116,7 @@ export function Workspace(props: {
         text: string;
         notes: string;
         deadline: string | undefined;
-        live: boolean;
+        state: WorkflowState;
         listId: string;
       }[] = [];
       visible.forEach((id, idx) => {
@@ -1061,7 +1130,7 @@ export function Workspace(props: {
           text: it.text,
           notes: it.notes,
           deadline: it.deadline,
-          live: it.live,
+          state: it.state,
           listId,
         });
       });
@@ -1083,7 +1152,7 @@ export function Workspace(props: {
           const id = app.addItemAt(s.listId, s.text, at);
           order.splice(at, 0, id);
           copyItemDetails(id, s);
-          if (s.live) app.setLifecycle(id, "live");
+          if (s.state !== "backlog") app.setLifecycle(id, s.state);
           app.addToFocus(id, insertAt + i);
           created.push(id);
         });
@@ -1100,14 +1169,14 @@ export function Workspace(props: {
     if (v.kind !== "list") return;
     const visible = items().map((it) => it.id);
     const sourceSet = new Set(sourceIds);
-    // Clones inherit the source's board lane: a dupe of a Live card stays
-    // Live, a Backlog dupe stays Backlog.
+    // Clones inherit the source's board lane: a dupe of an In Progress
+    // card stays In Progress, a Backlog dupe stays Backlog.
     const sourcesInOrder: {
       idx: number;
       text: string;
       notes: string;
       deadline: string | undefined;
-      live: boolean;
+      state: WorkflowState;
     }[] = [];
     visible.forEach((id, idx) => {
       if (!sourceSet.has(id)) return;
@@ -1118,14 +1187,14 @@ export function Workspace(props: {
         text: it.text,
         notes: it.notes,
         deadline: it.deadline,
-        live: it.live,
+        state: it.state,
       });
     });
     if (sourcesInOrder.length === 0) return;
     const insertAt = sourcesInOrder[sourcesInOrder.length - 1].idx + 1;
     const texts = sourcesInOrder.map((s) => s.text);
-    // Create the block (as Backlog), then flip each clone whose source was
-    // Live in the same undo step. The `live` flip keeps the clone's
+    // Create the block (as Backlog), then flip each clone to its source's
+    // lane in the same undo step. The state flip keeps the clone's
     // just-assigned Open position (spec/board.md).
     const newIds = app.withActionBatch(() => {
       const ids = app.addItemsAt(v.id, texts, insertAt);
@@ -1133,7 +1202,7 @@ export function Workspace(props: {
         const src = sourcesInOrder[i];
         if (!src) return;
         copyItemDetails(id, src);
-        if (src.live) app.setLifecycle(id, "live");
+        if (src.state !== "backlog") app.setLifecycle(id, src.state);
       });
       return ids;
     });
@@ -1286,12 +1355,16 @@ export function Workspace(props: {
         const at = linear.indexOf(anchor.id);
         setNewItemTarget({
           listId: boardId,
-          live: anchor.live,
+          state: anchor.state,
           index: at >= 0 ? at + 1 : 0,
         });
       } else {
-        // Nothing selected: top of the Backlog lane.
-        setNewItemTarget({ listId: boardId, live: false, index: 0 });
+        // Nothing selected: top of the first visible open lane.
+        setNewItemTarget({
+          listId: boardId,
+          state: defaultCaptureLane(boardId),
+          index: 0,
+        });
       }
       return;
     }
@@ -1879,21 +1952,46 @@ export function Workspace(props: {
                 </SegmentedControl>
                 <Show when={boardListId()}>
                   {(listId) => (
-                    <Switch
-                      class="done-switch"
-                      checked={showDoneColumn(listId())}
-                      onChange={(checked) =>
-                        setShowDoneColumn(listId(), checked)
-                      }
-                    >
-                      <Switch.Label class="done-switch-label">
-                        {m().board.showDoneColumn}
-                      </Switch.Label>
-                      <Switch.Input class="done-switch-input" />
-                      <Switch.Control class="done-switch-control">
-                        <Switch.Thumb class="done-switch-thumb" />
-                      </Switch.Control>
-                    </Switch>
+                    <>
+                      {/* Open-lane visibility (client-local, display-only —
+                          spec/board.md "Lane visibility"). At least one
+                          lane always stays on; the setters refuse the
+                          hide that would blank the board. */}
+                      <For each={OPEN_STATES}>
+                        {(lane) => (
+                          <Switch
+                            class="done-switch"
+                            checked={visibleOpenLanes(listId()).includes(lane)}
+                            onChange={(checked) =>
+                              setLaneVisible(listId(), lane, checked)
+                            }
+                          >
+                            <Switch.Label class="done-switch-label">
+                              {laneLabel(m(), lane)}
+                            </Switch.Label>
+                            <Switch.Input class="done-switch-input" />
+                            <Switch.Control class="done-switch-control">
+                              <Switch.Thumb class="done-switch-thumb" />
+                            </Switch.Control>
+                          </Switch>
+                        )}
+                      </For>
+                      <Switch
+                        class="done-switch"
+                        checked={showDoneColumn(listId())}
+                        onChange={(checked) =>
+                          setShowDoneColumn(listId(), checked)
+                        }
+                      >
+                        <Switch.Label class="done-switch-label">
+                          {m().board.showDoneColumn}
+                        </Switch.Label>
+                        <Switch.Input class="done-switch-input" />
+                        <Switch.Control class="done-switch-control">
+                          <Switch.Thumb class="done-switch-thumb" />
+                        </Switch.Control>
+                      </Switch>
+                    </>
                   )}
                 </Show>
                 {/* Publish this view as the list's default for every
@@ -1941,7 +2039,7 @@ export function Workspace(props: {
                   onClick={() =>
                     setNewItemTarget({
                       listId: "inbox",
-                      live: false,
+                      state: "backlog",
                       done: true,
                     })
                   }
@@ -1993,9 +2091,12 @@ export function Workspace(props: {
                   const boardId = boardListId();
                   if (boardId !== null) {
                     // Board view has no inline draft flow; capture a new item
-                    // into the Backlog lane, mirroring the board's own
-                    // Backlog "+".
-                    setNewItemTarget({ listId: boardId, live: false });
+                    // into the first visible open lane, mirroring that
+                    // lane's own "+".
+                    setNewItemTarget({
+                      listId: boardId,
+                      state: defaultCaptureLane(boardId),
+                    });
                   } else {
                     startDraft();
                   }
@@ -2111,13 +2212,14 @@ export function Workspace(props: {
               openOnTap={itemsIsMobile}
               duplicateBlock={duplicateBlock}
               copyBlock={copyBlock}
-              onAddItem={(listId, live, done) =>
-                setNewItemTarget({ listId, live, done })
+              onAddItem={(listId, state, done) =>
+                setNewItemTarget({ listId, state, done })
               }
               revealIds={boardRevealIds}
               clearReveal={() => setBoardRevealIds(null)}
               onActiveSelectionChange={setBoardSelection}
               showDoneColumn={() => showDoneColumn(listId)}
+              visibleOpenLanes={() => visibleOpenLanes(listId)}
               ref={(h) => (boardHandle = h)}
             />
           )}

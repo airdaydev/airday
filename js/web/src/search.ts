@@ -5,10 +5,18 @@
 // stream the store dispatches.
 
 import type { AppEventJs } from "@airday/core/wasm";
-import type { ItemView, ListView, WorkspaceState } from "./sync/store.ts";
+import {
+  lifecycleOf as itemLifecycleOf,
+  parseWorkflowState,
+  type ItemView,
+  type Lifecycle,
+  type ListView,
+  type WorkspaceState,
+} from "./sync/store.ts";
 
 export type SearchKind = "item" | "list";
-export type SearchLifecycle = "backlog" | "live" | "done" | "binned";
+/** Resolved lifecycle used for ranking/filtering (`spec/search.md`). */
+export type SearchLifecycle = Lifecycle;
 
 export interface SearchResult {
   id: string;
@@ -86,27 +94,24 @@ export function matchesName(name: string, query: string): boolean {
 }
 
 function lifecycleOf(item: ItemView): SearchLifecycle {
-  if (item.binnedAt != null) return "binned";
-  if (item.doneAt != null) return "done";
-  return item.live ? "live" : "backlog";
+  return itemLifecycleOf(item);
 }
 
-function lifecycleFromAt(
-  doneAt: number | undefined,
-  binnedAt: number | undefined,
-  live: boolean,
-): SearchLifecycle {
-  if (binnedAt != null) return "binned";
-  if (doneAt != null) return "done";
-  return live ? "live" : "backlog";
+function lifecycleFromEvent(ev: AppEventJs): SearchLifecycle {
+  if (ev.binnedAt != null) return "binned";
+  return parseWorkflowState(ev.state);
 }
 
-// Rank order for tie-breaking: Live > Backlog > Done > Binned
-// (spec/search.md). Open items outrank closed ones; within Open, Live
-// (actively worked) outranks Backlog.
+// Rank order for tie-breaking (spec/search.md "Ranking"): in_progress,
+// then review, then todo, then backlog, then done, then binned — active
+// work first, then queued, then closed.
 function lifecycleRankOf(s: SearchLifecycle | undefined): number {
   switch (s) {
-    case "live":
+    case "in_progress":
+      return 5;
+    case "review":
+      return 4;
+    case "todo":
       return 3;
     case "backlog":
       return 2;
@@ -253,7 +258,7 @@ export function createSearchEngine(): SearchEngine {
         text: itemDoc.title,
         notes: itemDoc.body,
         listId: itemDoc.listId ?? "",
-        lifecycle: itemDoc.lifecycle ?? "live",
+        lifecycle: itemDoc.lifecycle ?? "backlog",
         updatedAt: itemDoc.updatedAt,
       });
     }
@@ -278,9 +283,10 @@ export function createSearchEngine(): SearchEngine {
     // Iteration order is irrelevant to the index — enumerate the id map
     // directly (there is no global order array to walk; see store.ts).
     for (const item of Object.values(state.itemsById)) {
-      // Recency signal: latest state-bearing timestamp falls back to
-      // createdAt for never-touched items.
-      const updatedAt = item.binnedAt ?? item.doneAt ?? item.createdAt;
+      // Recency signal: latest state-bearing timestamp — the bin mask,
+      // else the register's transition time (which falls back to
+      // createdAt for never-touched items).
+      const updatedAt = item.binnedAt ?? item.lifecycleAt ?? item.createdAt;
       indexDoc(
         makeItemDoc({
           id: item.id,
@@ -297,11 +303,7 @@ export function createSearchEngine(): SearchEngine {
   function apply(event: AppEventJs): void {
     switch (event.kind) {
       case "itemAdded": {
-        const lifecycle = lifecycleFromAt(
-          bigToNum(event.doneAt),
-          bigToNum(event.binnedAt),
-          event.live ?? false,
-        );
+        const lifecycle = lifecycleFromEvent(event);
         const updatedAt = bigToNum(event.createdAt) ?? Date.now();
         reindexItem({
           id: event.id,
@@ -325,7 +327,7 @@ export function createSearchEngine(): SearchEngine {
           text: event.text ?? "",
           notes: prev.body,
           listId: prev.listId ?? "",
-          lifecycle: prev.lifecycle ?? "live",
+          lifecycle: prev.lifecycle ?? "backlog",
           updatedAt: Date.now(),
         });
         break;
@@ -338,7 +340,7 @@ export function createSearchEngine(): SearchEngine {
           text: prev.title,
           notes: event.notes ?? "",
           listId: prev.listId ?? "",
-          lifecycle: prev.lifecycle ?? "live",
+          lifecycle: prev.lifecycle ?? "backlog",
           updatedAt: Date.now(),
         });
         break;
@@ -346,11 +348,7 @@ export function createSearchEngine(): SearchEngine {
       case "itemLifecycleChanged": {
         const prev = docsById.get(event.id);
         if (!prev || prev.kind !== "item") break;
-        prev.lifecycle = lifecycleFromAt(
-          bigToNum(event.doneAt),
-          bigToNum(event.binnedAt),
-          event.live ?? false,
-        );
+        prev.lifecycle = lifecycleFromEvent(event);
         prev.updatedAt = Date.now();
         break;
       }
@@ -362,7 +360,7 @@ export function createSearchEngine(): SearchEngine {
           text: prev.title,
           notes: prev.body,
           listId: event.listId ?? "",
-          lifecycle: prev.lifecycle ?? "live",
+          lifecycle: prev.lifecycle ?? "backlog",
           updatedAt: Date.now(),
         });
         break;
@@ -395,7 +393,7 @@ export function createSearchEngine(): SearchEngine {
             text: itemDoc.title,
             notes: itemDoc.body,
             listId: itemDoc.listId ?? "",
-            lifecycle: itemDoc.lifecycle ?? "live",
+            lifecycle: itemDoc.lifecycle ?? "backlog",
             updatedAt: itemDoc.updatedAt,
           });
         }

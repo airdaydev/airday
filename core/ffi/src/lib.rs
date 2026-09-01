@@ -86,16 +86,21 @@ impl From<airday_core::CryptoError> for AirdayError {
 
 // ---------- flat view records ----------
 
-/// Flat mirror of `airday_core::ItemView` for the FFI boundary. `done` /
-/// `binned` are carried as their timestamps (`Some` ≡ set); the Swift
-/// side derives the booleans if it wants them.
+/// Flat mirror of `airday_core::ItemView` for the FFI boundary. `state`
+/// is the workflow register's name (`"backlog"` … `"done"`,
+/// `spec/data-model.md` "Lifecycle") and `lifecycle_at` its transition
+/// time; `binned_at` is the orthogonal bin mask, `done_at` the
+/// reflection stamp. The Swift side derives booleans if it wants them.
 #[derive(uniffi::Record)]
 pub struct ItemView {
     pub id: String,
     pub text: String,
     pub notes: String,
     pub list_id: String,
+    pub state: String,
+    pub lifecycle_at: i64,
     pub created_at: i64,
+    pub started_at: Option<i64>,
     pub done_at: Option<i64>,
     pub binned_at: Option<i64>,
 }
@@ -107,7 +112,10 @@ impl From<CoreItemView> for ItemView {
             text: v.text,
             notes: v.notes,
             list_id: v.list_id,
+            state: v.state.name().to_string(),
+            lifecycle_at: v.lifecycle_at,
             created_at: v.created_at,
+            started_at: v.started_at,
             done_at: v.done_at,
             binned_at: v.binned_at,
         }

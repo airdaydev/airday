@@ -1,5 +1,5 @@
-//! Item commands: add / ls / backlog / live / done / bin (verb) /
-//! restore / mv / edit.
+//! Item commands: add / ls / backlog / todo / start / review / done /
+//! bin (verb) / restore / mv / edit.
 //!
 //! Every action goes through `Session` (open → mutate → flush). The
 //! session reads from and writes to the local Loro doc; it only talks
@@ -8,7 +8,7 @@
 
 use std::io::{BufRead, IsTerminal};
 
-use airday_core::{ItemLifecycle, ItemView, LIST_INBOX};
+use airday_core::{ItemLifecycle, ItemView, LIST_INBOX, WorkflowState};
 use clap::Parser;
 use serde::Serialize;
 
@@ -99,7 +99,12 @@ struct ItemJson<'a> {
     id: &'a str,
     text: &'a str,
     list_id: &'a str,
+    /// Workflow register state name (`spec/data-model.md` "Lifecycle").
+    state: &'static str,
+    /// Unix millis the register's state was entered.
+    lifecycle_at: i64,
     created_at: i64,
+    started_at: Option<i64>,
     done_at: Option<i64>,
     binned_at: Option<i64>,
 }
@@ -109,28 +114,39 @@ fn item_json(item: &ItemView) -> ItemJson<'_> {
         id: &item.id,
         text: &item.text,
         list_id: &item.list_id,
+        state: item.state.name(),
+        lifecycle_at: item.lifecycle_at,
         created_at: item.created_at,
+        started_at: item.started_at,
         done_at: item.done_at,
         binned_at: item.binned_at,
     }
 }
 
+/// One-character box mark for the workflow register's state.
+pub fn state_mark(state: WorkflowState) -> &'static str {
+    match state {
+        WorkflowState::Backlog => " ",
+        WorkflowState::Todo => "-",
+        WorkflowState::InProgress => ">",
+        WorkflowState::Review => "?",
+        WorkflowState::Done => "x",
+    }
+}
+
 fn print_items(items: &[ItemView]) {
     for item in items {
-        // Two slots so done+binned can both show. `~` (binned) takes
-        // precedence in the box; done is a trailing `(done)` tag for
-        // items that are also binned.
+        // `~` (binned) masks the workflow mark in the box; the preserved
+        // state shows as a trailing tag so a binned row stays legible.
         let mark = if item.is_binned() {
             "~"
-        } else if item.is_done() {
-            "x"
         } else {
-            " "
+            state_mark(item.state)
         };
-        let suffix = if item.is_binned() && item.is_done() {
-            " (done)"
+        let suffix = if item.is_binned() {
+            format!(" ({})", item.state.name())
         } else {
-            ""
+            String::new()
         };
         println!("{}  [{mark}] {}{suffix}", item.id, item.text);
     }
@@ -142,43 +158,47 @@ pub fn print_json<T: Serialize>(value: &T) -> anyhow::Result<()> {
     Ok(())
 }
 
-// ---------- backlog / live / done / bin / restore ----------
+// ---------- backlog / todo / start / review / done / bin / restore ----------
 
 #[derive(Parser, Debug)]
 pub struct IdArg {
     pub item_id: String,
 }
 
-/// Move an item to the Backlog lane: clears `live`, `done_at`, and
-/// `binned_at` (`spec/data-model.md`). One commit.
+/// Shared workflow transition: write the `[state, now]` register (and
+/// clear any bin mask) per the transition table in `spec/data-model.md`.
+/// One commit.
+async fn transition(args: IdArg, sync: bool, lifecycle: ItemLifecycle) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
+    session.doc().set_item_lifecycle(&args.item_id, lifecycle)?;
+    session.flush().await?;
+    println!("{}", args.item_id);
+    Ok(())
+}
+
+/// Workflow → Backlog.
 pub async fn backlog(args: IdArg, sync: bool) -> anyhow::Result<()> {
-    let session = Session::open(sync).await?;
-    session
-        .doc()
-        .set_item_lifecycle(&args.item_id, ItemLifecycle::Backlog)?;
-    session.flush().await?;
-    println!("{}", args.item_id);
-    Ok(())
+    transition(args, sync, ItemLifecycle::Backlog).await
 }
 
-/// Move an item to the Live lane: sets `live`; clears `done_at` and
-/// `binned_at` (`spec/data-model.md`). One commit.
-pub async fn live(args: IdArg, sync: bool) -> anyhow::Result<()> {
-    let session = Session::open(sync).await?;
-    session
-        .doc()
-        .set_item_lifecycle(&args.item_id, ItemLifecycle::Live)?;
-    session.flush().await?;
-    println!("{}", args.item_id);
-    Ok(())
+/// Workflow → Todo.
+pub async fn todo(args: IdArg, sync: bool) -> anyhow::Result<()> {
+    transition(args, sync, ItemLifecycle::Todo).await
 }
 
+/// Workflow → In Progress (stamps `started_at` on first entry).
+pub async fn start(args: IdArg, sync: bool) -> anyhow::Result<()> {
+    transition(args, sync, ItemLifecycle::InProgress).await
+}
+
+/// Workflow → Review.
+pub async fn review(args: IdArg, sync: bool) -> anyhow::Result<()> {
+    transition(args, sync, ItemLifecycle::Review).await
+}
+
+/// Workflow → Done (stamps `done_at`).
 pub async fn done(args: IdArg, sync: bool) -> anyhow::Result<()> {
-    let session = Session::open(sync).await?;
-    session.doc().set_item_done(&args.item_id, true)?;
-    session.flush().await?;
-    println!("{}", args.item_id);
-    Ok(())
+    transition(args, sync, ItemLifecycle::Done).await
 }
 
 pub async fn bin(args: IdArg, sync: bool) -> anyhow::Result<()> {
@@ -189,9 +209,9 @@ pub async fn bin(args: IdArg, sync: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Restore from the bin. Done state is preserved — a done-then-binned
-/// item pops back into the Done view, a plain binned item back into
-/// its list. Use a follow-up command to toggle done off if needed.
+/// Restore from the bin: clear the mask only, revealing the preserved
+/// workflow state — a done-then-binned item pops back into the Done
+/// view, an open one back into its list at its former position.
 pub async fn restore(args: IdArg, sync: bool) -> anyhow::Result<()> {
     let session = Session::open(sync).await?;
     session.doc().set_item_binned(&args.item_id, false)?;

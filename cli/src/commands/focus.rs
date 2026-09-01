@@ -106,9 +106,8 @@ fn one_based_to_index(pos: usize) -> usize {
 fn print_items(items: &[ItemView]) {
     for (i, item) in items.iter().enumerate() {
         // 1-based position matches the `mv` / `add` argument space. Focus
-        // is Open-only, so `live` is the only lifecycle distinction worth
-        // surfacing.
-        let mark = if item.live { "*" } else { " " };
+        // is Open-only, so the box carries the workflow state mark.
+        let mark = super::items::state_mark(item.state);
         println!("{:>3}  {}  [{mark}] {}", i + 1, item.id, item.text);
     }
 }
@@ -119,7 +118,8 @@ struct FocusItemJson<'a> {
     id: &'a str,
     text: &'a str,
     list_id: &'a str,
-    live: bool,
+    /// Workflow register state name (`spec/data-model.md` "Lifecycle").
+    state: &'static str,
 }
 
 fn item_json(pos: usize, item: &ItemView) -> FocusItemJson<'_> {
@@ -128,6 +128,6 @@ fn item_json(pos: usize, item: &ItemView) -> FocusItemJson<'_> {
         id: &item.id,
         text: &item.text,
         list_id: &item.list_id,
-        live: item.live,
+        state: item.state.name(),
     }
 }

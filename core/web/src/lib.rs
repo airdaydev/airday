@@ -31,15 +31,18 @@ fn js_err<E: std::fmt::Display>(e: E) -> JsError {
 
 // ---------- lifecycle ----------
 
-/// Derived four-state item lifecycle (`spec/data-model.md`), mirrored
-/// from `airday_core::ItemLifecycle` for the wasm boundary. Passed to
+/// Resolved item lifecycle (`spec/data-model.md` "Lifecycle"), mirrored
+/// from `airday_core::ItemLifecycle` for the wasm boundary: the five
+/// workflow states plus the orthogonal `Binned` mask. Passed to
 /// `setItemLifecycle` / `setItemsLifecycle`; the board's lane-drop
 /// primitive.
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
 pub enum ItemLifecycle {
     Backlog,
-    Live,
+    Todo,
+    InProgress,
+    Review,
     Done,
     Binned,
 }
@@ -48,11 +51,23 @@ impl From<ItemLifecycle> for CoreItemLifecycle {
     fn from(l: ItemLifecycle) -> Self {
         match l {
             ItemLifecycle::Backlog => CoreItemLifecycle::Backlog,
-            ItemLifecycle::Live => CoreItemLifecycle::Live,
+            ItemLifecycle::Todo => CoreItemLifecycle::Todo,
+            ItemLifecycle::InProgress => CoreItemLifecycle::InProgress,
+            ItemLifecycle::Review => CoreItemLifecycle::Review,
             ItemLifecycle::Done => CoreItemLifecycle::Done,
             ItemLifecycle::Binned => CoreItemLifecycle::Binned,
         }
     }
+}
+
+/// Resolve a JS-side lifecycle argument to the open workflow state a
+/// direct capture requires (`spec/board.md` "Capture"): Done and Binned
+/// are not capture lanes.
+fn open_state_arg(l: ItemLifecycle) -> Result<airday_core::WorkflowState, JsError> {
+    CoreItemLifecycle::from(l)
+        .workflow_state()
+        .filter(|s| s.is_open())
+        .ok_or_else(|| JsError::new("can only capture directly into an open workflow state"))
 }
 
 // ---------- Doc ----------
@@ -300,8 +315,8 @@ impl Doc {
     // ---------- lifecycle (spec/board.md, spec/data-model.md) ----------
 
     /// Move one item to `lifecycle` in a single commit (the board's
-    /// lane-drop primitive). Writes `live` / `done_at` / `binned_at` per
-    /// the transition table.
+    /// lane-drop primitive). Writes the workflow register / bin mask
+    /// (plus reflection stamps) per the transition table.
     #[wasm_bindgen(js_name = setItemLifecycle)]
     pub fn set_item_lifecycle(
         &self,
@@ -327,23 +342,33 @@ impl Doc {
             .map_err(js_err)
     }
 
-    /// Append a new item directly as Live (board Live-lane capture).
-    #[wasm_bindgen(js_name = addItemLive)]
-    pub fn add_item_live(&self, list_id: &str, text: &str) -> Result<String, JsError> {
-        self.inner.add_item_live(list_id, text).map_err(js_err)
-    }
-
-    /// Insert a new Live item at `target_index` in the list's Open
-    /// projection (same index space as `addItemAt`), one commit.
-    #[wasm_bindgen(js_name = addItemLiveAt)]
-    pub fn add_item_live_at(
+    /// Append a new item directly in an open workflow state (board
+    /// open-lane capture). `state` must be one of the four open states.
+    #[wasm_bindgen(js_name = addItemInState)]
+    pub fn add_item_in_state(
         &self,
         list_id: &str,
         text: &str,
+        state: ItemLifecycle,
+    ) -> Result<String, JsError> {
+        self.inner
+            .add_item_in_state(list_id, text, open_state_arg(state)?)
+            .map_err(js_err)
+    }
+
+    /// Insert a new item in an open workflow state at `target_index` in
+    /// the list's Open projection (same index space as `addItemAt`), one
+    /// commit.
+    #[wasm_bindgen(js_name = addItemInStateAt)]
+    pub fn add_item_in_state_at(
+        &self,
+        list_id: &str,
+        text: &str,
+        state: ItemLifecycle,
         target_index: usize,
     ) -> Result<String, JsError> {
         self.inner
-            .add_item_live_at(list_id, text, target_index)
+            .add_item_in_state_at(list_id, text, open_state_arg(state)?, target_index)
             .map_err(js_err)
     }
 
@@ -429,10 +454,10 @@ impl Doc {
     // -- view-id helpers: order-stable id arrays that the JS store
     //    turns into per-view DnD sources --
 
-    /// Ids of `Open` items (Backlog + Live) in `list_id`, in resolved
-    /// per-list order (`spec/data-model.md` "Resolved order"). The board
-    /// partitions this by each item's `live` flag into the Backlog and
-    /// Live lanes.
+    /// Ids of `Open` items (the four open workflow states) in `list_id`,
+    /// in resolved per-list order (`spec/data-model.md` "Resolved
+    /// order"). The board partitions this by each item's register state
+    /// into the open lanes.
     #[wasm_bindgen(js_name = openItemIds)]
     pub fn open_item_ids(&self, list_id: &str) -> Vec<String> {
         self.inner.open_item_ids(list_id)
@@ -1619,27 +1644,35 @@ impl SyncEngine {
             .map_err(js_err)
     }
 
-    /// Append a new item directly as Live (board Live-lane capture).
-    #[wasm_bindgen(js_name = addItemLive)]
-    pub fn add_item_live(&self, list_id: &str, text: &str) -> Result<String, JsError> {
-        self.inner
-            .doc()
-            .add_item_live(list_id, text)
-            .map_err(js_err)
-    }
-
-    /// Insert a new Live item at `target_index` in the list's Open
-    /// projection (same index space as `addItemAt`), one commit.
-    #[wasm_bindgen(js_name = addItemLiveAt)]
-    pub fn add_item_live_at(
+    /// Append a new item directly in an open workflow state (board
+    /// open-lane capture). `state` must be one of the four open states.
+    #[wasm_bindgen(js_name = addItemInState)]
+    pub fn add_item_in_state(
         &self,
         list_id: &str,
         text: &str,
+        state: ItemLifecycle,
+    ) -> Result<String, JsError> {
+        self.inner
+            .doc()
+            .add_item_in_state(list_id, text, open_state_arg(state)?)
+            .map_err(js_err)
+    }
+
+    /// Insert a new item in an open workflow state at `target_index` in
+    /// the list's Open projection (same index space as `addItemAt`), one
+    /// commit.
+    #[wasm_bindgen(js_name = addItemInStateAt)]
+    pub fn add_item_in_state_at(
+        &self,
+        list_id: &str,
+        text: &str,
+        state: ItemLifecycle,
         target_index: usize,
     ) -> Result<String, JsError> {
         self.inner
             .doc()
-            .add_item_live_at(list_id, text, target_index)
+            .add_item_in_state_at(list_id, text, open_state_arg(state)?, target_index)
             .map_err(js_err)
     }
 
@@ -1860,13 +1893,13 @@ impl From<CoreEvent> for EngineEvent {
 ///
 /// Variant → fields:
 /// - `fullResync` — no fields; rematerialize current state once
-/// - `itemAdded` — id, listId, text, notes, createdAt, live, doneAt?, binnedAt?, deadline?, openIndex?
+/// - `itemAdded` — id, listId, text, notes, createdAt, state, lifecycleAt, startedAt?, doneAt?, binnedAt?, deadline?, openIndex?
 /// - `itemRemoved` — id
 /// - `itemMoved` — id, openIndex?
 /// - `itemTextChanged` — id, text
 /// - `itemNotesChanged` — id, notes
 /// - `itemDeadlineChanged` — id, deadline? (undefined = no deadline)
-/// - `itemLifecycleChanged` — id, live, doneAt?, binnedAt?, openIndex?
+/// - `itemLifecycleChanged` — id, state, lifecycleAt, startedAt?, doneAt?, binnedAt?, openIndex?
 /// - `itemListChanged` — id, listId, openIndex?
 /// - `listAdded` — id, name, createdAt, archivedAt?, index
 /// - `listRemoved` — id
@@ -1892,14 +1925,21 @@ pub struct AppEventJs {
     /// `"list"` / `"board"` / `"board:nodone"`, or `None` when the
     /// default was cleared or the event doesn't carry one.
     default_view: Option<String>,
-    /// Lifecycle flag (`itemAdded` / `itemLifecycleChanged`): `true` ≡
-    /// Live, `false` ≡ Backlog underneath any done/binned mask. `None`
-    /// on events that don't carry lifecycle.
-    live: Option<bool>,
+    /// Workflow register state name (`itemAdded` / `itemLifecycleChanged`):
+    /// `"backlog" | "todo" | "in_progress" | "review" | "done"`, masked
+    /// by `binned_at` when that is set. `None` on events that don't
+    /// carry lifecycle.
+    state: Option<&'static str>,
+    /// The workflow register's transition timestamp (`itemAdded` /
+    /// `itemLifecycleChanged`).
+    lifecycle_at: Option<i64>,
+    /// Reflection stamp: first entry into In Progress, if any.
+    started_at: Option<i64>,
     /// Date-only deadline `YYYY-MM-DD` (`itemAdded` / `itemDeadlineChanged`);
     /// `None` means no deadline.
     deadline: Option<String>,
     created_at: Option<i64>,
+    /// Reflection stamp: last entry into Done, if any.
     done_at: Option<i64>,
     binned_at: Option<i64>,
     /// List archive timestamp (`listAdded` / `listArchivedChanged`):
@@ -1914,10 +1954,10 @@ pub struct AppEventJs {
     /// events no longer carry a doc-wide index in the v2 schema — use
     /// `open_index`.
     index: Option<usize>,
-    /// Position within the owning list's *Open* projection (Backlog +
-    /// Live; done/binned excluded). Present on item events whenever the
-    /// item is open after the change; `undefined` otherwise. See
-    /// `airday_core::AppEvent` for per-variant semantics.
+    /// Position within the owning list's *Open* projection (the four
+    /// open workflow states; Done/binned excluded). Present on item
+    /// events whenever the item is open after the change; `undefined`
+    /// otherwise. See `airday_core::AppEvent` for per-variant semantics.
     open_index: Option<usize>,
 }
 
@@ -1988,8 +2028,16 @@ impl AppEventJs {
         self.inbox_view.clone()
     }
     #[wasm_bindgen(getter)]
-    pub fn live(&self) -> Option<bool> {
-        self.live
+    pub fn state(&self) -> Option<String> {
+        self.state.map(str::to_string)
+    }
+    #[wasm_bindgen(getter, js_name = lifecycleAt)]
+    pub fn lifecycle_at(&self) -> Option<i64> {
+        self.lifecycle_at
+    }
+    #[wasm_bindgen(getter, js_name = startedAt)]
+    pub fn started_at(&self) -> Option<i64> {
+        self.started_at
     }
     #[wasm_bindgen(getter, js_name = deadline)]
     pub fn deadline(&self) -> Option<String> {
@@ -2008,7 +2056,9 @@ impl From<CoreAppEvent> for AppEventJs {
             name: None,
             icon: None,
             default_view: None,
-            live: None,
+            state: None,
+            lifecycle_at: None,
+            started_at: None,
             deadline: None,
             created_at: None,
             done_at: None,
@@ -2034,9 +2084,11 @@ impl From<CoreAppEvent> for AppEventJs {
                 text,
                 notes,
                 created_at,
+                state,
+                lifecycle_at,
+                started_at,
                 done_at,
                 binned_at,
-                live,
                 deadline,
                 open_index,
             } => AppEventJs {
@@ -2046,9 +2098,11 @@ impl From<CoreAppEvent> for AppEventJs {
                 text: Some(text),
                 notes: Some(notes),
                 created_at: Some(created_at),
+                state: Some(state.name()),
+                lifecycle_at: Some(lifecycle_at),
+                started_at,
                 done_at,
                 binned_at,
-                live: Some(live),
                 deadline,
                 open_index,
                 ..blank
@@ -2084,14 +2138,18 @@ impl From<CoreAppEvent> for AppEventJs {
             },
             CoreAppEvent::ItemLifecycleChanged {
                 id,
-                live,
+                state,
+                lifecycle_at,
+                started_at,
                 done_at,
                 binned_at,
                 open_index,
             } => AppEventJs {
                 kind: "itemLifecycleChanged",
                 id,
-                live: Some(live),
+                state: Some(state.name()),
+                lifecycle_at: Some(lifecycle_at),
+                started_at,
                 done_at,
                 binned_at,
                 open_index,
@@ -2231,21 +2289,23 @@ fn lists_to_json(lists: &[airday_core::ListView]) -> String {
 
 fn item_to_json(it: &airday_core::ItemView) -> String {
     let mut s = format!(
-        "{{\"id\":{},\"text\":{},\"notes\":{},\"listId\":{},\"createdAt\":{}",
+        "{{\"id\":{},\"text\":{},\"notes\":{},\"listId\":{},\"createdAt\":{},\"state\":{},\"lifecycleAt\":{}",
         json_string(&it.id),
         json_string(&it.text),
         json_string(&it.notes),
         json_string(&it.list_id),
         it.created_at,
+        json_string(it.state.name()),
+        it.lifecycle_at,
     );
+    if let Some(t) = it.started_at {
+        s.push_str(&format!(",\"startedAt\":{t}"));
+    }
     if let Some(t) = it.done_at {
         s.push_str(&format!(",\"doneAt\":{t}"));
     }
     if let Some(t) = it.binned_at {
         s.push_str(&format!(",\"binnedAt\":{t}"));
-    }
-    if it.live {
-        s.push_str(",\"live\":true");
     }
     if let Some(d) = &it.deadline {
         s.push_str(",\"deadline\":");

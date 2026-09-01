@@ -35,10 +35,10 @@ export const isDraftId = (id: string): boolean => id.startsWith(DRAFT_ID_PREFIX)
 
 // Surface the most recent state-changing timestamp. Binned wins over
 // done because it's the later transition: a done-then-binned item shows
-// when it was binned in the Bin view; a plain done item shows doneAt in
-// the Done view.
+// when it was binned in the Bin view; a plain done item shows the
+// register's Done transition time in the Done view. Open rows show none.
 function lifecycleTimestamp(it: ItemView): number | undefined {
-  return it.binnedAt ?? it.doneAt;
+  return it.binnedAt ?? (isDone(it) ? it.lifecycleAt : undefined);
 }
 
 export function Row(props: {

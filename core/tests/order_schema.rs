@@ -20,7 +20,7 @@
 use std::collections::{HashMap, HashSet};
 
 use airday_core::crypto::Dek;
-use airday_core::doc::{Doc, LIST_INBOX};
+use airday_core::doc::{Doc, ItemLifecycle, LIST_INBOX};
 use airday_core::events::AppEvent;
 
 // ---------- deterministic rng ----------
@@ -99,7 +99,7 @@ impl Mirror {
             AppEvent::ItemAdded {
                 id,
                 list_id,
-                done_at,
+                state,
                 binned_at,
                 open_index,
                 ..
@@ -109,7 +109,7 @@ impl Mirror {
                 {
                     self.remove_open(&old_list, id);
                 }
-                let open = done_at.is_none() && binned_at.is_none();
+                let open = binned_at.is_none() && state.is_open();
                 if open {
                     self.insert_open(list_id, id, *open_index);
                 }
@@ -132,7 +132,7 @@ impl Mirror {
             }
             AppEvent::ItemLifecycleChanged {
                 id,
-                done_at,
+                state,
                 binned_at,
                 open_index,
                 ..
@@ -140,7 +140,7 @@ impl Mirror {
                 let Some((list, was_live)) = self.items.get(id).cloned() else {
                     return;
                 };
-                let now_live = done_at.is_none() && binned_at.is_none();
+                let now_live = binned_at.is_none() && state.is_open();
                 if was_live && !now_live {
                     self.remove_open(&list, id);
                 }
@@ -305,11 +305,25 @@ fn random_op(doc: &Doc, rng: &mut Lcg, op_no: usize) {
                 let _ = doc.move_item(&it.id, &target, rng.below(8));
             }
         }
-        // lifecycle flips
-        60..=69 => {
+        // lifecycle flips: done toggles plus random workflow transitions
+        // over the v3 ladder (spec/data-model.md "Set lifecycle").
+        60..=64 => {
             if !items.is_empty() {
                 let it = &items[rng.below(items.len())];
                 let _ = doc.set_item_done(&it.id, !it.is_done());
+            }
+        }
+        65..=69 => {
+            if !items.is_empty() {
+                let it = &items[rng.below(items.len())];
+                let target = match rng.below(5) {
+                    0 => ItemLifecycle::Backlog,
+                    1 => ItemLifecycle::Todo,
+                    2 => ItemLifecycle::InProgress,
+                    3 => ItemLifecycle::Review,
+                    _ => ItemLifecycle::Done,
+                };
+                let _ = doc.set_item_lifecycle(&it.id, target);
             }
         }
         70..=76 => {

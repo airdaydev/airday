@@ -13,7 +13,7 @@
 //! Initial attachment materializes current state explicitly. After that,
 //! consumers receive live deltas or an occasional `FullResync` request.
 
-use crate::doc::DefaultView;
+use crate::doc::{DefaultView, WorkflowState};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppEvent {
@@ -26,22 +26,30 @@ pub enum AppEvent {
     // ---------- items ----------
     /// New item appeared (local add or remote insert), or backfill on
     /// initial attach. `open_index` is the position within the *Open*
-    /// projection of `list_id` (Backlog + Live, i.e. done/binned excluded)
-    /// — `None` when the item is not open. UI layers that keep per-list
-    /// Open arrays splice at `open_index`. There is no global item order
-    /// in the v2 schema, so there is no doc-wide index.
+    /// projection of `list_id` (the four open workflow states;
+    /// Done/binned excluded) — `None` when the item is not open. UI
+    /// layers that keep per-list Open arrays splice at `open_index`.
+    /// There is no global item order in the v2+ schema, so there is no
+    /// doc-wide index.
     ItemAdded {
         id: String,
         list_id: String,
         text: String,
         notes: String,
         created_at: i64,
+        /// Workflow register state (`spec/data-model.md` "Lifecycle").
+        /// Masked by `binned_at` when that is set.
+        state: WorkflowState,
+        /// The workflow register's transition timestamp (unix millis) —
+        /// `created_at` for items whose register is absent.
+        lifecycle_at: i64,
+        /// Reflection stamp: first entry into In Progress, if any.
+        started_at: Option<i64>,
+        /// Reflection stamp: last entry into Done, if any. View sorts use
+        /// `lifecycle_at`, not this.
         done_at: Option<i64>,
+        /// Bin mask: present ≡ binned (masking the workflow state).
         binned_at: Option<i64>,
-        /// Lifecycle flag (`spec/data-model.md`): `true` ≡ Live, `false`
-        /// ≡ Backlog. Combined with `done_at`/`binned_at` (precedence
-        /// Binned > Done > Live > Backlog) it resolves the item's lane.
-        live: bool,
         /// Date-only deadline (`YYYY-MM-DD`) or `None`. Floating local
         /// calendar date — consumers format without timezone conversion.
         deadline: Option<String>,
@@ -79,19 +87,22 @@ pub enum AppEvent {
         id: String,
         deadline: Option<String>,
     },
-    /// Lifecycle changed (`spec/data-model.md`). The three stored fields
-    /// are independent — an event is emitted whenever any of `live`,
-    /// `done_at` or `binned_at` transitions, and the payload carries all
-    /// current values so consumers can resolve the lane by precedence
-    /// (Binned > Done > Live > Backlog) without rereading the doc.
-    /// `open_index` is the item's position within its list's Open
-    /// projection when the item is open after the change (restore /
-    /// un-done re-entry point, or a Backlog↔Live flip that keeps it in
-    /// place); `None` when it is done/binned (consumers drop it from the
-    /// Open array).
+    /// Lifecycle changed (`spec/data-model.md`). Emitted whenever the
+    /// workflow register, a reflection stamp, or the `binned_at` mask
+    /// transitions; the payload carries all current values so consumers
+    /// resolve the state (binned mask wins while present) without
+    /// rereading the doc. `open_index` is the item's position within its
+    /// list's Open projection when the item is open after the change
+    /// (restore / un-done re-entry point, or an open→open workflow flip
+    /// that keeps it in place); `None` when it is Done/binned (consumers
+    /// drop it from the Open array).
     ItemLifecycleChanged {
         id: String,
-        live: bool,
+        /// Workflow register state after the change.
+        state: WorkflowState,
+        /// The register's transition timestamp after the change.
+        lifecycle_at: i64,
+        started_at: Option<i64>,
         done_at: Option<i64>,
         binned_at: Option<i64>,
         open_index: Option<usize>,
@@ -172,7 +183,7 @@ pub enum AppEvent {
     /// mirror a small settings object with a single write.
     SettingsChanged {
         /// When true, clients render each non-Inbox list's open-item
-        /// count (Backlog + Live) in the nav (subject to the count > 0
+        /// count (all Open states) in the nav (subject to the count > 0
         /// gate). Inbox always shows its count regardless. Single global flag —
         /// there is no per-list override.
         show_list_counts: bool,

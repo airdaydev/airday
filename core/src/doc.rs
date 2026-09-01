@@ -1,16 +1,16 @@
 //! Loro CRDT layer: typed mutations, persistence, op-stream framing,
 //! and a deterministic logical-state fingerprint.
 //!
-//! Layout matches `spec/data-model.md` (schema v2):
+//! Layout matches `spec/data-model.md` (schema v3):
 //! - root container `items` (`LoroMap`) — keyed by the item's stable
 //!   UUID; each value is a child `LoroMap` with `id`, `text`,
-//!   `location`, `created_at`, optional `notes`, optional `live`,
-//!   optional `done_at`, optional `binned_at`. The lifecycle
-//!   (`spec/data-model.md`) is derived from these three fields by
-//!   precedence Binned > Done > Live > Backlog; they are independent
-//!   (an item can carry `done_at`, `binned_at` and `live` at once).
-//!   Presence of a timestamp is the done/binned flag; `live` (absent ≡
-//!   Backlog, `true` ≡ Live) is the underlying open state they mask.
+//!   `location`, `created_at`, optional `notes`, optional `lifecycle`
+//!   (the atomic workflow register `[state, at]`), optional `binned_at`
+//!   (the bin mask), and the optional reflection stamps `started_at` /
+//!   `done_at`. The resolved lifecycle is the register's state, masked
+//!   by `binned_at` while that is present (`spec/data-model.md`
+//!   "Lifecycle"). An absent/unparseable register reads as
+//!   `[Backlog, created_at]`.
 //! - root container `lists` (`LoroMovableList`) — each entry is a
 //!   `LoroMap` with `id`, `name`, `created_at`.
 //! - root container `settings` (`LoroMap`) — account-wide synced
@@ -85,11 +85,15 @@ const KEY_NOTES: &str = "notes";
 /// one scalar so list membership and placement can never be torn apart
 /// by concurrent edits. See `Location`.
 const KEY_LOCATION: &str = "location";
-/// Lifecycle flag (`spec/data-model.md`): absent or `false` ≡ Backlog,
-/// `true` ≡ Live. Independent of `done_at`/`binned_at`, which mask it.
-/// Written only when `true` and deleted when cleared, so Backlog items
-/// (the default) carry no key.
-const KEY_LIVE: &str = "live";
+/// Atomic workflow register (`spec/data-model.md` "Lifecycle"): a plain
+/// `LoroValue` list `[state, at]` — the current `WorkflowState` code
+/// (`0..=4`) and the unix millis it was entered. Whole-value LWW, so
+/// state and timestamp can never be torn apart by concurrent edits.
+/// Absent ≡ `[Backlog, created_at]`; new items omit it.
+const KEY_LIFECYCLE: &str = "lifecycle";
+/// Reflection stamp: set (write-once) the first time the item enters
+/// In Progress; never cleared. Feeds analytics; no view reads it.
+const KEY_STARTED_AT: &str = "started_at";
 /// Optional date-only deadline: a floating local calendar date in
 /// `YYYY-MM-DD` format (no time, no timezone). Absent ≡ no deadline;
 /// the mutation deletes the key when cleared. Written on its own scalar
@@ -109,7 +113,12 @@ const KEY_ICON: &str = "icon";
 /// default; clients fall back to their own built-in default.
 const KEY_VIEW: &str = "view";
 const KEY_CREATED_AT: &str = "created_at";
+/// Reflection stamp: set on each entry into Done; never cleared, so it
+/// survives later binning and un-doing. View sorts use the workflow
+/// register's `at`, not this.
 const KEY_DONE_AT: &str = "done_at";
+/// Bin mask: present ≡ binned (masking the workflow register); absent ≡
+/// not binned. Restore deletes the key.
 const KEY_BINNED_AT: &str = "binned_at";
 /// ListMeta archive timestamp (`spec/data-model.md` "Archived lists").
 /// Absent ≡ active; present ≡ archived. Written by `set_list_archived`;
@@ -174,64 +183,161 @@ impl From<loro::LoroEncodeError> for DocError {
     }
 }
 
-/// Derived four-state lifecycle of an item (`spec/data-model.md`),
-/// resolved from the stored `live` flag plus `done_at` / `binned_at`
-/// timestamps by precedence **Binned > Done > Live > Backlog**. The
-/// persisted representation is those three independent fields; this enum
-/// is the API-level view.
+/// Workflow state held by the atomic `lifecycle` register
+/// (`spec/data-model.md` "Lifecycle"): a five-step ladder, the first four
+/// of which are *Open*. Bin is **not** a workflow state — it is the
+/// orthogonal `binned_at` mask.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum WorkflowState {
+    Backlog = 0,
+    Todo = 1,
+    InProgress = 2,
+    Review = 3,
+    Done = 4,
+}
+
+impl WorkflowState {
+    /// The register's stored integer code.
+    pub fn code(self) -> i64 {
+        self as i64
+    }
+
+    /// Decode a stored register code. An unrecognized code (a newer
+    /// client's state) reads as `None`; the caller degrades to Backlog.
+    pub fn from_code(code: i64) -> Option<WorkflowState> {
+        match code {
+            0 => Some(WorkflowState::Backlog),
+            1 => Some(WorkflowState::Todo),
+            2 => Some(WorkflowState::InProgress),
+            3 => Some(WorkflowState::Review),
+            4 => Some(WorkflowState::Done),
+            _ => None,
+        }
+    }
+
+    /// Canonical export / event name (`spec/data-model.md` "Workflow
+    /// register — the v2 → v3 break").
+    pub fn name(self) -> &'static str {
+        match self {
+            WorkflowState::Backlog => "backlog",
+            WorkflowState::Todo => "todo",
+            WorkflowState::InProgress => "in_progress",
+            WorkflowState::Review => "review",
+            WorkflowState::Done => "done",
+        }
+    }
+
+    /// Inverse of [`name`](Self::name).
+    pub fn parse_name(s: &str) -> Option<WorkflowState> {
+        match s {
+            "backlog" => Some(WorkflowState::Backlog),
+            "todo" => Some(WorkflowState::Todo),
+            "in_progress" => Some(WorkflowState::InProgress),
+            "review" => Some(WorkflowState::Review),
+            "done" => Some(WorkflowState::Done),
+            _ => None,
+        }
+    }
+
+    /// Open = Backlog | Todo | In Progress | Review. The four open states
+    /// share each list's single manual order.
+    pub fn is_open(self) -> bool {
+        self <= WorkflowState::Review
+    }
+}
+
+/// API-level resolved lifecycle of an item (`spec/data-model.md`): the
+/// workflow register's state, or `Binned` while the `binned_at` mask is
+/// present. This is the target vocabulary of `set_item_lifecycle`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ItemLifecycle {
     Backlog,
-    Live,
+    Todo,
+    InProgress,
+    Review,
     Done,
     Binned,
 }
 
+impl From<WorkflowState> for ItemLifecycle {
+    fn from(s: WorkflowState) -> Self {
+        match s {
+            WorkflowState::Backlog => ItemLifecycle::Backlog,
+            WorkflowState::Todo => ItemLifecycle::Todo,
+            WorkflowState::InProgress => ItemLifecycle::InProgress,
+            WorkflowState::Review => ItemLifecycle::Review,
+            WorkflowState::Done => ItemLifecycle::Done,
+        }
+    }
+}
+
+impl ItemLifecycle {
+    /// The workflow state this lifecycle names, or `None` for `Binned`
+    /// (which is the mask, not a register state).
+    pub fn workflow_state(self) -> Option<WorkflowState> {
+        match self {
+            ItemLifecycle::Backlog => Some(WorkflowState::Backlog),
+            ItemLifecycle::Todo => Some(WorkflowState::Todo),
+            ItemLifecycle::InProgress => Some(WorkflowState::InProgress),
+            ItemLifecycle::Review => Some(WorkflowState::Review),
+            ItemLifecycle::Done => Some(WorkflowState::Done),
+            ItemLifecycle::Binned => None,
+        }
+    }
+}
+
 /// Stable view of a single item, surfaced to clients (CLI list, fingerprint).
-/// `live`, `done_at` and `binned_at` are independent stored fields; the
-/// displayed [`ItemLifecycle`] is derived from them by precedence.
-/// `list_id` is derived from the atomic `location` register.
+/// `state`/`lifecycle_at` mirror the workflow register (with the
+/// absent-register fallback `[Backlog, created_at]` already applied);
+/// `binned_at` is the orthogonal bin mask; `started_at`/`done_at` are the
+/// reflection stamps. `list_id` is derived from the atomic `location`
+/// register.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemView {
     pub id: String,
     pub text: String,
     pub notes: String,
     pub list_id: String,
-    /// Lifecycle flag (`spec/data-model.md`): `true` ≡ Live, `false` ≡
-    /// Backlog. Masked by `done_at`/`binned_at` when those are set; it is
-    /// the underlying open state revealed by un-done / restore.
-    pub live: bool,
+    /// Workflow register state (`spec/data-model.md` "Lifecycle").
+    /// Masked by `binned_at` when that is present — see
+    /// [`lifecycle`](Self::lifecycle) for the resolved value.
+    pub state: WorkflowState,
+    /// Unix millis the register's state was entered; `created_at` when
+    /// the register is absent.
+    pub lifecycle_at: i64,
     /// Optional date-only deadline — a floating local calendar date in
     /// `YYYY-MM-DD` format. `None` ≡ no deadline. The core stores and
     /// echoes the raw string; it never parses it into a timestamp.
     pub deadline: Option<String>,
     pub created_at: i64,
+    /// Reflection stamp: first entry into In Progress (write-once).
+    pub started_at: Option<i64>,
+    /// Reflection stamp: last entry into Done; never cleared. The Done
+    /// view sorts by `lifecycle_at`, not this.
     pub done_at: Option<i64>,
     pub binned_at: Option<i64>,
 }
 
 impl ItemView {
+    /// Workflow register says Done (regardless of the bin mask).
     pub fn is_done(&self) -> bool {
-        self.done_at.is_some()
+        self.state == WorkflowState::Done
     }
     pub fn is_binned(&self) -> bool {
         self.binned_at.is_some()
     }
-    /// Open (visible in a per-list view): neither done nor binned. The
-    /// Open projection of a list is its Backlog + Live items.
+    /// Open (visible in a per-list view): one of the four open workflow
+    /// states and not binned.
     pub fn is_open(&self) -> bool {
-        !self.is_done() && !self.is_binned()
+        !self.is_binned() && self.state.is_open()
     }
-    /// Resolved lifecycle by precedence Binned > Done > Live > Backlog.
+    /// Resolved lifecycle: `Binned` while the mask is present, else the
+    /// workflow register's state.
     pub fn lifecycle(&self) -> ItemLifecycle {
         if self.is_binned() {
             ItemLifecycle::Binned
-        } else if self.is_done() {
-            ItemLifecycle::Done
-        } else if self.live {
-            ItemLifecycle::Live
         } else {
-            ItemLifecycle::Backlog
+            self.state.into()
         }
     }
 }
@@ -391,6 +497,19 @@ pub struct ExportList {
     pub builtin: bool,
 }
 
+/// The workflow register in export form (`spec/data-model.md` "Workflow
+/// register — the v2 → v3 break"): the state as a name plus the unix
+/// millis it was entered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportLifecycle {
+    /// `"backlog" | "todo" | "in_progress" | "review" | "done"`. An
+    /// unrecognized name in a hand-edited export degrades to Backlog on
+    /// import.
+    pub state: String,
+    pub at: i64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportItem {
@@ -398,16 +517,27 @@ pub struct ExportItem {
     pub text: String,
     pub notes: String,
     pub list_id: String,
-    /// Lifecycle flag (`spec/data-model.md`): `true` ≡ Live. Skipped when
-    /// `false`/Backlog to keep the default-case JSON minimal and stay
-    /// byte-compatible with pre-lifecycle dumps.
-    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    /// v3 workflow register (`{state, at}`) — always emitted by v3
+    /// exports, for every item. Absent marks a **v2 export**: the
+    /// importer then maps `live`/`done_at` onto the register
+    /// (`spec/data-model.md` "Workflow register — the v2 → v3 break").
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub lifecycle: Option<ExportLifecycle>,
+    /// v2 lifecycle flag — accepted on import only (for the v2 → v3
+    /// mapping); v3 exports never write it.
+    #[serde(skip_serializing, default)]
     pub live: bool,
     /// Date-only deadline (`YYYY-MM-DD`). Skipped when unset to keep
     /// pre-deadline dumps byte-identical.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub deadline: Option<String>,
     pub created_at: i64,
+    /// Reflection stamp (first entry into In Progress). Skipped when
+    /// unset; v2 exports never carry it.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub started_at: Option<i64>,
+    /// In a v3 export: the `done_at` reflection stamp. In a v2 export:
+    /// done-as-state — mapped to register `[Done, done_at]` on import.
     pub done_at: Option<i64>,
     pub binned_at: Option<i64>,
 }
@@ -1216,28 +1346,39 @@ impl Doc {
         texts: &[&str],
         target_index: usize,
     ) -> Result<Vec<String>, DocError> {
-        self.add_items_at_impl(list_id, texts, target_index, false)
+        self.add_items_at_impl(list_id, texts, target_index, WorkflowState::Backlog)
     }
 
-    /// Board Live-lane quick-capture: append a new **Live** item to
-    /// `list_id`, one commit. New items are otherwise Backlog; this sets
-    /// the `live` flag in the same commit so the item materializes
-    /// directly in the Live lane (`spec/board.md`).
-    pub fn add_item_live(&self, list_id: &str, text: &str) -> Result<String, DocError> {
-        self.add_item_live_at(list_id, text, usize::MAX)
-    }
-
-    /// Board Live-lane quick-capture at a position: insert a new Live
-    /// item as the `target_index`-th open entry of `list_id`, one commit.
-    /// `target_index` addresses the list's Open projection — the same
-    /// index space as `add_item_at`.
-    pub fn add_item_live_at(
+    /// Board open-lane quick-capture: append a new item directly in the
+    /// open workflow state `state`, one commit (`spec/board.md`
+    /// "Capture"). Rejects `Done` — the Done lane logs completions via
+    /// create-then-transition, not direct capture.
+    pub fn add_item_in_state(
         &self,
         list_id: &str,
         text: &str,
+        state: WorkflowState,
+    ) -> Result<String, DocError> {
+        self.add_item_in_state_at(list_id, text, state, usize::MAX)
+    }
+
+    /// Board open-lane quick-capture at a position: insert a new item in
+    /// state `state` as the `target_index`-th open entry of `list_id`,
+    /// one commit. `target_index` addresses the list's Open projection —
+    /// the same index space as `add_item_at`.
+    pub fn add_item_in_state_at(
+        &self,
+        list_id: &str,
+        text: &str,
+        state: WorkflowState,
         target_index: usize,
     ) -> Result<String, DocError> {
-        let ids = self.add_items_at_impl(list_id, &[text], target_index, true)?;
+        if !state.is_open() {
+            return Err(DocError::Invalid(
+                "can only capture directly into an open workflow state".into(),
+            ));
+        }
+        let ids = self.add_items_at_impl(list_id, &[text], target_index, state)?;
         Ok(ids.into_iter().next().expect("one text yields one id"))
     }
 
@@ -1246,7 +1387,7 @@ impl Doc {
         list_id: &str,
         texts: &[&str],
         target_index: usize,
-        live: bool,
+        state: WorkflowState,
     ) -> Result<Vec<String>, DocError> {
         let trimmed: Vec<&str> = texts.iter().map(|t| t.trim()).collect();
         if trimmed.iter().any(|t| t.is_empty()) {
@@ -1279,8 +1420,14 @@ impl Doc {
                 .encode()
                 .as_str(),
             )?;
-            if live {
-                map.insert(KEY_LIVE, true)?;
+            if state != WorkflowState::Backlog {
+                // Direct capture into a non-default open lane: write the
+                // register (and the started_at stamp when the lane is
+                // In Progress) in the same commit (`spec/board.md`).
+                write_workflow(&map, state, now)?;
+                if state == WorkflowState::InProgress {
+                    map.insert(KEY_STARTED_AT, now)?;
+                }
             }
             let entry = OrderEntry {
                 item_id: id.clone(),
@@ -1338,9 +1485,11 @@ impl Doc {
                 text,
                 notes: String::new(),
                 created_at: now,
+                state,
+                lifecycle_at: now,
+                started_at: (state == WorkflowState::InProgress).then_some(now),
                 done_at: None,
                 binned_at: None,
-                live,
                 deadline: None,
                 open_index,
             });
@@ -1584,7 +1733,7 @@ impl Doc {
             .encode()
             .as_str(),
         )?;
-        // The `live` lifecycle flag is list-agnostic and rides along with
+        // The workflow register is list-agnostic and rides along with
         // the item across lists (`spec/data-model.md`); nothing to clear.
         let (plan, src_positions, was_visible) = {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
@@ -1682,104 +1831,52 @@ impl Doc {
         guard.plan_target(list_id, target_index, is_open, exclude)
     }
 
-    /// Set or clear an item's done state. Independent of `binned` —
-    /// flipping done leaves `binned_at` untouched. Order containers are
-    /// untouched: a hidden item's entry stays in place so restore
-    /// returns it to exactly its former position.
+    /// Convenience toggle over the workflow ladder: `done == true` is the
+    /// Done transition; `done == false` is **un-done** — a plain write to
+    /// Backlog (`spec/data-model.md` "Set lifecycle"), applied only to
+    /// items whose resolved lifecycle is currently Done (so it never
+    /// yanks a Todo/In Progress/Review item back to Backlog).
     pub fn set_item_done(&self, item_id: &str, done: bool) -> Result<(), DocError> {
-        let map = self.find_item(item_id)?;
-        let prev_done = read_i64(&map, KEY_DONE_AT);
-        let new_done = match (done, prev_done) {
-            (true, Some(_)) => return Ok(()),
-            (false, None) => return Ok(()),
-            (true, None) => Some(now_millis()),
-            (false, Some(_)) => None,
-        };
-        match new_done {
-            Some(t) => {
-                map.insert(KEY_DONE_AT, t)?;
-            }
-            None => {
-                let _ = map.delete(KEY_DONE_AT);
-            }
-        }
-        let binned_at = read_i64(&map, KEY_BINNED_AT);
-        // Done self-compacts Focus: setting done removes the item's focus
-        // ref in the same commit (`spec/focus.md`).
-        let focus_removed = if new_done.is_some() {
-            self.prune_focus_refs(&std::iter::once(item_id.to_string()).collect())
-        } else {
-            0
-        };
-        self.inner.commit();
-        let open_index = self.sync_item_openness(item_id, &map);
-        self.push_event(AppEvent::ItemLifecycleChanged {
-            id: item_id.to_string(),
-            live: read_live(&map),
-            done_at: new_done,
-            binned_at,
-            open_index,
-        });
-        if focus_removed > 0 {
-            self.push_event(AppEvent::FocusChanged);
-        }
-        Ok(())
+        self.set_items_done(&[item_id], done)
     }
 
-    /// Set or clear done state for many items in one commit. Surgical
-    /// below `BULK_LIFECYCLE_EVENT_THRESHOLD`: work is proportional to the
-    /// touched items' lists, never total doc size. At/above the
-    /// threshold it falls back to one rebuild + diff.
+    /// Bulk [`set_item_done`](Self::set_item_done): one commit, one shared
+    /// `now`. Surgical below `BULK_LIFECYCLE_EVENT_THRESHOLD`: work is
+    /// proportional to the touched items' lists, never total doc size.
+    /// At/above the threshold it falls back to one rebuild + diff.
     pub fn set_items_done(&self, item_ids: &[&str], done: bool) -> Result<(), DocError> {
-        self.set_items_timestamp(item_ids, done, KEY_DONE_AT)
-    }
-
-    /// Set or clear an item's binned state. Independent of `done` —
-    /// binning a done item keeps it done; restoring (unbinning) leaves
-    /// the done state alone.
-    pub fn set_item_binned(&self, item_id: &str, binned: bool) -> Result<(), DocError> {
-        let map = self.find_item(item_id)?;
-        let prev_binned = read_i64(&map, KEY_BINNED_AT);
-        let new_binned = match (binned, prev_binned) {
-            (true, Some(_)) => return Ok(()),
-            (false, None) => return Ok(()),
-            (true, None) => Some(now_millis()),
-            (false, Some(_)) => None,
+        let write = if done {
+            LifecycleWrite::Set(ItemLifecycle::Done)
+        } else {
+            LifecycleWrite::UnDone
         };
-        match new_binned {
-            Some(t) => {
-                map.insert(KEY_BINNED_AT, t)?;
-            }
-            None => {
-                let _ = map.delete(KEY_BINNED_AT);
-            }
-        }
-        let done_at = read_i64(&map, KEY_DONE_AT);
-        self.inner.commit();
-        let open_index = self.sync_item_openness(item_id, &map);
-        self.push_event(AppEvent::ItemLifecycleChanged {
-            id: item_id.to_string(),
-            live: read_live(&map),
-            done_at,
-            binned_at: new_binned,
-            open_index,
-        });
-        Ok(())
+        self.set_items_lifecycle_impl(item_ids, write)
     }
 
-    /// Set or clear binned state for many items in one commit.
-    /// Surgical / bulk-fallback split for the same reason as
-    /// `set_items_done`.
+    /// Convenience toggle over the bin mask: `binned == true` is the
+    /// Binned transition (mask set, workflow register preserved for
+    /// restore); `binned == false` is **restore** — clear the mask only,
+    /// revealing the preserved workflow state (which may itself be Done).
+    pub fn set_item_binned(&self, item_id: &str, binned: bool) -> Result<(), DocError> {
+        self.set_items_binned(&[item_id], binned)
+    }
+
+    /// Bulk [`set_item_binned`](Self::set_item_binned): one commit, one
+    /// shared `now`. Surgical / bulk-fallback split as `set_items_done`.
     pub fn set_items_binned(&self, item_ids: &[&str], binned: bool) -> Result<(), DocError> {
-        self.set_items_timestamp(item_ids, binned, KEY_BINNED_AT)
+        let write = if binned {
+            LifecycleWrite::Set(ItemLifecycle::Binned)
+        } else {
+            LifecycleWrite::Restore
+        };
+        self.set_items_lifecycle_impl(item_ids, write)
     }
 
     /// Move one item to a target [`ItemLifecycle`] in a single commit,
-    /// writing the stored `live` / `done_at` / `binned_at` fields per the
-    /// transition table in `spec/data-model.md`. This is the primitive the
-    /// board uses; `set_item_done` / `set_item_binned` are convenience
-    /// wrappers for the toggle cases (and preserve un-done / restore
-    /// masking semantics that this method does not).
+    /// writing the workflow register / bin mask (plus reflection stamps)
+    /// per the transition table in `spec/data-model.md`. This is the
+    /// primitive the board uses; the `done`/`bin`/`restore` helpers are
+    /// convenience wrappers over it.
     pub fn set_item_lifecycle(
         &self,
         item_id: &str,
@@ -1789,12 +1886,24 @@ impl Doc {
     }
 
     /// Bulk [`set_item_lifecycle`]: move many items to the same target
-    /// lifecycle in one commit. Surgical below
+    /// lifecycle in one commit (one shared `now`). Surgical below
     /// `BULK_LIFECYCLE_EVENT_THRESHOLD`, rebuild+diff at/above it.
     pub fn set_items_lifecycle(
         &self,
         item_ids: &[&str],
         lifecycle: ItemLifecycle,
+    ) -> Result<(), DocError> {
+        self.set_items_lifecycle_impl(item_ids, LifecycleWrite::Set(lifecycle))
+    }
+
+    /// Shared driver behind every lifecycle mutation: resolve all ids up
+    /// front (an unknown id aborts before any write), apply the
+    /// transition with one shared `now`, prune Focus on Done, commit
+    /// once, and emit per-item events (or the bulk rebuild + diff).
+    fn set_items_lifecycle_impl(
+        &self,
+        item_ids: &[&str],
+        write: LifecycleWrite,
     ) -> Result<(), DocError> {
         if item_ids.is_empty() {
             return Ok(());
@@ -1806,9 +1915,10 @@ impl Doc {
             .iter()
             .map(|id| self.find_item(id).map(|map| (*id, map)))
             .collect::<Result<_, _>>()?;
+        let now = now_millis();
         let mut changed: Vec<(&str, LoroMap)> = Vec::new();
         for (item_id, map) in maps {
-            if apply_lifecycle(&map, lifecycle)? {
+            if apply_lifecycle_write(&map, write, now)? {
                 changed.push((item_id, map));
             }
         }
@@ -1820,7 +1930,7 @@ impl Doc {
         // is the one lifecycle transition that touches a second container —
         // a Done focus ref renders nothing, so Focus stays finite without
         // relying on the unwired `reconcile()`. Binned is left to the sweep.
-        let focus_removed = if lifecycle == ItemLifecycle::Done {
+        let focus_removed = if write == LifecycleWrite::Set(ItemLifecycle::Done) {
             let done_ids: HashSet<String> = changed.iter().map(|(id, _)| id.to_string()).collect();
             self.prune_focus_refs(&done_ids)
         } else {
@@ -1837,9 +1947,12 @@ impl Doc {
         }
         for (item_id, map) in changed {
             let open_index = self.sync_item_openness(item_id, &map);
+            let (state, lifecycle_at) = workflow_of(&map);
             self.push_event(AppEvent::ItemLifecycleChanged {
                 id: item_id.to_string(),
-                live: read_live(&map),
+                state,
+                lifecycle_at,
+                started_at: read_i64(&map, KEY_STARTED_AT),
                 done_at: read_i64(&map, KEY_DONE_AT),
                 binned_at: read_i64(&map, KEY_BINNED_AT),
                 open_index,
@@ -2019,84 +2132,7 @@ impl Doc {
             .collect()
     }
 
-    fn set_items_timestamp(&self, item_ids: &[&str], on: bool, key: &str) -> Result<(), DocError> {
-        if item_ids.is_empty() {
-            return Ok(());
-        }
-        assert_unique_item_ids(item_ids)?;
-        let pre_items = (item_ids.len() >= BULK_LIFECYCLE_EVENT_THRESHOLD)
-            .then(|| self.iter_items().collect::<Vec<ItemView>>());
-        // Resolve everything up front so an unknown id errors before
-        // any map is touched.
-        let maps: Vec<(&str, LoroMap)> = item_ids
-            .iter()
-            .map(|id| self.find_item(id).map(|map| (*id, map)))
-            .collect::<Result<_, _>>()?;
-        let mut changed: Vec<(&str, LoroMap, Option<i64>)> = Vec::new();
-        for (item_id, map) in maps {
-            let prev = read_i64(&map, key);
-            let new = match (on, prev) {
-                (true, Some(_)) | (false, None) => continue,
-                (true, None) => Some(now_millis()),
-                (false, Some(_)) => None,
-            };
-            match new {
-                Some(t) => {
-                    map.insert(key, t)?;
-                }
-                None => {
-                    let _ = map.delete(key);
-                }
-            }
-            changed.push((item_id, map, new));
-        }
-        if changed.is_empty() {
-            return Ok(());
-        }
-        // Setting done (not clearing) self-compacts Focus in the same
-        // commit (`spec/focus.md`); only the `done_at` key does this.
-        let focus_removed = if key == KEY_DONE_AT && on {
-            let done_ids: HashSet<String> = changed
-                .iter()
-                .filter(|(_, _, new)| new.is_some())
-                .map(|(id, _, _)| id.to_string())
-                .collect();
-            if done_ids.is_empty() {
-                0
-            } else {
-                self.prune_focus_refs(&done_ids)
-            }
-        } else {
-            0
-        };
-        self.inner.commit();
-        if focus_removed > 0 {
-            self.push_event(AppEvent::FocusChanged);
-        }
-        if let Some(pre) = pre_items {
-            self.rebuild_index();
-            self.emit_item_diffs(&pre);
-            return Ok(());
-        }
-        for (item_id, map, new) in changed {
-            let open_index = self.sync_item_openness(item_id, &map);
-            let (done_at, binned_at) = if key == KEY_DONE_AT {
-                (new, read_i64(&map, KEY_BINNED_AT))
-            } else {
-                (read_i64(&map, KEY_DONE_AT), new)
-            };
-            self.push_event(AppEvent::ItemLifecycleChanged {
-                id: item_id.to_string(),
-                live: read_live(&map),
-                done_at,
-                binned_at,
-                open_index,
-            });
-        }
-        Ok(())
-    }
-
-    /// Refresh the index after an item's done/binned flags changed.
+    /// Refresh the index after an item's lifecycle changed.
     /// Returns the item's open index within its list (`None` when
     /// hidden). Hiding is an O(open) splice; a restore recomputes the
     /// list's projection to find the re-entry position.
@@ -2717,9 +2753,16 @@ impl Doc {
                 text: item.text,
                 notes: item.notes,
                 list_id: item.list_id,
-                live: item.live,
+                // Always emitted (fallback already applied) so the
+                // importer can tell a v3 item from a v2 one by presence.
+                lifecycle: Some(ExportLifecycle {
+                    state: item.state.name().to_string(),
+                    at: item.lifecycle_at,
+                }),
+                live: false,
                 deadline: item.deadline,
                 created_at: item.created_at,
+                started_at: item.started_at,
                 done_at: item.done_at,
                 binned_at: item.binned_at,
             })
@@ -2856,10 +2899,47 @@ impl Doc {
                 .as_str(),
             )?;
             map.insert(KEY_CREATED_AT, src_item.created_at)?;
-            // Lifecycle flag rides along; a missing/false `live` (Backlog,
-            // and any legacy column-era dump) leaves the key unset.
-            if src_item.live {
-                map.insert(KEY_LIVE, true)?;
+            // Workflow register + reflection stamps. A v3 export carries
+            // the register explicitly; a v2 export (no `lifecycle` key)
+            // is mapped per `spec/data-model.md` "Workflow register —
+            // the v2 → v3 break": `done_at` ⇒ `[Done, done_at]` (also
+            // seeding the `done_at` stamp), else `live` ⇒
+            // `[InProgress, created_at]`, else Backlog (register
+            // omitted). `started_at` accrues only from v3 exports.
+            let (register, started_at, done_stamp) = match &src_item.lifecycle {
+                Some(lc) => (
+                    Some((
+                        // An unrecognized state name in a hand-edited
+                        // export degrades to Backlog: visible and open.
+                        WorkflowState::parse_name(&lc.state).unwrap_or(WorkflowState::Backlog),
+                        lc.at,
+                    )),
+                    src_item.started_at,
+                    src_item.done_at,
+                ),
+                None => {
+                    if let Some(t) = src_item.done_at {
+                        (Some((WorkflowState::Done, t)), None, Some(t))
+                    } else if src_item.live {
+                        (
+                            Some((WorkflowState::InProgress, src_item.created_at)),
+                            None,
+                            None,
+                        )
+                    } else {
+                        (None, None, None)
+                    }
+                }
+            };
+            if let Some((state, at)) = register {
+                // The exact fallback value stays unwritten so a plain
+                // Backlog item round-trips to a keyless map.
+                if state != WorkflowState::Backlog || at != src_item.created_at {
+                    write_workflow(&map, state, at)?;
+                }
+            }
+            if let Some(t) = started_at {
+                map.insert(KEY_STARTED_AT, t)?;
             }
             // Carry a well-formed deadline through; a malformed one in a
             // hand-edited export is silently dropped rather than aborting
@@ -2875,7 +2955,7 @@ impl Doc {
             if !notes.is_empty() {
                 map.insert(KEY_NOTES, notes)?;
             }
-            if let Some(t) = src_item.done_at {
+            if let Some(t) = done_stamp {
                 map.insert(KEY_DONE_AT, t)?;
             }
             if let Some(t) = src_item.binned_at {
@@ -2889,7 +2969,8 @@ impl Doc {
                 .encode()
                 .as_str(),
             )?;
-            let open = src_item.done_at.is_none() && src_item.binned_at.is_none();
+            let open = src_item.binned_at.is_none()
+                && register.is_none_or(|(state, _)| state.is_open());
             item_id_map.insert(src_item.id.clone(), (new_item_id, open));
             items_added += 1;
         }
@@ -2959,19 +3040,19 @@ impl Doc {
     }
 
     /// Cross-list "Done" view: ids of done-but-not-binned items, sorted
-    /// by `done_at` descending. Ties broken by id ascending so the
-    /// order is deterministic across devices despite client-clock skew.
-    /// Binned items are excluded — Bin owns them in the UI even if
-    /// they're also done.
+    /// by the workflow register's `at` descending. Ties broken by id
+    /// ascending so the order is deterministic across devices despite
+    /// client-clock skew. Binned items are excluded — Bin owns them in
+    /// the UI even if their preserved state is Done.
     pub fn done_item_ids(&self) -> Vec<String> {
         let mut items: Vec<ItemView> = self
             .iter_items()
             .filter(|i| i.is_done() && !i.is_binned())
             .collect();
         items.sort_by(|a, b| {
-            let at = a.done_at.unwrap_or(0);
-            let bt = b.done_at.unwrap_or(0);
-            bt.cmp(&at).then_with(|| a.id.cmp(&b.id))
+            b.lifecycle_at
+                .cmp(&a.lifecycle_at)
+                .then_with(|| a.id.cmp(&b.id))
         });
         items.into_iter().map(|i| i.id).collect()
     }
@@ -3407,10 +3488,12 @@ impl Doc {
                     [
                         KEY_TEXT,
                         KEY_NOTES,
+                        KEY_DEADLINE,
+                        KEY_LIFECYCLE,
+                        KEY_STARTED_AT,
                         KEY_DONE_AT,
                         KEY_BINNED_AT,
                         KEY_LOCATION,
-                        KEY_LIVE,
                     ]
                     .into_iter()
                     .map(str::to_string)
@@ -3532,18 +3615,27 @@ impl Doc {
                         deadline: view.deadline.clone(),
                     });
                 }
-                // A Backlog↔Live flip (the `live` register alone) on an
-                // item that stays open changes its lane but not its order,
-                // so the per-list walk emits nothing for it — surface the
-                // lifecycle here. When done/binned also changed this frame,
-                // the lifecycle event is emitted by those paths instead.
-                if has(KEY_LIVE) && new.open && !(has(KEY_DONE_AT) || has(KEY_BINNED_AT)) {
+                // An open→open workflow flip (the register alone, e.g.
+                // Backlog → In Progress) changes the item's lane but not
+                // its order, so the per-list walk emits nothing for it —
+                // surface the lifecycle here. Hidden↔open transitions are
+                // emitted by the walk / hidden paths instead.
+                let was_open = c.old.as_ref().is_some_and(|o| o.open);
+                if new.open
+                    && was_open
+                    && (has(KEY_LIFECYCLE)
+                        || has(KEY_STARTED_AT)
+                        || has(KEY_DONE_AT)
+                        || has(KEY_BINNED_AT))
+                {
                     let open_index = post_open
                         .get(&new.list_id)
                         .and_then(|arr| arr.iter().position(|x| x == id));
                     self.push_event(AppEvent::ItemLifecycleChanged {
                         id: id.clone(),
-                        live: view.live,
+                        state: view.state,
+                        lifecycle_at: view.lifecycle_at,
+                        started_at: view.started_at,
                         done_at: view.done_at,
                         binned_at: view.binned_at,
                         open_index,
@@ -3575,18 +3667,22 @@ impl Doc {
                     text: view.text,
                     notes: view.notes,
                     created_at: view.created_at,
+                    state: view.state,
+                    lifecycle_at: view.lifecycle_at,
+                    started_at: view.started_at,
                     done_at: view.done_at,
                     binned_at: view.binned_at,
-                    live: view.live,
                     deadline: view.deadline,
                     open_index: None,
                 });
                 continue;
             }
-            if has(KEY_DONE_AT) || has(KEY_BINNED_AT) || has(KEY_LIVE) {
+            if has(KEY_LIFECYCLE) || has(KEY_STARTED_AT) || has(KEY_DONE_AT) || has(KEY_BINNED_AT) {
                 self.push_event(AppEvent::ItemLifecycleChanged {
                     id: id.clone(),
-                    live: view.live,
+                    state: view.state,
+                    lifecycle_at: view.lifecycle_at,
+                    started_at: view.started_at,
                     done_at: view.done_at,
                     binned_at: view.binned_at,
                     open_index: None,
@@ -3633,9 +3729,11 @@ impl Doc {
                             text: view.text,
                             notes: view.notes,
                             created_at: view.created_at,
+                            state: view.state,
+                            lifecycle_at: view.lifecycle_at,
+                            started_at: view.started_at,
                             done_at: view.done_at,
                             binned_at: view.binned_at,
-                            live: view.live,
                             deadline: view.deadline,
                             open_index: Some(i),
                         },
@@ -3648,13 +3746,17 @@ impl Doc {
                 // on the consumer, so an `ItemMoved` candidate
                 // repositions them like any other id.
                 let shown = c.old.as_ref().is_some_and(|o| !o.open);
-                if shown && (c.keys.contains(KEY_DONE_AT) || c.keys.contains(KEY_BINNED_AT)) {
+                if shown
+                    && (c.keys.contains(KEY_LIFECYCLE) || c.keys.contains(KEY_BINNED_AT))
+                {
                     let view = view_of(id)?;
                     insert_type.insert(
                         id,
                         AppEvent::ItemLifecycleChanged {
                             id: id.clone(),
-                            live: view.live,
+                            state: view.state,
+                            lifecycle_at: view.lifecycle_at,
+                            started_at: view.started_at,
                             done_at: view.done_at,
                             binned_at: view.binned_at,
                             open_index: Some(i),
@@ -3878,9 +3980,11 @@ impl Doc {
                 text: item.text,
                 notes: item.notes,
                 created_at: item.created_at,
+                state: item.state,
+                lifecycle_at: item.lifecycle_at,
+                started_at: item.started_at,
                 done_at: item.done_at,
                 binned_at: item.binned_at,
-                live: item.live,
                 deadline: item.deadline,
                 open_index,
             });
@@ -3971,10 +4075,14 @@ impl Doc {
             hash_str(&mut hasher, &i.text);
             hash_str(&mut hasher, &i.notes);
             hash_str(&mut hasher, &i.list_id);
-            // Lifecycle flag is part of logical state (`spec/data-model.md`).
-            hasher.update([i.live as u8]);
+            // The resolved workflow register (state + at), the bin mask,
+            // and the reflection stamps are all logical state
+            // (`spec/data-model.md`).
+            hasher.update([i.state as u8]);
+            hasher.update(i.lifecycle_at.to_be_bytes());
             hash_opt_str(&mut hasher, i.deadline.as_deref());
             hasher.update(i.created_at.to_be_bytes());
+            hash_opt_i64(&mut hasher, i.started_at);
             hash_opt_i64(&mut hasher, i.done_at);
             hash_opt_i64(&mut hasher, i.binned_at);
         }
@@ -4384,14 +4492,17 @@ fn item_view(map: &LoroMap) -> Option<ItemView> {
         .and_then(|s| Location::parse(&s))
         .map(|l| l.list_id)
         .unwrap_or_else(|| LIST_INBOX.to_string());
+    let (state, lifecycle_at) = workflow_of(map);
     Some(ItemView {
         id: read_string(map, KEY_ID)?,
         text: read_string(map, KEY_TEXT)?,
         notes: read_string(map, KEY_NOTES).unwrap_or_default(),
         list_id: location,
-        live: read_live(map),
+        state,
+        lifecycle_at,
         deadline: read_string(map, KEY_DEADLINE).filter(|s| !s.is_empty()),
         created_at: read_i64(map, KEY_CREATED_AT)?,
+        started_at: read_i64(map, KEY_STARTED_AT),
         done_at: read_i64(map, KEY_DONE_AT),
         binned_at: read_i64(map, KEY_BINNED_AT),
     })
@@ -4417,67 +4528,117 @@ fn read_default_view(map: &LoroMap, key: &str) -> Option<DefaultView> {
         .and_then(DefaultView::parse)
 }
 
-/// The item's stored lifecycle flag: `true` ≡ Live, absent/`false` ≡
-/// Backlog (`spec/data-model.md`). Independent of `done_at`/`binned_at`.
-fn read_live(map: &LoroMap) -> bool {
-    read_bool(map, KEY_LIVE).unwrap_or(false)
+/// Decode the item's workflow register: a plain `LoroValue` list
+/// `[state, at]`. Wrong shape, non-integer members, or an unrecognized
+/// state code (a newer client's state) all read as `None` — the caller
+/// applies the `[Backlog, created_at]` fallback so a future state
+/// degrades to visible-and-open, never silently hidden.
+fn read_workflow(map: &LoroMap) -> Option<(WorkflowState, i64)> {
+    let v = map.get(KEY_LIFECYCLE)?;
+    let value = v.as_value()?.clone();
+    let list = value.into_list().ok()?;
+    let [state, at] = list.as_slice() else {
+        return None;
+    };
+    let state = state.clone().into_i64().ok()?;
+    let at = at.clone().into_i64().ok()?;
+    Some((WorkflowState::from_code(state)?, at))
 }
 
-/// Apply a target [`ItemLifecycle`] to an item map by writing the stored
-/// `live` / `done_at` / `binned_at` fields per the transition table
-/// (`spec/data-model.md`). Returns whether any field changed; does not
-/// commit. A timestamp the transition *sets* is written as `now` only
-/// when absent, so re-applying Done/Binned keeps the original timestamp.
-fn apply_lifecycle(map: &LoroMap, lifecycle: ItemLifecycle) -> Result<bool, DocError> {
-    let cur_live = read_live(map);
-    let cur_done = read_i64(map, KEY_DONE_AT);
-    let cur_binned = read_i64(map, KEY_BINNED_AT);
-    let (want_live, want_done, want_binned): (bool, Option<i64>, Option<i64>) = match lifecycle {
-        ItemLifecycle::Backlog => (false, None, None),
-        ItemLifecycle::Live => (true, None, None),
-        ItemLifecycle::Done => (cur_live, Some(cur_done.unwrap_or_else(now_millis)), None),
-        ItemLifecycle::Binned => (
-            cur_live,
-            cur_done,
-            Some(cur_binned.unwrap_or_else(now_millis)),
-        ),
-    };
-    let mut changed = false;
-    if want_live != cur_live {
-        if want_live {
-            map.insert(KEY_LIVE, true)?;
-        } else {
-            let _ = map.delete(KEY_LIVE);
+/// The item's workflow register with the absent/unparseable fallback
+/// applied: `[Backlog, created_at]`.
+fn workflow_of(map: &LoroMap) -> (WorkflowState, i64) {
+    read_workflow(map)
+        .unwrap_or_else(|| (WorkflowState::Backlog, read_i64(map, KEY_CREATED_AT).unwrap_or(0)))
+}
+
+/// Write the workflow register as one atomic plain value — a single op,
+/// merged whole by LWW.
+fn write_workflow(map: &LoroMap, state: WorkflowState, at: i64) -> Result<(), DocError> {
+    let value = LoroValue::List(vec![LoroValue::I64(state.code()), LoroValue::I64(at)].into());
+    map.insert(KEY_LIFECYCLE, value)?;
+    Ok(())
+}
+
+/// One entry in the lifecycle-mutation vocabulary — the target of
+/// [`Doc::set_items_lifecycle_impl`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LifecycleWrite {
+    /// The transition table's targets (`spec/data-model.md` "Set
+    /// lifecycle").
+    Set(ItemLifecycle),
+    /// Restore from the bin: clear `binned_at` only, revealing the
+    /// preserved workflow state. No-op when not binned.
+    Restore,
+    /// Un-done: write Backlog, but only for items currently resolved
+    /// Done (skips the rest, so a bulk un-done never disturbs open items).
+    UnDone,
+}
+
+/// Apply one lifecycle transition to an item map per the transition
+/// table (`spec/data-model.md` "Set lifecycle"). Returns whether
+/// anything was written; does not commit. Re-applying the current
+/// resolved lifecycle is a no-op.
+///
+/// - Open / Done targets write the register `[state, now]`, clear the
+///   bin mask, and ride the reflection stamps in the same batch:
+///   entering In Progress sets `started_at` iff absent; entering Done
+///   sets `done_at`.
+/// - Binned sets the mask only — the register is preserved for restore.
+fn apply_lifecycle(map: &LoroMap, lifecycle: ItemLifecycle, now: i64) -> Result<bool, DocError> {
+    let binned = read_i64(map, KEY_BINNED_AT).is_some();
+    match lifecycle.workflow_state() {
+        None => {
+            if binned {
+                return Ok(false);
+            }
+            map.insert(KEY_BINNED_AT, now)?;
+            Ok(true)
         }
-        changed = true;
-    }
-    if want_done != cur_done {
-        match want_done {
-            Some(t) => {
-                map.insert(KEY_DONE_AT, t)?;
+        Some(want) => {
+            let (cur, _) = workflow_of(map);
+            if !binned && cur == want {
+                return Ok(false);
             }
-            None => {
-                let _ = map.delete(KEY_DONE_AT);
-            }
-        }
-        changed = true;
-    }
-    if want_binned != cur_binned {
-        match want_binned {
-            Some(t) => {
-                map.insert(KEY_BINNED_AT, t)?;
-            }
-            None => {
+            if binned {
                 let _ = map.delete(KEY_BINNED_AT);
             }
+            write_workflow(map, want, now)?;
+            if want == WorkflowState::InProgress && read_i64(map, KEY_STARTED_AT).is_none() {
+                map.insert(KEY_STARTED_AT, now)?;
+            }
+            if want == WorkflowState::Done {
+                map.insert(KEY_DONE_AT, now)?;
+            }
+            Ok(true)
         }
-        changed = true;
     }
-    Ok(changed)
+}
+
+/// Dispatch a [`LifecycleWrite`] onto an item map. Returns whether
+/// anything was written; does not commit.
+fn apply_lifecycle_write(map: &LoroMap, write: LifecycleWrite, now: i64) -> Result<bool, DocError> {
+    match write {
+        LifecycleWrite::Set(lifecycle) => apply_lifecycle(map, lifecycle, now),
+        LifecycleWrite::Restore => {
+            if read_i64(map, KEY_BINNED_AT).is_none() {
+                return Ok(false);
+            }
+            let _ = map.delete(KEY_BINNED_AT);
+            Ok(true)
+        }
+        LifecycleWrite::UnDone => {
+            let binned = read_i64(map, KEY_BINNED_AT).is_some();
+            if binned || workflow_of(map).0 != WorkflowState::Done {
+                return Ok(false);
+            }
+            apply_lifecycle(map, ItemLifecycle::Backlog, now)
+        }
+    }
 }
 
 fn is_open(map: &LoroMap) -> bool {
-    read_i64(map, KEY_DONE_AT).is_none() && read_i64(map, KEY_BINNED_AT).is_none()
+    read_i64(map, KEY_BINNED_AT).is_none() && workflow_of(map).0.is_open()
 }
 
 fn hash_str(hasher: &mut Sha256, s: &str) {
@@ -4568,9 +4729,11 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     text: post_it.text.clone(),
                     notes: post_it.notes.clone(),
                     created_at: post_it.created_at,
+                    state: post_it.state,
+                    lifecycle_at: post_it.lifecycle_at,
+                    started_at: post_it.started_at,
                     done_at: post_it.done_at,
                     binned_at: post_it.binned_at,
-                    live: post_it.live,
                     deadline: post_it.deadline.clone(),
                     open_index,
                 });
@@ -4594,13 +4757,17 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                         deadline: post_it.deadline.clone(),
                     });
                 }
-                if pre_it.live != post_it.live
+                if pre_it.state != post_it.state
+                    || pre_it.lifecycle_at != post_it.lifecycle_at
+                    || pre_it.started_at != post_it.started_at
                     || pre_it.done_at != post_it.done_at
                     || pre_it.binned_at != post_it.binned_at
                 {
                     out.push(AppEvent::ItemLifecycleChanged {
                         id: post_it.id.clone(),
-                        live: post_it.live,
+                        state: post_it.state,
+                        lifecycle_at: post_it.lifecycle_at,
+                        started_at: post_it.started_at,
                         done_at: post_it.done_at,
                         binned_at: post_it.binned_at,
                         open_index,
@@ -5223,7 +5390,8 @@ mod tests {
         let d = doc.add_item(&list, "d").unwrap();
         doc.edit_item_notes(&a, "some notes").unwrap();
         doc.set_item_deadline(&a, Some("2026-09-01")).unwrap();
-        doc.set_item_lifecycle(&b, ItemLifecycle::Live).unwrap();
+        doc.set_item_lifecycle(&b, ItemLifecycle::InProgress)
+            .unwrap();
         doc.set_item_done(&c, true).unwrap();
         doc.set_item_binned(&d, true).unwrap();
         doc.move_item(&a, &list, 1).unwrap();
@@ -7303,9 +7471,11 @@ mod tests {
             text: "   ".to_string(),
             notes: String::new(),
             list_id: LIST_INBOX.to_string(),
+            lifecycle: None,
             live: false,
             deadline: None,
             created_at: 1,
+            started_at: None,
             done_at: None,
             binned_at: None,
         });
@@ -7336,7 +7506,10 @@ mod tests {
         // item (a live doc self-compacts these, so force it in the JSON).
         for item in &mut export.items {
             if item.text == "done-later" {
-                item.done_at = Some(42);
+                item.lifecycle = Some(ExportLifecycle {
+                    state: "done".to_string(),
+                    at: 42,
+                });
             }
         }
 
@@ -7602,9 +7775,11 @@ mod tests {
                 text: "stranded".to_string(),
                 notes: String::new(),
                 list_id: "no-such-list".to_string(),
+                lifecycle: None,
                 live: false,
                 deadline: None,
                 created_at: 1_700_000_000_000,
+                started_at: None,
                 done_at: None,
                 binned_at: None,
             }],
@@ -7953,191 +8128,308 @@ mod tests {
     // ---------- lifecycle (spec/data-model.md, spec/board.md) ----------
 
     #[test]
-    fn new_item_defaults_to_backlog() {
+    fn new_item_defaults_to_backlog_with_created_at_fallback() {
         let doc = Doc::new().unwrap();
         let id = doc.add_item(LIST_INBOX, "x").unwrap();
         let it = doc.get_item(&id).unwrap();
         assert_eq!(it.lifecycle(), ItemLifecycle::Backlog);
-        assert!(!it.live);
+        assert_eq!(it.state, WorkflowState::Backlog);
+        assert_eq!(
+            it.lifecycle_at, it.created_at,
+            "absent register reads as [Backlog, created_at]"
+        );
         assert!(it.is_open());
+        assert!(it.started_at.is_none() && it.done_at.is_none());
+        // The register itself stays unwritten for new items.
+        let map = doc.find_item(&id).unwrap();
+        assert!(map.get(KEY_LIFECYCLE).is_none());
         assert_eq!(doc.open_item_ids(LIST_INBOX), vec![id]);
     }
 
     #[test]
-    fn add_item_live_creates_live() {
+    fn add_item_in_state_captures_directly_into_open_lanes() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item_live(LIST_INBOX, "x").unwrap();
-        let it = doc.get_item(&id).unwrap();
-        assert_eq!(it.lifecycle(), ItemLifecycle::Live);
-        assert!(it.live && it.is_open());
-        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![id]);
+        for state in [
+            WorkflowState::Todo,
+            WorkflowState::InProgress,
+            WorkflowState::Review,
+        ] {
+            let id = doc
+                .add_item_in_state(LIST_INBOX, state.name(), state)
+                .unwrap();
+            let it = doc.get_item(&id).unwrap();
+            assert_eq!(it.state, state);
+            assert!(it.is_open());
+            // Capturing straight into In Progress stamps started_at.
+            assert_eq!(it.started_at.is_some(), state == WorkflowState::InProgress);
+        }
+        // Backlog capture leaves the register unwritten (same as add_item).
+        let plain = doc
+            .add_item_in_state(LIST_INBOX, "plain", WorkflowState::Backlog)
+            .unwrap();
+        let map = doc.find_item(&plain).unwrap();
+        assert!(map.get(KEY_LIFECYCLE).is_none());
+        // Done is not a capture lane.
+        assert!(matches!(
+            doc.add_item_in_state(LIST_INBOX, "nope", WorkflowState::Done)
+                .unwrap_err(),
+            DocError::Invalid(_)
+        ));
     }
 
     #[test]
-    fn backlog_live_flip_preserves_list_order() {
+    fn open_state_flips_preserve_list_order() {
         let doc = Doc::new().unwrap();
         let a = doc.add_item(LIST_INBOX, "a").unwrap();
         let b = doc.add_item(LIST_INBOX, "b").unwrap();
         let c = doc.add_item(LIST_INBOX, "c").unwrap();
         let ordered = vec![a.clone(), b.clone(), c.clone()];
         assert_eq!(doc.open_item_ids(LIST_INBOX), ordered);
-        // Flip b Backlog→Live: shared Open order is untouched.
-        doc.set_item_lifecycle(&b, ItemLifecycle::Live).unwrap();
-        assert_eq!(doc.open_item_ids(LIST_INBOX), ordered);
-        assert_eq!(doc.get_item(&b).unwrap().lifecycle(), ItemLifecycle::Live);
-        // ...and back to Backlog.
-        doc.set_item_lifecycle(&b, ItemLifecycle::Backlog).unwrap();
-        assert_eq!(doc.open_item_ids(LIST_INBOX), ordered);
-        assert_eq!(
-            doc.get_item(&b).unwrap().lifecycle(),
-            ItemLifecycle::Backlog
-        );
+        // Walk b around the open ladder: the shared Open order never moves.
+        for lc in [
+            ItemLifecycle::Todo,
+            ItemLifecycle::InProgress,
+            ItemLifecycle::Review,
+            ItemLifecycle::Backlog,
+        ] {
+            doc.set_item_lifecycle(&b, lc).unwrap();
+            assert_eq!(doc.open_item_ids(LIST_INBOX), ordered);
+            assert_eq!(doc.get_item(&b).unwrap().lifecycle(), lc);
+        }
+        assert_open_projection_matches_doc(&doc);
     }
 
     #[test]
-    fn complete_backlog_then_undo_returns_to_backlog() {
+    fn undone_lands_in_backlog_not_prior_state() {
+        // The workflow ladder has no masking: un-done is a plain write to
+        // Backlog, whatever state the item was completed from.
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_INBOX, "x").unwrap();
+        let id = doc
+            .add_item_in_state(LIST_INBOX, "x", WorkflowState::Review)
+            .unwrap();
         doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
         assert_eq!(doc.get_item(&id).unwrap().lifecycle(), ItemLifecycle::Done);
-        assert!(!doc.get_item(&id).unwrap().live, "masked Backlog preserved");
         doc.set_item_done(&id, false).unwrap();
         assert_eq!(
             doc.get_item(&id).unwrap().lifecycle(),
             ItemLifecycle::Backlog
         );
+        // Un-done on a non-Done item is a no-op, not a Backlog write.
+        let open = doc
+            .add_item_in_state(LIST_INBOX, "y", WorkflowState::InProgress)
+            .unwrap();
+        let _ = doc.drain_events();
+        doc.set_item_done(&open, false).unwrap();
+        assert!(doc.drain_events().is_empty());
+        assert_eq!(
+            doc.get_item(&open).unwrap().lifecycle(),
+            ItemLifecycle::InProgress
+        );
     }
 
     #[test]
-    fn complete_live_then_undo_returns_to_live() {
-        let doc = Doc::new().unwrap();
-        let id = doc.add_item_live(LIST_INBOX, "x").unwrap();
-        doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
-        let it = doc.get_item(&id).unwrap();
-        assert_eq!(it.lifecycle(), ItemLifecycle::Done);
-        assert!(it.live, "Done preserves the underlying Live flag");
-        doc.set_item_done(&id, false).unwrap();
-        assert_eq!(doc.get_item(&id).unwrap().lifecycle(), ItemLifecycle::Live);
-    }
-
-    #[test]
-    fn binning_and_restoring_preserves_underlying_state() {
+    fn binning_and_restoring_preserves_workflow_register() {
         let doc = Doc::new().unwrap();
         let backlog = doc.add_item(LIST_INBOX, "backlog").unwrap();
-        let live = doc.add_item_live(LIST_INBOX, "live").unwrap();
-        let done = doc.add_item_live(LIST_INBOX, "done").unwrap();
+        let progress = doc
+            .add_item_in_state(LIST_INBOX, "progress", WorkflowState::InProgress)
+            .unwrap();
+        let done = doc.add_item(LIST_INBOX, "done").unwrap();
         doc.set_item_lifecycle(&done, ItemLifecycle::Done).unwrap();
+        let done_at_before = doc.get_item(&done).unwrap().lifecycle_at;
 
-        for id in [&backlog, &live, &done] {
+        for id in [&backlog, &progress, &done] {
             doc.set_item_lifecycle(id, ItemLifecycle::Binned).unwrap();
             assert_eq!(doc.get_item(id).unwrap().lifecycle(), ItemLifecycle::Binned);
         }
-        // Restore (clear binned only) reveals each preserved underlying state.
+        // Restore (clear the mask only) reveals each preserved state —
+        // including Done, with its register timestamp untouched.
         doc.set_item_binned(&backlog, false).unwrap();
-        doc.set_item_binned(&live, false).unwrap();
+        doc.set_item_binned(&progress, false).unwrap();
         doc.set_item_binned(&done, false).unwrap();
         assert_eq!(
             doc.get_item(&backlog).unwrap().lifecycle(),
             ItemLifecycle::Backlog
         );
         assert_eq!(
-            doc.get_item(&live).unwrap().lifecycle(),
-            ItemLifecycle::Live
+            doc.get_item(&progress).unwrap().lifecycle(),
+            ItemLifecycle::InProgress
         );
+        let restored = doc.get_item(&done).unwrap();
+        assert_eq!(restored.lifecycle(), ItemLifecycle::Done);
         assert_eq!(
-            doc.get_item(&done).unwrap().lifecycle(),
-            ItemLifecycle::Done
+            restored.lifecycle_at, done_at_before,
+            "restore never touches the register"
         );
     }
 
     #[test]
-    fn explicit_transitions_clear_the_right_overlays() {
+    fn reapplying_resolved_state_is_a_noop() {
         let doc = Doc::new().unwrap();
-        // Live → Done → Binned, then explicit Backlog clears everything.
-        let id = doc.add_item_live(LIST_INBOX, "x").unwrap();
-        doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
-        doc.set_item_lifecycle(&id, ItemLifecycle::Binned).unwrap();
+        let id = doc.add_item(LIST_INBOX, "x").unwrap();
+        let _ = doc.drain_events();
+        // Backlog onto a fresh (register-less) item: no commit, no event.
+        let vv = doc.oplog_vv();
         doc.set_item_lifecycle(&id, ItemLifecycle::Backlog).unwrap();
-        let it = doc.get_item(&id).unwrap();
-        assert_eq!(it.lifecycle(), ItemLifecycle::Backlog);
-        assert!(!it.live && it.done_at.is_none() && it.binned_at.is_none());
-
-        // Binned+Done → Live sets live and clears both timestamps.
-        let j = doc.add_item(LIST_INBOX, "y").unwrap();
-        doc.set_item_lifecycle(&j, ItemLifecycle::Done).unwrap();
-        doc.set_item_lifecycle(&j, ItemLifecycle::Binned).unwrap();
-        doc.set_item_lifecycle(&j, ItemLifecycle::Live).unwrap();
-        let jt = doc.get_item(&j).unwrap();
-        assert_eq!(jt.lifecycle(), ItemLifecycle::Live);
-        assert!(jt.live && jt.done_at.is_none() && jt.binned_at.is_none());
-    }
-
-    #[test]
-    fn lifecycle_precedence_binned_over_done_over_live() {
-        let doc = Doc::new().unwrap();
-        let id = doc.add_item_live(LIST_INBOX, "x").unwrap();
-        doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
-        assert_eq!(doc.get_item(&id).unwrap().lifecycle(), ItemLifecycle::Done);
+        assert!(doc.drain_events().is_empty());
+        assert_eq!(doc.oplog_vv(), vv);
+        // Same-state re-apply after a real transition keeps the timestamp.
+        doc.set_item_lifecycle(&id, ItemLifecycle::Todo).unwrap();
+        let at = doc.get_item(&id).unwrap().lifecycle_at;
+        let _ = doc.drain_events();
+        doc.set_item_lifecycle(&id, ItemLifecycle::Todo).unwrap();
+        assert!(doc.drain_events().is_empty());
+        assert_eq!(doc.get_item(&id).unwrap().lifecycle_at, at);
+        // Re-binning an already-binned item is a no-op too.
         doc.set_item_lifecycle(&id, ItemLifecycle::Binned).unwrap();
-        let it = doc.get_item(&id).unwrap();
-        assert_eq!(it.lifecycle(), ItemLifecycle::Binned);
-        // All three underlying fields survive under the precedence mask.
-        assert!(it.live && it.done_at.is_some() && it.binned_at.is_some());
+        let binned_at = doc.get_item(&id).unwrap().binned_at;
+        let _ = doc.drain_events();
+        doc.set_item_lifecycle(&id, ItemLifecycle::Binned).unwrap();
+        assert!(doc.drain_events().is_empty());
+        assert_eq!(doc.get_item(&id).unwrap().binned_at, binned_at);
     }
 
     #[test]
-    fn open_projection_contains_only_backlog_and_live() {
+    fn reflection_stamps_ride_transitions() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_INBOX, "x").unwrap();
+        // First entry into In Progress stamps started_at, write-once.
+        doc.set_item_lifecycle(&id, ItemLifecycle::InProgress)
+            .unwrap();
+        let started = doc.get_item(&id).unwrap().started_at.unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        doc.set_item_lifecycle(&id, ItemLifecycle::Review).unwrap();
+        doc.set_item_lifecycle(&id, ItemLifecycle::InProgress)
+            .unwrap();
+        assert_eq!(
+            doc.get_item(&id).unwrap().started_at,
+            Some(started),
+            "started_at is write-once"
+        );
+        // Each entry into Done stamps done_at; un-done never clears it.
+        doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
+        let first_done = doc.get_item(&id).unwrap().done_at.unwrap();
+        doc.set_item_done(&id, false).unwrap();
+        assert_eq!(
+            doc.get_item(&id).unwrap().done_at,
+            Some(first_done),
+            "done_at survives un-done"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
+        let second_done = doc.get_item(&id).unwrap().done_at.unwrap();
+        assert!(second_done > first_done, "done_at re-stamps on each entry");
+    }
+
+    #[test]
+    fn done_view_sorts_by_register_at_desc() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        doc.set_item_lifecycle(&a, ItemLifecycle::Done).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        doc.set_item_lifecycle(&b, ItemLifecycle::Done).unwrap();
+        assert_eq!(doc.done_item_ids(), vec![b.clone(), a.clone()]);
+        // Re-completing a re-stamps the register; it moves to the top.
+        doc.set_item_done(&a, false).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        doc.set_item_lifecycle(&a, ItemLifecycle::Done).unwrap();
+        assert_eq!(doc.done_item_ids(), vec![a, b]);
+    }
+
+    #[test]
+    fn open_projection_contains_all_four_open_states() {
         let doc = Doc::new().unwrap();
         let backlog = doc.add_item(LIST_INBOX, "backlog").unwrap();
-        let live = doc.add_item_live(LIST_INBOX, "live").unwrap();
+        let todo = doc
+            .add_item_in_state(LIST_INBOX, "todo", WorkflowState::Todo)
+            .unwrap();
+        let progress = doc
+            .add_item_in_state(LIST_INBOX, "progress", WorkflowState::InProgress)
+            .unwrap();
+        let review = doc
+            .add_item_in_state(LIST_INBOX, "review", WorkflowState::Review)
+            .unwrap();
         let done = doc.add_item(LIST_INBOX, "done").unwrap();
         let binned = doc.add_item(LIST_INBOX, "binned").unwrap();
         doc.set_item_lifecycle(&done, ItemLifecycle::Done).unwrap();
         doc.set_item_lifecycle(&binned, ItemLifecycle::Binned)
             .unwrap();
-        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![backlog, live]);
+        assert_eq!(
+            doc.open_item_ids(LIST_INBOX),
+            vec![backlog, todo, progress, review]
+        );
         assert_eq!(doc.done_item_ids(), vec![done]);
         assert_eq!(doc.binned_item_ids(), vec![binned]);
     }
 
     #[test]
-    fn events_carry_live_and_open_index() {
+    fn unparseable_register_degrades_to_backlog() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_INBOX, "x").unwrap();
+        let map = doc.find_item(&id).unwrap();
+        // A future client's state code, and outright garbage — both read
+        // as the [Backlog, created_at] fallback: visible and open.
+        for garbage in [
+            LoroValue::List(vec![LoroValue::I64(99), LoroValue::I64(1)].into()),
+            LoroValue::String("nonsense".to_string().into()),
+            LoroValue::List(vec![LoroValue::I64(1)].into()),
+        ] {
+            map.insert(KEY_LIFECYCLE, garbage).unwrap();
+            doc.inner.commit();
+            doc.rebuild_index();
+            let it = doc.get_item(&id).unwrap();
+            assert_eq!(it.state, WorkflowState::Backlog);
+            assert_eq!(it.lifecycle_at, it.created_at);
+            assert!(it.is_open(), "future state must never hide data");
+            assert_eq!(doc.open_item_ids(LIST_INBOX), vec![id.clone()]);
+        }
+    }
+
+    #[test]
+    fn events_carry_state_and_open_index() {
         let doc = Doc::new().unwrap();
         let _ = doc.drain_events();
         let a = doc.add_item(LIST_INBOX, "a").unwrap(); // Backlog
-        let b = doc.add_item_live(LIST_INBOX, "b").unwrap(); // Live
+        let b = doc
+            .add_item_in_state(LIST_INBOX, "b", WorkflowState::InProgress)
+            .unwrap();
         match doc.drain_events().as_slice() {
             [
                 AppEvent::ItemAdded {
                     id: ia,
-                    live: la,
+                    state: sa,
                     open_index: oa,
                     ..
                 },
                 AppEvent::ItemAdded {
                     id: ib,
-                    live: lb,
+                    state: sb,
+                    started_at: stb,
                     open_index: ob,
                     ..
                 },
             ] => {
-                assert_eq!((ia, *la, *oa), (&a, false, Some(0)));
-                assert_eq!((ib, *lb, *ob), (&b, true, Some(1)));
+                assert_eq!((ia, *sa, *oa), (&a, WorkflowState::Backlog, Some(0)));
+                assert_eq!((ib, *sb, *ob), (&b, WorkflowState::InProgress, Some(1)));
+                assert!(stb.is_some(), "In Progress capture stamps started_at");
             }
             other => panic!("unexpected add events: {other:?}"),
         }
-        // Backlog→Live flip keeps the item at its open index, live now true.
-        doc.set_item_lifecycle(&a, ItemLifecycle::Live).unwrap();
+        // Open→open flip keeps the item at its open index; the event
+        // carries the new register state.
+        doc.set_item_lifecycle(&a, ItemLifecycle::Todo).unwrap();
         let evs = doc.drain_events();
         assert!(
             matches!(
                 evs.as_slice(),
                 [AppEvent::ItemLifecycleChanged {
                     id,
-                    live: true,
+                    state: WorkflowState::Todo,
                     done_at: None,
                     binned_at: None,
                     open_index: Some(0),
+                    ..
                 }] if id == &a
             ),
             "got {evs:?}"
@@ -8145,44 +8437,132 @@ mod tests {
     }
 
     #[test]
-    fn export_import_preserves_lifecycle() {
+    fn export_import_round_trips_v3_lifecycle() {
         let src = Doc::new().unwrap();
         let _backlog = src.add_item(LIST_INBOX, "backlog").unwrap();
-        let _live = src.add_item_live(LIST_INBOX, "live").unwrap();
-        let done = src.add_item_live(LIST_INBOX, "done").unwrap();
+        let _review = src
+            .add_item_in_state(LIST_INBOX, "review", WorkflowState::Review)
+            .unwrap();
+        let started = src
+            .add_item_in_state(LIST_INBOX, "started", WorkflowState::InProgress)
+            .unwrap();
+        let done = src.add_item(LIST_INBOX, "done").unwrap();
         src.set_item_lifecycle(&done, ItemLifecycle::Done).unwrap();
 
         let export = src.export_json();
         let by_text = |t: &str| export.items.iter().find(|i| i.text == t).unwrap();
-        assert!(!by_text("backlog").live, "Backlog omits live");
-        assert!(by_text("live").live);
-        assert!(by_text("done").live, "Done keeps its underlying Live flag");
+        // Every v3 item carries the register with a named state.
+        assert_eq!(
+            by_text("backlog").lifecycle.as_ref().unwrap().state,
+            "backlog"
+        );
+        assert_eq!(by_text("review").lifecycle.as_ref().unwrap().state, "review");
+        assert_eq!(
+            by_text("started").lifecycle.as_ref().unwrap().state,
+            "in_progress"
+        );
+        assert_eq!(by_text("done").lifecycle.as_ref().unwrap().state, "done");
+        assert!(by_text("started").started_at.is_some());
+        assert!(by_text("done").done_at.is_some());
+        // The exported JSON never carries the v2 `live` flag.
+        assert!(!src.export_json_string().contains("\"live\""));
 
         let dst = Doc::new().unwrap();
         dst.import_json(&export).unwrap();
-        let lifecycle_of = |t: &str| {
-            dst.all_items()
-                .into_iter()
-                .find(|i| i.text == t)
-                .unwrap()
-                .lifecycle()
-        };
-        assert_eq!(lifecycle_of("backlog"), ItemLifecycle::Backlog);
-        assert_eq!(lifecycle_of("live"), ItemLifecycle::Live);
-        assert_eq!(lifecycle_of("done"), ItemLifecycle::Done);
+        let view_of = |t: &str| dst.all_items().into_iter().find(|i| i.text == t).unwrap();
+        assert_eq!(view_of("backlog").lifecycle(), ItemLifecycle::Backlog);
+        assert_eq!(view_of("review").lifecycle(), ItemLifecycle::Review);
+        assert_eq!(view_of("started").lifecycle(), ItemLifecycle::InProgress);
+        assert_eq!(view_of("done").lifecycle(), ItemLifecycle::Done);
+        assert_eq!(
+            view_of("started").started_at,
+            src.get_item(&started).unwrap().started_at,
+            "reflection stamps round-trip"
+        );
+        assert_eq!(
+            view_of("done").lifecycle_at,
+            src.get_item(&done).unwrap().lifecycle_at,
+            "register timestamps round-trip"
+        );
     }
 
     #[test]
-    fn fingerprint_covers_live_state() {
+    fn import_maps_v2_exports_onto_the_register() {
+        // A v2 export has no `lifecycle` key: `binned_at` carries through,
+        // `done_at` ⇒ [Done, done_at] (even when also binned), `live` ⇒
+        // [InProgress, created_at], else Backlog.
+        let json = r#"{
+            "version": 1,
+            "settings": { "showListCounts": true },
+            "lists": [
+                { "id": "inbox", "name": "Inbox", "createdAt": null, "builtin": true }
+            ],
+            "items": [
+                { "id": "i1", "text": "plain", "notes": "", "listId": "inbox",
+                  "createdAt": 100, "doneAt": null, "binnedAt": null },
+                { "id": "i2", "text": "was live", "notes": "", "listId": "inbox", "live": true,
+                  "createdAt": 200, "doneAt": null, "binnedAt": null },
+                { "id": "i3", "text": "was done", "notes": "", "listId": "inbox",
+                  "createdAt": 300, "doneAt": 350, "binnedAt": null },
+                { "id": "i4", "text": "done then binned", "notes": "", "listId": "inbox",
+                  "createdAt": 400, "doneAt": 450, "binnedAt": 460 }
+            ]
+        }"#;
+        let doc = Doc::new().unwrap();
+        doc.import_json_str(json).unwrap();
+        let by_text = |t: &str| doc.all_items().into_iter().find(|i| i.text == t).unwrap();
+        let plain = by_text("plain");
+        assert_eq!(plain.lifecycle(), ItemLifecycle::Backlog);
+        assert_eq!(plain.lifecycle_at, 100);
+        let live = by_text("was live");
+        assert_eq!(live.lifecycle(), ItemLifecycle::InProgress);
+        assert_eq!(
+            live.lifecycle_at, 200,
+            "v2 recorded no live-transition time; created_at stands in"
+        );
+        assert!(live.started_at.is_none(), "started_at accrues from v3 only");
+        let done = by_text("was done");
+        assert_eq!(done.lifecycle(), ItemLifecycle::Done);
+        assert_eq!(done.lifecycle_at, 350);
+        assert_eq!(done.done_at, Some(350), "v2 done_at seeds the stamp");
+        let binned = by_text("done then binned");
+        assert_eq!(binned.lifecycle(), ItemLifecycle::Binned);
+        assert_eq!(binned.binned_at, Some(460));
+        assert_eq!(
+            binned.state,
+            WorkflowState::Done,
+            "restore then reveals Done, matching v2 masking"
+        );
+    }
+
+    #[test]
+    fn import_degrades_unknown_register_state_to_backlog() {
+        let src = Doc::new().unwrap();
+        let _ = src.add_item(LIST_INBOX, "future").unwrap();
+        let mut export = src.export_json();
+        export.items[0].lifecycle = Some(ExportLifecycle {
+            state: "hologram".to_string(),
+            at: 42,
+        });
+        let dst = Doc::new().unwrap();
+        dst.import_json(&export).unwrap();
+        let it = dst.all_items().into_iter().next().unwrap();
+        assert_eq!(it.state, WorkflowState::Backlog);
+        assert!(it.is_open());
+    }
+
+    #[test]
+    fn fingerprint_covers_workflow_state() {
         let doc = Doc::new().unwrap();
         let id = doc.add_item(LIST_INBOX, "x").unwrap();
         let before = doc.fingerprint();
-        doc.set_item_lifecycle(&id, ItemLifecycle::Live).unwrap();
-        assert_ne!(doc.fingerprint(), before, "live flag must diverge the hash");
-        // Reverting the flag returns to the original hash — the flag is the
-        // only difference and is folded into the item hash.
+        doc.set_item_lifecycle(&id, ItemLifecycle::Todo).unwrap();
+        let todo = doc.fingerprint();
+        assert_ne!(todo, before, "register state must diverge the hash");
+        // Returning to Backlog writes a *new* [Backlog, now] register —
+        // the transition time is logical state, so the hash stays new.
         doc.set_item_lifecycle(&id, ItemLifecycle::Backlog).unwrap();
-        assert_eq!(doc.fingerprint(), before);
+        assert_ne!(doc.fingerprint(), todo);
     }
 
     #[test]
@@ -8195,9 +8575,9 @@ mod tests {
         a.mark_persisted();
         b.apply_remote(&dek, &blob).unwrap();
 
-        // Concurrent divergent lifecycle writes: A marks Done, B marks Live.
+        // Concurrent divergent transitions: A marks Done, B marks Review.
         a.set_item_lifecycle(&item, ItemLifecycle::Done).unwrap();
-        b.set_item_lifecycle(&item, ItemLifecycle::Live).unwrap();
+        b.set_item_lifecycle(&item, ItemLifecycle::Review).unwrap();
         let blob_a = a.pending_export(&dek).unwrap().unwrap();
         let blob_b = b.pending_export(&dek).unwrap().unwrap();
         a.mark_persisted();
@@ -8206,13 +8586,46 @@ mod tests {
         b.apply_remote(&dek, &blob_a).unwrap();
 
         assert_eq!(a.fingerprint(), b.fingerprint(), "replicas must converge");
-        // Both fields merged by LWW; precedence resolves the same lane on each.
-        assert_eq!(
-            a.get_item(&item).unwrap().lifecycle(),
-            b.get_item(&item).unwrap().lifecycle()
-        );
+        // The whole-value register merged by LWW: both replicas resolve
+        // the identical state and timestamp.
+        let (va, vb) = (a.get_item(&item).unwrap(), b.get_item(&item).unwrap());
+        assert_eq!(va.lifecycle(), vb.lifecycle());
+        assert_eq!(va.lifecycle_at, vb.lifecycle_at);
         assert_open_projection_matches_doc(&a);
         assert_open_projection_matches_doc(&b);
+    }
+
+    #[test]
+    fn concurrent_bin_and_transition_converge_to_both() {
+        // A bins while B (offline) moves the item to Review: the merge is
+        // binned with Review preserved underneath for restore.
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let item = a.add_item(LIST_INBOX, "shared").unwrap();
+        let seed = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_persisted();
+        let mut b = Doc::empty();
+        b.apply_remote(&dek, &seed).unwrap();
+
+        a.set_item_lifecycle(&item, ItemLifecycle::Binned).unwrap();
+        b.set_item_lifecycle(&item, ItemLifecycle::Review).unwrap();
+        let blob_a = a.pending_export(&dek).unwrap().unwrap();
+        let blob_b = b.pending_export(&dek).unwrap().unwrap();
+        a.mark_persisted();
+        b.mark_persisted();
+        a.apply_remote(&dek, &blob_b).unwrap();
+        b.apply_remote(&dek, &blob_a).unwrap();
+
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        let v = a.get_item(&item).unwrap();
+        assert_eq!(v.lifecycle(), ItemLifecycle::Binned);
+        assert_eq!(v.state, WorkflowState::Review);
+        // Restore reveals the other device's transition.
+        a.set_item_binned(&item, false).unwrap();
+        assert_eq!(
+            a.get_item(&item).unwrap().lifecycle(),
+            ItemLifecycle::Review
+        );
     }
 
     // ---------- focus (spec/focus.md) ----------

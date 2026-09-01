@@ -33,20 +33,21 @@ import {
   type DocApp,
   type ItemView,
   type ListView,
+  type WorkflowState,
 } from "./sync/store.ts";
 
 export function TaskDialog(props: {
   /** The open item's id, or null when closed. */
   itemId: () => string | null;
   setItemId: (id: string | null) => void;
-  /** New-item mode: a target lane to capture into (`live: true` = Live,
-   *  `false` = Backlog / list view). Mutually exclusive with `itemId`;
-   *  nothing is written until a non-empty title is committed on close.
-   *  `index`, when set, inserts at that position in the list's Open
-   *  projection (Space capture below a board card); omitted appends. */
+  /** New-item mode: a target open lane to capture into (`backlog` is the
+   *  list view's default). Mutually exclusive with `itemId`; nothing is
+   *  written until a non-empty title is committed on close. `index`,
+   *  when set, inserts at that position in the list's Open projection
+   *  (Space capture below a board card); omitted appends. */
   newItem?: () => {
     listId: string;
-    live: boolean;
+    state: WorkflowState;
     index?: number;
     /** Log an already-completed item: created open, marked done on commit. */
     done?: boolean;
@@ -54,7 +55,7 @@ export function TaskDialog(props: {
   setNewItem?: (
     v: {
       listId: string;
-      live: boolean;
+      state: WorkflowState;
       index?: number;
       done?: boolean;
     } | null,
@@ -151,7 +152,7 @@ export function TaskDialog(props: {
   const setNewItemList = (targetId: string) => {
     const nw = newItemTarget();
     if (!nw || targetId === nw.listId) return;
-    props.setNewItem?.({ listId: targetId, live: nw.live, done: nw.done });
+    props.setNewItem?.({ listId: targetId, state: nw.state, done: nw.done });
   };
   // Toggle whether a new capture is logged as already-done.
   const setNewItemDone = (done: boolean) => {
@@ -289,19 +290,20 @@ export function TaskDialog(props: {
     if (!open()) loadedId = null;
   });
 
-  // Commit new-item mode: create the item in its target lane (Live when
-  // `live`, else Backlog) iff the title is non-empty, then close. A capture
-  // without an explicit slot lands at the TOP of the lane (index 0) —
-  // matching the list view's inline-draft default — rather than appending.
+  // Commit new-item mode: create the item in its target lane's workflow
+  // state iff the title is non-empty, then close. A capture without an
+  // explicit slot lands at the TOP of the lane (index 0) — matching the
+  // list view's inline-draft default — rather than appending.
   const commitNew = () => {
     const nw = newItemTarget();
     if (nw) {
       const t = editorText(titleRef).trim();
       if (t) {
         const at = nw.index ?? 0;
-        const id = nw.live
-          ? props.app.addItemLiveAt(nw.listId, t, at)
-          : props.app.addItemAt(nw.listId, t, at);
+        const id =
+          nw.state !== "backlog"
+            ? props.app.addItemInStateAt(nw.listId, t, nw.state, at)
+            : props.app.addItemAt(nw.listId, t, at);
         const n = editorText(notesRef);
         if (n.trim()) props.app.editItemNotes(id, n);
         const d = newDeadline();
@@ -576,7 +578,7 @@ export function TaskDialog(props: {
               <span class="task-dialog-created">
                 {isDone(it())
                   ? m().workspace.completedStamp(
-                      formatDialogStamp(it().doneAt!, nowMs(), locale(), { inline: true }),
+                      formatDialogStamp(it().lifecycleAt, nowMs(), locale(), { inline: true }),
                     )
                   : m().workspace.createdStamp(
                       formatDialogStamp(it().createdAt, nowMs(), locale(), { inline: true }),

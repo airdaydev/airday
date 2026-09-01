@@ -55,10 +55,14 @@ enum Cmd {
     Add(items::AddArgs),
     /// List items.
     Ls(items::LsArgs),
-    /// Move an item to the Backlog lane.
+    /// Move an item to the Backlog state.
     Backlog(items::IdArg),
-    /// Move an item to the Live lane.
-    Live(items::IdArg),
+    /// Move an item to the Todo state.
+    Todo(items::IdArg),
+    /// Move an item to In Progress (stamps started_at on first entry).
+    Start(items::IdArg),
+    /// Move an item to the Review state.
+    Review(items::IdArg),
     /// Mark an item done.
     Done(items::IdArg),
     /// Send an item to the bin (or operate on the bin namespace).
@@ -95,7 +99,9 @@ impl Cli {
             Cmd::Add(a) => items::add(a, sync).await,
             Cmd::Ls(a) => items::ls(a, sync).await,
             Cmd::Backlog(a) => items::backlog(a, sync).await,
-            Cmd::Live(a) => items::live(a, sync).await,
+            Cmd::Todo(a) => items::todo(a, sync).await,
+            Cmd::Start(a) => items::start(a, sync).await,
+            Cmd::Review(a) => items::review(a, sync).await,
             Cmd::Done(a) => items::done(a, sync).await,
             Cmd::Bin(a) => bin::run(a, sync).await,
             Cmd::Restore(a) => items::restore(a, sync).await,

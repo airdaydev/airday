@@ -35,7 +35,7 @@ const localeByLanguage: Record<AppLanguage, string> = {
   en: "en-US",
 };
 
-type Messages = {
+export type Messages = {
   common: {
     loading: string;
     add: string;
@@ -175,10 +175,15 @@ type Messages = {
   board: {
     viewAsBoard: string;
     viewAsList: string;
-    /** Header labels for the three fixed board lanes (spec/board.md). */
+    /** Header labels for the five fixed board lanes (spec/board.md). */
     backlogLane: string;
-    liveLane: string;
+    todoLane: string;
+    inProgressLane: string;
+    reviewLane: string;
     doneLane: string;
+    /** View-mode popover section label for the open-lane visibility
+     *  toggles (client-local lane hiding, spec/board.md). */
+    lanes: string;
     addItem: string;
     /** Accessible name for the list/board view-mode segmented control. */
     viewMode: string;
@@ -274,9 +279,6 @@ type Messages = {
     showInList: string;
     /** Context-menu jump from a list / board to the item in the Focus lens. */
     showInFocus: string;
-    /** Flat Focus view lifecycle toggles (no lanes — spec/focus.md). */
-    markLive: string;
-    markBacklog: string;
     /** Empty-state hint shown when the Focus lens has no visible refs. */
     empty: string;
   };
@@ -429,8 +431,11 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       viewAsBoard: "Vista de tablero",
       viewAsList: "Vista de lista",
       backlogLane: "Pendiente",
-      liveLane: "En curso",
+      todoLane: "Por hacer",
+      inProgressLane: "En curso",
+      reviewLane: "Revisión",
       doneLane: "Hecho",
+      lanes: "Carriles",
       addItem: "Añadir elemento",
       viewMode: "Modo de vista",
       list: "Lista",
@@ -495,8 +500,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       badge: "Enfoque",
       showInList: "Ver en la lista",
       showInFocus: "Ver en Enfoque",
-      markLive: "Marcar en curso",
-      markBacklog: "Marcar como pendiente",
       empty:
         "Enfoque está vacío. Añade un elemento nuevo aquí, o haz clic derecho en uno existente y elige «Añadir a Enfoque», para organizar en qué estás trabajando.",
     },
@@ -648,8 +651,11 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       viewAsBoard: "Board view",
       viewAsList: "List view",
       backlogLane: "Backlog",
-      liveLane: "In progress",
+      todoLane: "Todo",
+      inProgressLane: "In progress",
+      reviewLane: "Review",
       doneLane: "Done",
+      lanes: "Lanes",
       addItem: "Add item",
       viewMode: "View mode",
       list: "List",
@@ -714,8 +720,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       badge: "Focus",
       showInList: "Show in list",
       showInFocus: "Show in Focus",
-      markLive: "Mark as in progress",
-      markBacklog: "Mark as backlog",
       empty:
         "Nothing in Focus yet. Add a new item here, or right-click an existing one and choose “Add to Focus”, to line up what you're working on.",
     },

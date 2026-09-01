@@ -20,29 +20,51 @@ import { batch, createSignal, type Accessor } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import { createSearchEngine, type SearchEngine } from "../search.ts";
 
-/** Done and binned are independent flags — an item can be both. The
- *  presence of the timestamp *is* the flag; there's no separate
- *  boolean. Helpers below derive predicates without recomputing. */
+/** Workflow register state (`spec/data-model.md` "Lifecycle"): the
+ *  five-step ladder held by the atomic `[state, at]` register. Bin is
+ *  not a state — it is the orthogonal `binnedAt` mask. */
+export type WorkflowState =
+  | "backlog"
+  | "todo"
+  | "in_progress"
+  | "review"
+  | "done";
+
+/** The four open states, in board lane order. */
+export const OPEN_STATES: readonly WorkflowState[] = [
+  "backlog",
+  "todo",
+  "in_progress",
+  "review",
+];
+
 export interface ItemView {
   id: string;
   text: string;
   notes: string;
   listId: string;
-  /** Lifecycle flag (`spec/data-model.md`): `true` ≡ Live, `false` ≡
-   *  Backlog underneath any done/binned mask. The board's Backlog/Live
-   *  lanes partition a list's Open items by this flag. */
-  live: boolean;
+  /** Workflow register state, masked by `binnedAt` when that is set.
+   *  The board partitions a list's Open items by this into lanes. */
+  state: WorkflowState;
+  /** The register's transition timestamp (unix millis) — the Done view's
+   *  sort key. Equals `createdAt` while the register is unwritten. */
+  lifecycleAt: number;
   /** Optional date-only deadline as a raw `YYYY-MM-DD` string (floating
    *  local calendar date — never parse it with `new Date("YYYY-MM-DD")`,
    *  which reads as UTC midnight). Absent means no deadline. */
   deadline?: string;
   createdAt: number;
+  /** Reflection stamp: first entry into In Progress, if any. */
+  startedAt?: number;
+  /** Reflection stamp: last entry into Done, if any. View sorts use
+   *  `lifecycleAt`, not this. */
   doneAt?: number;
   binnedAt?: number;
 }
 
-/** Derived four-state lifecycle (`spec/data-model.md`). */
-export type Lifecycle = "backlog" | "live" | "done" | "binned";
+/** Resolved lifecycle (`spec/data-model.md`): the workflow state, or
+ *  `binned` while the mask is present. */
+export type Lifecycle = WorkflowState | "binned";
 
 /** Map the JS lifecycle string onto the wasm `ItemLifecycle` enum the
  *  engine's `setItemLifecycle` / `setItemsLifecycle` expect. */
@@ -50,8 +72,12 @@ function lifecycleEnum(l: Lifecycle): ItemLifecycle {
   switch (l) {
     case "backlog":
       return ItemLifecycle.Backlog;
-    case "live":
-      return ItemLifecycle.Live;
+    case "todo":
+      return ItemLifecycle.Todo;
+    case "in_progress":
+      return ItemLifecycle.InProgress;
+    case "review":
+      return ItemLifecycle.Review;
     case "done":
       return ItemLifecycle.Done;
     case "binned":
@@ -59,18 +85,32 @@ function lifecycleEnum(l: Lifecycle): ItemLifecycle {
   }
 }
 
-export const isDone = (it: ItemView): boolean => it.doneAt != null;
+/** Normalize a wire state string onto the known ladder; anything a newer
+ *  client wrote degrades to `backlog` (visible and open), mirroring the
+ *  core's unparseable-register fallback. */
+export function parseWorkflowState(s: string | undefined): WorkflowState {
+  switch (s) {
+    case "todo":
+    case "in_progress":
+    case "review":
+    case "done":
+      return s;
+    default:
+      return "backlog";
+  }
+}
+
+/** Workflow register says Done (regardless of the bin mask). */
+export const isDone = (it: ItemView): boolean => it.state === "done";
 export const isBinned = (it: ItemView): boolean => it.binnedAt != null;
-/** Open (Backlog + Live): not done, not binned — the per-list view. */
+/** Open (one of the four open workflow states, not binned) — the
+ *  per-list view. */
 export const isOpen = (it: ItemView): boolean =>
-  !isDone(it) && !isBinned(it);
-/** In the board's Live lane: open and flagged live. */
-export const isLive = (it: ItemView): boolean => isOpen(it) && it.live;
-/** In the board's Backlog lane: open and not flagged live. */
-export const isBacklog = (it: ItemView): boolean => isOpen(it) && !it.live;
-/** Resolved lifecycle by precedence Binned > Done > Live > Backlog. */
+  !isBinned(it) && it.state !== "done";
+/** Resolved lifecycle: `binned` while the mask is present, else the
+ *  workflow register's state. */
 export const lifecycleOf = (it: ItemView): Lifecycle =>
-  isBinned(it) ? "binned" : isDone(it) ? "done" : it.live ? "live" : "backlog";
+  isBinned(it) ? "binned" : it.state;
 
 export interface ListView {
   id: string;
@@ -93,11 +133,11 @@ export interface ListView {
 
 export interface WorkspaceState {
   itemsById: Record<string, ItemView>;
-  /** Per-list Open order (Backlog + Live) — mirrors the core's `open`
-   *  projection of the list's `order/<list-id>` container. Done/binned
-   *  items never appear here; a list with no open items may be absent
-   *  or hold `[]`. The board partitions this array by each item's
-   *  `live` flag into the Backlog and Live lanes. */
+  /** Per-list Open order (the four open workflow states) — mirrors the
+   *  core's `open` projection of the list's `order/<list-id>` container.
+   *  Done/binned items never appear here; a list with no open items may
+   *  be absent or hold `[]`. The board partitions this array by each
+   *  item's register state into the open lanes. */
   listOpen: Record<string, string[]>;
   /** Binned-item count, maintained incrementally so the Bin badge
    *  never needs a global scan. */
@@ -125,6 +165,7 @@ export interface RecentDoneEntry {
   /** Visible Focus slot the item occupied, when it was in the Focus lens
    *  (Done auto-removes the ref, so this is the only record). */
   focusIndex?: number;
+  /** The Done transition's register timestamp (`lifecycleAt`). */
   doneAt: number;
 }
 
@@ -193,7 +234,8 @@ export interface DocApp {
    *  The value is a floating local calendar date; a malformed string is
    *  rejected by the core. */
   setItemDeadline(id: string, deadline: string | null): void;
-  /** Set or clear an item's done flag. Independent of binned. */
+  /** Done toggle: `true` is the Done transition; `false` is un-done — a
+   *  plain write to Backlog, applied only to currently-Done items. */
   setDone(id: string, done: boolean): void;
   setDoneMany(ids: string[], done: boolean): void;
   /** Un-done from inside the Focus lens: clear each id's done flag and
@@ -201,20 +243,27 @@ export interface DocApp {
    *  spec/focus.md, so "un-done" in Focus is the deliberate re-add). Ids
    *  without a captured slot land at the top. One undo step. */
   undoneIntoFocus(ids: string[]): void;
-  /** Set or clear an item's binned flag. Independent of done — binning a
-   *  done item keeps it done; restoring keeps the done state alone. */
+  /** Bin toggle: `true` sets the bin mask (workflow state preserved for
+   *  restore); `false` restores — clears the mask only, revealing the
+   *  preserved state (which may itself be done). */
   setBinned(id: string, binned: boolean): void;
   setBinnedMany(ids: string[], binned: boolean): void;
   /** Move one item to a lifecycle in a single commit — the board's
-   *  lane-drop primitive (`spec/board.md`). A Backlog↔Live flip keeps
-   *  the item in its list's Open order; Done/Binned remove it. */
+   *  lane-drop primitive (`spec/board.md`). An open→open flip keeps
+   *  the item in its list's Open order; done/binned remove it. */
   setLifecycle(id: string, lifecycle: Lifecycle): void;
   setLifecycleMany(ids: string[], lifecycle: Lifecycle): void;
-  /** Board Live-lane capture: append a new item directly as Live. */
-  addItemLive(listId: string, text: string): string;
-  /** Board Live-lane capture at a position: insert a new Live item at
-   *  `indexInList` in the list's Open projection (like `addItemAt`). */
-  addItemLiveAt(listId: string, text: string, indexInList: number): string;
+  /** Board open-lane capture: append a new item directly in an open
+   *  workflow state. */
+  addItemInState(listId: string, text: string, state: WorkflowState): string;
+  /** Board open-lane capture at a position: insert a new item in `state`
+   *  at `indexInList` in the list's Open projection (like `addItemAt`). */
+  addItemInStateAt(
+    listId: string,
+    text: string,
+    state: WorkflowState,
+    indexInList: number,
+  ): string;
   moveItem(id: string, listId: string, indexInList: number): void;
   deleteBinned(id: string): void;
   deleteBinnedMany(ids: string[]): void;
@@ -293,9 +342,10 @@ const COARSE_EVENT_KINDS = new Set([
 interface WorkspaceSnapshotPayload {
   settings: SettingsView;
   lists: ListView[];
-  /** `live` is omitted from the JSON when false (Backlog); normalize on
-   *  read so `ItemView.live` is always a real boolean. */
-  items: (Omit<ItemView, "live"> & { live?: boolean })[];
+  /** `state` crosses the boundary as a wire string; normalize on read so
+   *  a newer client's state degrades to `backlog` instead of breaking
+   *  the lane partition. */
+  items: (Omit<ItemView, "state"> & { state?: string })[];
 }
 
 function materializeEngineSnapshot(engine: SyncEngine): WorkspaceState {
@@ -304,7 +354,7 @@ function materializeEngineSnapshot(engine: SyncEngine): WorkspaceState {
   const listOpen: Record<string, string[]> = {};
   let binCount = 0;
   for (const raw of payload.items) {
-    const item: ItemView = { ...raw, live: raw.live ?? false };
+    const item: ItemView = { ...raw, state: parseWorkflowState(raw.state) };
     itemsById[item.id] = item;
     if (isOpen(item)) (listOpen[item.listId] ??= []).push(item.id);
     if (isBinned(item)) binCount++;
@@ -437,9 +487,11 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           listId: ev.listId ?? "",
           text: ev.text ?? "",
           notes: ev.notes ?? "",
-          live: ev.live ?? false,
+          state: parseWorkflowState(ev.state),
+          lifecycleAt: Number(ev.lifecycleAt ?? ev.createdAt ?? 0),
           deadline: ev.deadline ?? undefined,
           createdAt: Number(ev.createdAt ?? 0),
+          startedAt: ev.startedAt != null ? Number(ev.startedAt) : undefined,
           doneAt: ev.doneAt != null ? Number(ev.doneAt) : undefined,
           binnedAt: ev.binnedAt != null ? Number(ev.binnedAt) : undefined,
         };
@@ -491,11 +543,13 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         if (!prev) break;
         const wasOpen = isOpen(prev);
         const wasBinned = isBinned(prev);
-        const live = ev.live ?? prev.live;
+        const nextState = parseWorkflowState(ev.state);
+        const lifecycleAt = Number(ev.lifecycleAt ?? prev.lifecycleAt);
+        const startedAt = ev.startedAt != null ? Number(ev.startedAt) : undefined;
         const doneAt = ev.doneAt != null ? Number(ev.doneAt) : undefined;
         const binnedAt = ev.binnedAt != null ? Number(ev.binnedAt) : undefined;
-        const nowOpen = doneAt == null && binnedAt == null;
-        if (wasOpen && doneAt != null && binnedAt == null) {
+        const nowOpen = binnedAt == null && nextState !== "done";
+        if (wasOpen && nextState === "done" && binnedAt == null) {
           // Leaving the Open projection by being marked done: snapshot
           // the vacated position (before the removal below) for the
           // linger re-insert.
@@ -514,17 +568,23 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
             listId: prev.listId,
             index: idx >= 0 ? idx : 0,
             focusIndex: focusIdx >= 0 ? focusIdx : undefined,
-            doneAt,
+            doneAt: lifecycleAt,
           });
         } else if (nowOpen || binnedAt != null) {
           dropRecentDone(ev.id);
         }
-        // Only an open↔closed transition touches `listOpen`. A Backlog↔Live
-        // flip (wasOpen && nowOpen) leaves the item in place — its lane is
-        // recomputed from the updated `live` flag below.
+        // Only an open↔closed transition touches `listOpen`. An open→open
+        // workflow flip (wasOpen && nowOpen) leaves the item in place —
+        // its lane is recomputed from the updated register state below.
         if (wasOpen && !nowOpen) removeOpen(prev.listId, ev.id);
         if (!wasOpen && nowOpen) insertOpen(prev.listId, ev.id, ev.openIndex);
-        setState("itemsById", ev.id, { live, doneAt, binnedAt });
+        setState("itemsById", ev.id, {
+          state: nextState,
+          lifecycleAt,
+          startedAt,
+          doneAt,
+          binnedAt,
+        });
         adjustBinCount((binnedAt != null ? 1 : 0) - (wasBinned ? 1 : 0));
         break;
       }
@@ -822,11 +882,13 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     setLifecycleMany(ids, lifecycle) {
       mutate(() => engine.setItemsLifecycle(ids, lifecycleEnum(lifecycle)));
     },
-    addItemLive(listId, text) {
-      return mutate(() => engine.addItemLive(listId, text));
+    addItemInState(listId, text, state) {
+      return mutate(() => engine.addItemInState(listId, text, lifecycleEnum(state)));
     },
-    addItemLiveAt(listId, text, indexInList) {
-      return mutate(() => engine.addItemLiveAt(listId, text, indexInList));
+    addItemInStateAt(listId, text, state, indexInList) {
+      return mutate(() =>
+        engine.addItemInStateAt(listId, text, lifecycleEnum(state), indexInList),
+      );
     },
     moveItem(id, listId, indexInList) {
       mutate(() => engine.moveItem(id, listId, indexInList));
