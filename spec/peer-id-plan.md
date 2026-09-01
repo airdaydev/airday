@@ -162,11 +162,12 @@ Other sites:
   before wasm doc construction, peer passed in as u64. Prod already
   enforces one tab (`BrowserTabGate.tsx`, Web Lock `airday-single-tab`,
   `!DEV` only), so the minimum web version is just stable slot 0 - the
-  pool only matters once multi-tab lands. Note the gate's escape
-  hatches (`?multiTab=1`, missing `navigator.locks` -> gate disabled):
-  today those are safe because peers are random per load; with a stable
-  peer they become corruption paths, so tie the peer claim to the same
-  lock acquisition that gates the tab (no lock held -> random peer).
+  pool only matters once multi-tab lands. The `?multiTab=1` escape
+  hatch is removed; the remaining gate-disabled paths (DEV /
+  `VITE_ENFORCE_SINGLE_TAB=0`, missing `navigator.locks`) are safe
+  today because peers are random per load, but with a stable peer they
+  become corruption paths, so tie the peer claim to the same lock
+  acquisition that gates the tab (no lock held -> random peer).
 - Multi-tab web (later, decided direction): NOT a SharedWorker owning
   the db (fights the platform: OPFS sync handles are dedicated-worker
   only, SharedWorker support history is poor, and it turns every doc op

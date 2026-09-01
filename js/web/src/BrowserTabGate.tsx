@@ -72,8 +72,5 @@ function shouldEnforceSingleTab(): boolean {
   if (flag === "0") return false;
   if (flag === "1") return true;
 
-  const url = new URL(window.location.href);
-  if (url.searchParams.get("multiTab") === "1") return false;
-
   return !import.meta.env.DEV;
 }
