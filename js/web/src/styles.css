@@ -876,15 +876,18 @@ input.task-check:hover {
    edge; stays hidden until the row is hovered / selected — removing a
    pinned item must be as cheap as adding it (spec/focus.md). */
 /* Static Focus-membership badge on list rows — a non-interactive pin
-   pill, always visible (not hover-gated) so Focus membership is
+   glyph, always visible (not hover-gated) so Focus membership is
    glanceable while scanning a list. Add / remove happens via the row
-   context menu. Styled to match the neutral `.deadline-badge` pill; being
-   icon-only it has no line box, so min-height pins it to the deadline badge's
-   text-driven height (1.3em line + 2px padding + 2px border). */
+   context menu. No pill background — like the notes badge it reads as a
+   glyph in the text flow, not a detached chip; being icon-only it has no
+   line box, so min-height pins it to the deadline badge's text-driven
+   height (1.3em line + 2px padding + 2px border). */
 .row-focus-badge {
   justify-content: center;
   margin-top: -1px;
   min-height: calc(1.3em + 4px);
+  background: none;
+  color: var(--text-badge-faint);
 }
 
 .row-focus-badge svg {
