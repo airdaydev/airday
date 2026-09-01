@@ -214,11 +214,16 @@ pub struct Device {
     pub name: String,
     pub last_seen_at: i64,
     pub created_at: i64,
+    /// Highest op seq this device has acked (0 = never acked).
+    pub last_acked_seq: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DevicesListResponse {
     pub devices: Vec<Device>,
+    /// Head of the account's op log, so clients can render how far
+    /// behind each device is.
+    pub server_last_seq: u64,
 }
 
 // ---------- error envelope ----------

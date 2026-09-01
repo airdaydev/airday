@@ -99,6 +99,7 @@ export function Settings(props: {
   trackOverlay(() => props.open);
   const [section, setSection] = createSignal<Section>("general");
   const [devices, setDevices] = createSignal<Device[] | null>(null);
+  const [serverLastSeq, setServerLastSeq] = createSignal(0);
   const [devicesError, setDevicesError] = createSignal<string | null>(null);
   const [devicesLoading, setDevicesLoading] = createSignal(false);
   const [revoking, setRevoking] = createSignal<ReadonlySet<string>>(new Set());
@@ -145,6 +146,7 @@ export function Settings(props: {
     try {
       const res = await api.listDevices();
       setDevices(res.devices);
+      setServerLastSeq(res.server_last_seq);
     } catch (e) {
       setDevicesError(
         e instanceof Error ? e.message : m().settings.failedToLoadDevices,
@@ -398,6 +400,8 @@ export function Settings(props: {
                               </div>
                               <div class="device-meta">
                                 {m().settings.lastSeen} {formatRelative(d.last_seen_at, locale())}
+                                {" · "}
+                                {m().settings.deviceSeq(d.last_acked_seq, serverLastSeq())}
                               </div>
                             </div>
                             <Show when={editingDeviceId() !== d.id}>

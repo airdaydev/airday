@@ -36,6 +36,7 @@ pub struct DeviceRow {
     pub name: String,
     pub last_seen_at: i64,
     pub created_at: i64,
+    pub last_acked_seq: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -244,7 +245,7 @@ pub async fn list_devices(db: &Db, account_id: Uuid) -> anyhow::Result<Vec<Devic
     let acc_bytes = account_id.as_bytes().to_vec();
     db.call(move |c| {
         let mut stmt = c.prepare(
-            "SELECT id, account_id, name, last_seen_at, created_at
+            "SELECT id, account_id, name, last_seen_at, created_at, last_acked_seq
              FROM devices WHERE account_id = ? ORDER BY created_at",
         )?;
         let rows = stmt
@@ -423,6 +424,7 @@ fn row_to_device(r: &rusqlite::Row<'_>) -> rusqlite::Result<DeviceRow> {
         name: r.get(2)?,
         last_seen_at: r.get(3)?,
         created_at: r.get(4)?,
+        last_acked_seq: r.get(5)?,
     })
 }
 

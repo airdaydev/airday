@@ -46,10 +46,12 @@ export interface Device {
   name: string;
   last_seen_at: number;
   created_at: number;
+  last_acked_seq: number;
 }
 
 export interface DevicesListResponse {
   devices: Device[];
+  server_last_seq: number;
 }
 
 export interface ApiErrorBody {
