@@ -150,8 +150,7 @@ export function Row(props: {
     (!props.deadlineInFooter &&
       (Boolean(lifecycleTimestamp(props.item())) ||
         (!props.expanded() &&
-          (hasNotes() ||
-            (canPinToFocus() && focused()) ||
+          ((canPinToFocus() && focused()) ||
             (isOpen(props.item()) && Boolean(props.item().deadline))))));
   let textRef!: HTMLSpanElement;
   // Set by the Enter keydown handler before it dispatches the synthetic
@@ -593,6 +592,17 @@ export function Row(props: {
               if (e.key !== "Escape") e.stopPropagation();
             }}
           />
+          {/* Has-notes badge: a corner-fold glyph that opens the dialog
+              straight to the notes editor. Sits inline right after the
+              title — the text is the shrinking flex child of .row-body,
+              so the badge hugs the last word of a short title and sits
+              just past the ellipsis of a truncated one. List rows only:
+              a card title that wraps (without clamping) is full width,
+              which would strand the badge at the card's edge, so cards
+              keep it in the footer below instead. */}
+          <Show when={!props.deadlineInFooter && !props.expanded() && hasNotes()}>
+            <NotesBadge />
+          </Show>
         </div>
         {/* Board cards gather every badge on a full-width bottom line —
             a direct child of the card so the badges start at the card's
@@ -647,11 +657,6 @@ export function Row(props: {
             gap still separates the group from the title. */}
         <Show when={showInlineBadges()}>
           <div class="row-badges">
-            {/* Has-notes badge: a corner-fold glyph that opens the dialog
-                straight to the notes editor. */}
-            <Show when={!props.deadlineInFooter && !props.expanded() && hasNotes()}>
-              <NotesBadge />
-            </Show>
             {/* Focus-membership badge — a static, non-interactive pin glyph
                 shown only when the item is pinned to Focus; nothing otherwise.
                 There is no hover toggle: adding / removing goes through the row
