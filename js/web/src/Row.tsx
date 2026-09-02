@@ -114,6 +114,17 @@ export function Row(props: {
       ? laneLabel(m(), props.item().state)
       : null;
   });
+  // Lifecycle stamp shown on the row. Only the Done and Bin views carry
+  // one: a just-ticked row lingering in a list / Focus / board lane is
+  // about to leave, and stamping it would only flash "just now".
+  const rowStamp = () =>
+    props.viewKind === "done" || props.viewKind === "bin"
+      ? lifecycleTimestamp(props.item())
+      : undefined;
+  // The global Done view leads with the stamp, sat right of the checkbox
+  // and without the check glyph (the ticked box already says done). Bin
+  // rows and board Done cards keep it trailing with the other badges.
+  const leadingStamp = () => props.viewKind === "done" && !props.deadlineInFooter;
   // Open state of this row's context menu, mirrored into the shared
   // overlay count so global keyboard shortcuts stand down while it's up.
   const [menuOpen, setMenuOpen] = createSignal(false);
@@ -165,7 +176,7 @@ export function Row(props: {
     Boolean(originList()) ||
     Boolean(stateBadge()) ||
     (!props.deadlineInFooter &&
-      (Boolean(lifecycleTimestamp(props.item())) ||
+      ((!leadingStamp() && Boolean(rowStamp())) ||
         (!props.expanded() &&
           ((canPinToFocus() && focused()) ||
             (isOpen(props.item()) && Boolean(props.item().deadline))))));
@@ -502,6 +513,13 @@ export function Row(props: {
             }
           }}
         />
+        <Show when={leadingStamp() && rowStamp()}>
+          {(ts) => (
+            <span class="badge row-timestamp" title={formatDateTime(ts(), locale())}>
+              {formatDoneStamp(ts(), nowMs(), locale())}
+            </span>
+          )}
+        </Show>
         <div class="row-body">
           <span
             ref={textRef}
@@ -634,7 +652,7 @@ export function Row(props: {
             ((isOpen(props.item()) && props.item().deadline) ||
               (canPinToFocus() && focused()) ||
               hasNotes() ||
-              lifecycleTimestamp(props.item()))
+              rowStamp())
           }
         >
           <div class="row-footer">
@@ -652,7 +670,7 @@ export function Row(props: {
             <Show when={isOpen(props.item()) && props.item().deadline}>
               {(d) => <DeadlineBadge deadline={d()} />}
             </Show>
-            <Show when={lifecycleTimestamp(props.item())}>
+            <Show when={rowStamp()}>
               {(ts) => (
                 <span
                   class="badge row-timestamp"
@@ -710,15 +728,12 @@ export function Row(props: {
                 </span>
               )}
             </Show>
-            <Show when={!props.deadlineInFooter && lifecycleTimestamp(props.item())}>
+            {/* Trailing stamp: Bin rows only (the Done view leads with
+                its stamp next to the checkbox, board cards use the footer). */}
+            <Show when={!props.deadlineInFooter && !leadingStamp() && rowStamp()}>
               {(ts) => (
                 <span class="badge row-timestamp" title={formatDateTime(ts(), locale())}>
-                  <Show when={props.viewKind === "done"}>
-                    <span class="row-timestamp-icon" innerHTML={checkSvg} />
-                  </Show>
-                  {props.viewKind === "done"
-                    ? formatDoneStamp(ts(), nowMs(), locale())
-                    : formatRelative(ts(), nowMs(), locale())}
+                  {formatRelative(ts(), nowMs(), locale())}
                 </span>
               )}
             </Show>
