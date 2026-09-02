@@ -27,6 +27,9 @@
   --error-bg: #fee2e2;
   --error-text: #991b1b;
   --dnd-select-bg: #dbeafe;
+  /* Divider under a selected row: a blue-grey a step darker than the
+     selection fill so the row's edge still reads against it. */
+  --dnd-select-border: #c8d7ef;
   /* Neutral highlight for palette / picker rows (no blue). */
   --palette-select-bg: #eceff3;
   --dnd-placeholder-color: #cbd5e1;
@@ -34,7 +37,7 @@
 }
 
 [data-theme="dark"] {
-  --bg: #1a1a1d;
+  --bg: #161618;
   --bg-board-col: #171718;
   --bg-elevated: #1a1a1c;
   --surface: #1a1a1d;
@@ -48,7 +51,7 @@
   --text-faint: #636364;
   --text-empty: #666;
   --border: #272727;
-  --border-surface: #1f1f1f;
+  --border-surface: #2e2e2e;
   --border-input: #333;
   --border-row: #222;
   --row-divider: #1c1c1c;
@@ -56,6 +59,7 @@
   --error-bg: #2a1215;
   --error-text: #f87171;
   --dnd-select-bg: #293a5b;
+  --dnd-select-border: #33466e;
   --palette-select-bg: #26262a;
   --dnd-placeholder-color: #475569;
 }
@@ -400,12 +404,59 @@ body {
 }
 
 .nav-section {
-  padding: 8px 16px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  padding: 8px 8px 4px;
   color: var(--text-faint);
+}
+
+/* Clickable workspace heading: collapses the group beneath it. Reset the
+   button chrome so it reads as a heading, with the caret revealing the
+   affordance. */
+.nav-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+@media (max-width: 768px) and (pointer: coarse) {
+  .nav-section-toggle {
+    height: 40px;
+  }
+}
+
+.nav-section-toggle:hover {
+  background: var(--bg-hover);
+}
+
+/* Caret is a hover-only affordance: hidden at rest so the heading reads
+   as a plain label, revealed when the row is hovered or focused. */
+.nav-section-caret {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.nav-section-toggle:hover .nav-section-caret,
+.nav-section-toggle:focus-visible .nav-section-caret {
+  opacity: 1;
+}
+
+.nav-section-caret svg {
+  width: 12px;
+  height: 12px;
+}
+
+.nav-section-caret[data-collapsed] {
+  transform: rotate(-90deg);
 }
 
 .nav-item {
@@ -612,23 +663,14 @@ body {
   cursor: pointer;
   font: inherit;
   box-shadow:
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(0, 0, 0, 0.06) 0px 0px 0px 1px inset,
-    rgba(0, 0, 0, 0.08) 0px 1px 0px 0px inset;
+    rgba(0, 0, 0, 0.06) 0 0 0 1px inset,
+    rgba(0, 0, 0, 0.08) 0 1px 0 0 inset;
 }
 
 [data-theme="dark"] .add-button {
-  background: transparent;
   box-shadow:
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(255, 255, 255, 0.02) 0px 0px 0px 1px inset,
-    rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset;
+    rgba(255, 255, 255, 0.02) 0 0 0 1px inset,
+    rgba(255, 255, 255, 0.04) 0 1px 0 0 inset;
 }
 
 /* Desktop header: display-options + add sit together in one plain group
@@ -646,7 +688,12 @@ body {
 .header-group .add-button {
   box-shadow: none;
   border-radius: 8px;
-  padding: 4px 7px;
+  padding: 4px;
+}
+
+.header-group .add-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .add-button-icon {
@@ -767,6 +814,7 @@ body {
 
 [aria-selected="true"] .row {
   background: var(--dnd-select-bg);
+  border-color: var(--dnd-select-border);
 }
 
 /* Shared task checkbox: the done indicator wherever it appears (list row,
@@ -1224,12 +1272,10 @@ input.task-check:hover {
   color: var(--text);
 }
 
-/* Board/list view-mode switcher: a dots trigger in the header opening a
-   popover with an icon-only segmented control (reusing .theme-segment*). */
-.view-mode-trigger {
-  padding: 4px 6px;
-}
-
+/* Board/list view-mode switcher: the display-options trigger in the header
+   opens a popover with a segmented control (reusing .theme-segment*). The
+   trigger itself is styled by `.header-group .add-button` on desktop and
+   by the mobile glass-disc rules below. */
 .view-mode-popover {
   background: var(--bg-elevated);
   border: 1px solid var(--border);

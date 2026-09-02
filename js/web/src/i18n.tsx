@@ -77,6 +77,9 @@ export type Messages = {
     unarchiveList: string;
     renameList: string;
     newList: string;
+    /** Heading over the user's own workspace (Inbox + lists). Sibling
+     *  headings will appear once shared workspaces exist. */
+    personal: string;
     connected: string;
     disconnected: string;
     offline: string;
@@ -380,6 +383,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       unarchiveList: "Restaurar",
       renameList: "Renombrar",
       newList: "+ Nueva lista",
+      personal: "Personal",
       connected: "Conectado",
       disconnected: "Desconectado",
       offline: "Sin conexión",
@@ -611,6 +615,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       unarchiveList: "Unarchive",
       renameList: "Rename",
       newList: "+ Add list",
+      personal: "Personal",
       connected: "Connected",
       disconnected: "Disconnected",
       offline: "Offline",

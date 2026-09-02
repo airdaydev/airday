@@ -15,6 +15,7 @@ import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Dnd, DndSelection, type DndOp } from "./dnd/solid";
 import archiveSvg from "./icons/archive.svg?raw";
 import calendarSvg from "./icons/calendar.svg?raw";
+import caretDownSvg from "./icons/caret-down.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import cloudSvg from "./icons/cloud.svg?raw";
 import cloudOffSvg from "./icons/cloud-off.svg?raw";
@@ -57,6 +58,27 @@ function markAuthPromptDismissed(): void {
     localStorage.setItem(AUTH_DISMISSED_KEY, "1");
   } catch {
     // Best-effort; failing to persist just means we re-prompt next load.
+  }
+}
+
+// Whether the "Personal" workspace group (Inbox + lists) is collapsed in
+// the nav. Groundwork for shared workspaces: each workspace will get its
+// own collapsible heading, and the personal one is the first. Purely
+// local UI state, same localStorage rationale as the flag above.
+const PERSONAL_COLLAPSED_KEY = "airday:nav-personal-collapsed";
+function loadPersonalCollapsed(): boolean {
+  try {
+    return localStorage.getItem(PERSONAL_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function savePersonalCollapsed(collapsed: boolean): void {
+  try {
+    if (collapsed) localStorage.setItem(PERSONAL_COLLAPSED_KEY, "1");
+    else localStorage.removeItem(PERSONAL_COLLAPSED_KEY);
+  } catch {
+    // Best-effort; failing to persist just means the group reopens next load.
   }
 }
 
@@ -349,6 +371,12 @@ export function Nav(props: {
   // moves; we just translate that into a setView. stopPropagation keeps the
   // document-level onOpenKey from also firing and opening whatever's
   // selected in the main list.
+  const [personalCollapsed, setPersonalCollapsed] = createSignal(loadPersonalCollapsed());
+  const togglePersonal = () => {
+    const next = !personalCollapsed();
+    setPersonalCollapsed(next);
+    savePersonalCollapsed(next);
+  };
   const onNavKeyDown = (e: KeyboardEvent) => {
     if (e.key !== "Enter") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
@@ -466,6 +494,25 @@ export function Nav(props: {
         </Show>
       </div>
       <div class="nav-group">
+        {/* Workspace heading. Today there is exactly one workspace
+            ("Personal"); shared workspaces will add sibling groups, each
+            with its own heading. Click collapses the group; the state is
+            local to this browser. */}
+        <button
+          type="button"
+          class="nav-section nav-section-toggle"
+          tabIndex={-1}
+          aria-expanded={!personalCollapsed()}
+          onClick={togglePersonal}
+        >
+          <span class="nav-section-label">{m().nav.personal}</span>
+          <span
+            class="nav-section-caret"
+            data-collapsed={personalCollapsed() ? "" : undefined}
+            innerHTML={caretDownSvg}
+          />
+        </button>
+        <Show when={!personalCollapsed()}>
         {/* Inbox is reserved: it has no `ListMeta` row and carries the
             localized built-in label, so it's a static entry with no rename
             affordance and no context menu. It sits at the head of the lists
@@ -602,6 +649,7 @@ export function Nav(props: {
             onSubmit={submit}
             onDismiss={() => setAdding(false)}
           />
+        </Show>
         </Show>
       </div>
       </div>
