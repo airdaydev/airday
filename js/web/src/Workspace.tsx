@@ -1,4 +1,5 @@
 import {
+  batch,
   createEffect,
   createMemo,
   createSignal,
@@ -6,6 +7,7 @@ import {
   on,
   onCleanup,
   Show,
+  untrack,
   type JSX,
 } from "solid-js";
 import {
@@ -294,7 +296,17 @@ export function Workspace(props: {
   const [findOpen, setFindOpen] = createSignal(false);
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   // The item currently opened in the detail dialog, or null when closed.
-  const [openItemId, setOpenItemId] = createSignal<string | null>(null);
+  const [openItemId, setOpenItemIdRaw] = createSignal<string | null>(null);
+  // Whether the current open was selection-driven (side panel follows the
+  // list/board selection) rather than explicit (row open icon, Enter, a
+  // find pick). Passive opens must not pull focus off the list, or arrow
+  // keys would land in the panel's title editor after the first step.
+  const [openPassive, setOpenPassive] = createSignal(false);
+  const setOpenItemId = (id: string | null) =>
+    batch(() => {
+      setOpenPassive(false);
+      setOpenItemIdRaw(id);
+    });
   // Rows the move palette will re-file (visible order), or null when the
   // palette is closed. Captured at open (from the `m` shortcut's selection
   // or a row context menu's target set) so the pick acts on what the user
@@ -1751,7 +1763,14 @@ export function Workspace(props: {
     loadSidePanelOpenPref(),
   );
   const setSidePanelOpen = (open: boolean) => {
-    setSidePanelOpenSignal(open);
+    batch(() => {
+      // Hiding the sidebar closes whatever it was showing; otherwise the
+      // task surface would fall back to its modal shell and pop up. The
+      // dialog's load effect settles pending edits on the way out. A
+      // capture in progress is left alone (its text would be lost).
+      if (!open) setOpenItemId(null);
+      setSidePanelOpenSignal(open);
+    });
     try {
       if (open) localStorage.setItem(SIDE_PANEL_OPEN_PREF_KEY, "1");
       else localStorage.removeItem(SIDE_PANEL_OPEN_PREF_KEY);
@@ -1766,6 +1785,40 @@ export function Workspace(props: {
   const [panelMount, setPanelMount] = createSignal<HTMLElement | null>(null);
   const taskSurfaceOpen = () =>
     openItemId() !== null || newItemTarget() !== null;
+
+  // Side panel follows the selection: while the panel is showing, the
+  // topmost selected item (list view or the board's active lane) opens in
+  // it passively. `equals: false` so re-selecting the same row after
+  // closing the panel reopens it. Modal / mobile shells are untouched —
+  // nothing fires unless `sidePanelShown`. A capture in progress keeps the
+  // panel (the effect re-runs once it commits, so a board "+" capture ends
+  // with the new card open). Draft rows and stale keys are skipped.
+  const [selectionTick, setSelectionTick] = createSignal<DndSelection | null>(
+    null,
+    { equals: false },
+  );
+  selection.onChange(setSelectionTick);
+  createEffect(
+    on(boardSelection, (sel) => {
+      if (!sel) return;
+      setSelectionTick(sel);
+      onCleanup(sel.onChange(setSelectionTick));
+    }),
+  );
+  createEffect(() => {
+    const sel = selectionTick();
+    if (!sel || !sidePanelShown() || newItemTarget() !== null) return;
+    if (sel !== untrack(actionSelection)) return;
+    const top = sel.getSelectionTop();
+    if (top === null) return;
+    const id = String(top);
+    if (!app.state.itemsById[id]) return;
+    if (untrack(openItemId) === id) return;
+    batch(() => {
+      setOpenPassive(true);
+      setOpenItemIdRaw(id);
+    });
+  });
 
   const navigateTo = (v: ViewKey) => {
       setView(v);
@@ -1903,6 +1956,7 @@ export function Workspace(props: {
         lists={activeLists}
         focusField={openFocus}
         caret={openCaret}
+        passive={openPassive}
         onClosed={restoreItemsFocus}
         onLiveText={(text) => {
           const id = openItemId();

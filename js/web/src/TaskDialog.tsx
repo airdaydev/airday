@@ -83,6 +83,11 @@ export function TaskDialog(props: {
   /** Title character offset to land the caret at on open (from a
    *  double-click); null/undefined → caret at the end of the title. */
   caret?: () => number | null;
+  /** True when the open was selection-driven (the side panel following
+   *  the list selection): the non-modal shells then leave focus on the
+   *  list instead of landing the caret. Flipping back to false on an
+   *  explicit open of the same item focuses the editor. */
+  passive?: () => boolean;
   /** Called as the dialog closes so the owner can restore focus (to the
    *  list). Fires from Kobalte's close-auto-focus hook, which we take over
    *  to steer focus back to the listbox instead of the trigger. */
@@ -828,7 +833,8 @@ export function TaskDialog(props: {
 
   // Non-modal shells: focus the editor whenever the target changes (the
   // dialog does this via onOpenAutoFocus, but it can't swap targets while
-  // open) and hand focus back once nothing is open.
+  // open) and hand focus back once nothing is open. A passive (selection-
+  // driven) open skips the focus so keyboard nav stays on the list.
   const nonModal = () => isMobile() || panelMode();
   createEffect(() => {
     if (!nonModal() || !open()) return;
@@ -836,6 +842,7 @@ export function TaskDialog(props: {
     // shows another item lands the caret in the new title.
     props.itemId();
     newItemTarget();
+    if (props.passive?.()) return;
     focusOnOpen();
   });
   createEffect(() => {
@@ -888,7 +895,7 @@ export function TaskDialog(props: {
           <Dialog.Overlay class="dialog-overlay" />
           <div class="dialog-positioner">
             <Dialog.Content
-              class="task-dialog"
+              class="task-dialog task-modal"
               onKeyDown={onShellKeyDown}
               onCloseAutoFocus={(e) => {
                 // Kobalte would restore focus to whatever opened the dialog

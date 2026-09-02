@@ -205,11 +205,11 @@ body {
    class. The panel hosts the open task surface (`.task-panel`, portaled
    into `.side-panel-task`); idle, it shows a hint. */
 .app.side-panel-open {
-  grid-template-columns: 260px 1fr 360px;
+  grid-template-columns: 260px 1fr 300px;
 }
 
 .app.nav-hidden.side-panel-open {
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 1fr 300px;
 }
 
 .side-panel {
@@ -241,10 +241,9 @@ body {
   color: var(--text-faint);
 }
 
-/* The task surface as an inline pane: the dialog's card chrome (border,
-   shadow, width cap) comes off; it fills the panel column and scrolls
+/* The task surface as an inline pane: fills the panel column and scrolls
    on its own. Lives beside the main surface so it borrows the same
-   floating-surface frame. */
+   floating-surface frame (hairline border, no shadow). */
 .task-panel {
   flex: 1;
   min-height: 0;
@@ -253,12 +252,7 @@ body {
   margin: 0 8px 8px 0;
   border: 0.5px solid var(--border-surface);
   border-radius: 8px;
-  box-shadow: none;
   background: var(--surface);
-}
-
-[data-theme="dark"] .task-panel {
-  box-shadow: none;
 }
 
 .task-panel .task-dialog-title {
@@ -2122,6 +2116,9 @@ input.task-check:hover {
 /* Task detail dialog — the "open task" surface. Modelled on the shared
    elevated-card treatment; becomes a full-screen sheet on small touch
    screens (see the media query below). */
+/* Shared task surface: layout only. Each host adds its own chrome —
+   `.task-modal` (floating card), `.task-panel` (inline side pane),
+   `.task-page` (mobile full-screen). */
 .task-dialog {
   display: flex;
   flex-direction: column;
@@ -2130,16 +2127,19 @@ input.task-check:hover {
   max-height: 100%;
   overflow-y: auto;
   padding: 12px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
   outline: none;
   user-select: text;
   -webkit-user-select: text;
 }
 
-[data-theme="dark"] .task-dialog {
+.task-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .task-modal {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
 }
 
@@ -2676,8 +2676,6 @@ input.task-check:hover {
     width: 100%;
     height: 100%;
     max-height: 100%;
-    border: 0;
-    border-radius: 0;
   }
 
   /* Mobile page shell (TaskDialog's non-modal variant): a fixed full-screen
@@ -2687,7 +2685,7 @@ input.task-check:hover {
     position: fixed;
     inset: 0;
     z-index: 40;
-    box-shadow: none;
+    background: var(--bg-elevated);
     padding-bottom: calc(var(--mobile-bar-h) + 28px + env(safe-area-inset-bottom));
   }
 
