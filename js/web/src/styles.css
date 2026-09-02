@@ -1420,7 +1420,8 @@ input.task-check:hover {
   cursor: default;
 }
 
-/* Done-column toggle in the view-mode popover. Kobalte Switch, sized at
+/* Small Kobalte Switch used in display popovers (e.g. the Done view's
+   "show origin list" toggle). Sized at
    50% of the component's default (44×24 track / 20px thumb → 22×12 / 10px).
    The track is padded 1px, so the 10px thumb travels 22 − 2 − 10 = 10px. */
 .done-switch {
@@ -1435,18 +1436,6 @@ input.task-check:hover {
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-}
-
-.done-switch-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* Item count beside each lane toggle; faint like .board-col-count. */
-.done-switch-count {
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
 }
 
 .done-switch-input {
@@ -1492,6 +1481,73 @@ input.task-check:hover {
 
 /* Keyboard focus ring on the hidden input's sibling control. */
 .done-switch-input:focus-visible + .done-switch-control {
+  box-shadow: 0 0 0 2px var(--dnd-select-bg);
+}
+
+/* Lane visibility rows in the view-mode popover (spec/board.md "Lane
+   visibility"): name, item count, and a trailing eye button. Hidden
+   lanes dim the text so the icon state needn't be read closely. */
+.lane-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 2px 2px 2px 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.lane-row-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lane-row-count {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.lane-row[data-hidden] .lane-row-name,
+.lane-row[data-hidden] .lane-row-count {
+  color: var(--text-faint);
+  opacity: 0.7;
+}
+
+.lane-row-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.lane-row-eye svg {
+  width: 14px;
+  height: 14px;
+}
+
+.lane-row-eye:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.lane-row[data-hidden] .lane-row-eye {
+  color: var(--text-faint);
+}
+
+.lane-row-eye:focus-visible {
+  outline: none;
   box-shadow: 0 0 0 2px var(--dnd-select-bg);
 }
 

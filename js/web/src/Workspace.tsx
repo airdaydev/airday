@@ -26,6 +26,8 @@ import checkSvg from "./icons/check.svg?raw";
 import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
 import dotsHorizontalSvg from "./icons/dots-horizontal.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
+import eyeNoneSvg from "./icons/eye-none.svg?raw";
+import eyeOpenSvg from "./icons/eye-open.svg?raw";
 import listBulletSvg from "./icons/list-bullet.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
 import plusSvg from "./icons/card-stack-plus.svg?raw";
@@ -110,6 +112,37 @@ function loadViewPrefs(): Record<string, string> {
 // as "board:nodone"). Absent ≡ all four lanes; only lists with hidden
 // lanes get a key, stored as the *visible* lane names in ladder order.
 const LANES_PREF_KEY = "airday:board-lanes";
+/** One lane in the view-mode popover: name, item count, and an eye
+ *  button toggling client-local visibility (spec/board.md "Lane
+ *  visibility"). Hidden lanes dim so the icon state needn't be read
+ *  closely. Only the eye is interactive for now. */
+function LaneRow(props: {
+  name: string;
+  count: number;
+  visible: boolean;
+  onToggle: (show: boolean) => void;
+}) {
+  const { m } = useAppI18n();
+  return (
+    <div class="lane-row" data-hidden={props.visible ? undefined : ""}>
+      <span class="lane-row-name">{props.name}</span>
+      <span class="lane-row-count">{props.count}</span>
+      <button
+        type="button"
+        class="lane-row-eye"
+        aria-pressed={props.visible}
+        aria-label={
+          props.visible
+            ? m().board.hideLane(props.name)
+            : m().board.showLane(props.name)
+        }
+        onClick={() => props.onToggle(!props.visible)}
+        innerHTML={props.visible ? eyeOpenSvg : eyeNoneSvg}
+      />
+    </div>
+  );
+}
+
 function loadLanePrefs(): Record<string, WorkflowState[]> {
   try {
     const raw = localStorage.getItem(LANES_PREF_KEY);
@@ -2006,44 +2039,20 @@ export function Workspace(props: {
                           hide that would blank the board. */}
                       <For each={OPEN_STATES}>
                         {(lane) => (
-                          <Switch
-                            class="done-switch"
-                            checked={visibleOpenLanes(listId()).includes(lane)}
-                            onChange={(checked) =>
-                              setLaneVisible(listId(), lane, checked)
-                            }
-                          >
-                            <Switch.Label class="done-switch-label">
-                              {laneLabel(m(), lane)}
-                              <span class="done-switch-count">
-                                {boardLaneCounts()[lane]}
-                              </span>
-                            </Switch.Label>
-                            <Switch.Input class="done-switch-input" />
-                            <Switch.Control class="done-switch-control">
-                              <Switch.Thumb class="done-switch-thumb" />
-                            </Switch.Control>
-                          </Switch>
+                          <LaneRow
+                            name={laneLabel(m(), lane)}
+                            count={boardLaneCounts()[lane]}
+                            visible={visibleOpenLanes(listId()).includes(lane)}
+                            onToggle={(show) => setLaneVisible(listId(), lane, show)}
+                          />
                         )}
                       </For>
-                      <Switch
-                        class="done-switch"
-                        checked={showDoneColumn(listId())}
-                        onChange={(checked) =>
-                          setShowDoneColumn(listId(), checked)
-                        }
-                      >
-                        <Switch.Label class="done-switch-label">
-                          {m().board.showDoneColumn}
-                          <span class="done-switch-count">
-                            {boardLaneCounts().done}
-                          </span>
-                        </Switch.Label>
-                        <Switch.Input class="done-switch-input" />
-                        <Switch.Control class="done-switch-control">
-                          <Switch.Thumb class="done-switch-thumb" />
-                        </Switch.Control>
-                      </Switch>
+                      <LaneRow
+                        name={m().board.showDoneColumn}
+                        count={boardLaneCounts().done}
+                        visible={showDoneColumn(listId())}
+                        onToggle={(show) => setShowDoneColumn(listId(), show)}
+                      />
                     </>
                   )}
                 </Show>

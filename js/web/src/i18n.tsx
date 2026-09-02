@@ -193,8 +193,11 @@ export type Messages = {
     /** Short segment labels for that control. */
     list: string;
     board: string;
-    /** Switch label (view-mode popover) toggling the Done lane on/off. */
+    /** Done-lane row label in the view-mode popover's lane list. */
     showDoneColumn: string;
+    /** Accessible labels for a lane row's eye button (view-mode popover). */
+    showLane: (lane: string) => string;
+    hideLane: (lane: string) => string;
     /** Popover action saving the current view as this list's default on
      *  every device (spec/board.md). */
     saveAsDefault: string;
@@ -449,6 +452,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       list: "Lista",
       board: "Tablero",
       showDoneColumn: "Hecho",
+      showLane: (lane) => `Mostrar ${lane}`,
+      hideLane: (lane) => `Ocultar ${lane}`,
       saveAsDefault: "Guardar como predeterminada",
       savedAsDefault: "Vista predeterminada",
     },
@@ -673,6 +678,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       list: "List",
       board: "Board",
       showDoneColumn: "Done",
+      showLane: (lane) => `Show ${lane}`,
+      hideLane: (lane) => `Hide ${lane}`,
       saveAsDefault: "Save as default",
       savedAsDefault: "Default view",
     },
