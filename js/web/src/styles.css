@@ -218,7 +218,6 @@ body {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  padding: 8px 0 0;
   color: var(--text-muted);
 }
 
@@ -249,9 +248,7 @@ body {
   min-height: 0;
   width: auto;
   max-height: none;
-  margin: 0 8px 8px 0;
   border: 0.5px solid var(--border-surface);
-  border-radius: 8px;
   background: var(--surface);
 }
 
@@ -591,23 +588,6 @@ body {
   min-width: 0;
   overflow-y: scroll;
   background: var(--surface);
-}
-
-/* Mobile-first: the floating-surface frame (gutter, radius, hairline) is
-   desktop-only, gated on the exact inverse of the mobile query so neither
-   rule depends on source order. */
-@media not all and (max-width: 768px) and (pointer: coarse) {
-  .main {
-    margin: 8px 8px 8px 0;
-    border-radius: 8px;
-    border: 0.5px solid var(--border-surface);
-  }
-
-  /* The main surface normally borrows its left gutter from the nav
-     column; restore it when that column is gone. */
-  .app.nav-hidden .main {
-    margin-left: 8px;
-  }
 }
 
 .main-header {
