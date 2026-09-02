@@ -476,6 +476,12 @@ body {
   background: var(--dnd-select-bg);
 }
 
+/* "+ Add list" affordance: muted so it reads as a secondary action rather
+   than another list row. */
+.nav-item-add {
+  color: var(--text-faint);
+}
+
 .nav-item-label {
   display: flex;
   align-items: center;

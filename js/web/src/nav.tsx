@@ -591,7 +591,7 @@ export function Nav(props: {
         <Show
           when={adding()}
           fallback={
-            <button type="button" class="nav-item" tabIndex={-1} onClick={() => setAdding(true)}>
+            <button type="button" class="nav-item nav-item-add" tabIndex={-1} onClick={() => setAdding(true)}>
               {m().nav.newList}
             </button>
           }
