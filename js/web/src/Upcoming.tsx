@@ -1,9 +1,11 @@
 // The Upcoming view: the main-surface home for deadlines and the seed of
 // a calendar surface. Every Open item with a deadline, bucketed by day
 // (`deadlineGroups.ts`), Today always anchored so the surface reads as
-// "the days ahead" even when nothing is due. Rows tick off in place and
-// open the task surface (dialog or side panel) on click; the day header
-// carries the date, so only overdue rows badge the date that slipped.
+// "the days ahead" even when nothing is due. Overdue items live in Today
+// rather than a section of their own — a slipped deadline is still owed
+// now — and are the only rows that badge a date, in the overdue tone, since
+// the day header already carries everyone else's. Rows tick off in place
+// and open the task surface (dialog or side panel) on click.
 //
 // Deliberately not a `Dnd` listbox: day sections are the point, and the
 // flat virtualised list can't host group headers. Selection, keyboard
@@ -34,20 +36,21 @@ export function Upcoming(props: {
         tomorrow: m().deadline.tomorrow,
       },
       locale(),
-      { ensureToday: true },
     ),
   );
 
-  // Long-form day heading beside the short label: "Tomorrow · Thu 3 Sep".
-  const dayDetail = (g: DeadlineGroup): string | null => {
-    if (g.key === "overdue") return null;
+  // Every day heads with the same long-form date ("Sat 24 Sept"); Today
+  // is the only one annotated, so the eye lands on it without the other
+  // days changing shape as they approach.
+  const dayHeading = (g: DeadlineGroup): string => {
     const [y, mo, d] = g.key.split("-").map(Number);
-    if (!y || !mo || !d) return null;
-    return new Intl.DateTimeFormat(locale(), {
+    if (!y || !mo || !d) return g.label;
+    const date = new Intl.DateTimeFormat(locale(), {
       weekday: "short",
       day: "numeric",
       month: "short",
     }).format(new Date(y, mo - 1, d));
+    return g.urgency === "today" ? `${date} (${m().deadline.today})` : date;
   };
 
   return (
@@ -56,12 +59,7 @@ export function Upcoming(props: {
         {(g) => (
           <section class="upcoming-day" data-urgency={g.urgency}>
             <header class="upcoming-day-header">
-              <h2 class="upcoming-day-label">{g.label}</h2>
-              <Show when={dayDetail(g)}>
-                {(detail) => (
-                  <span class="upcoming-day-detail">{detail()}</span>
-                )}
-              </Show>
+              <h2 class="upcoming-day-label">{dayHeading(g)}</h2>
             </header>
             <Show
               when={g.items.length > 0}
@@ -94,11 +92,16 @@ export function Upcoming(props: {
                     />
                     <span class="upcoming-row-text">{it.text}</span>
                     <span class="upcoming-row-meta">
-                      <Show when={g.urgency === "overdue"}>
-                        <DeadlineBadge deadline={it.deadline!} muted />
+                      <Show when={it.deadline! < g.key}>
+                        <DeadlineBadge deadline={it.deadline!} pastAsDate />
                       </Show>
-                      <span class="upcoming-row-list">
-                        {props.listLabel(it.listId)}
+                      <span
+                        class="badge row-list"
+                        title={props.listLabel(it.listId)}
+                      >
+                        <span class="row-list-name">
+                          {props.listLabel(it.listId)}
+                        </span>
                       </span>
                     </span>
                   </div>

@@ -7,9 +7,16 @@ import { useAppI18n } from "./i18n.tsx";
 // raw `YYYY-MM-DD` register and renders a short label whose color role
 // (`data-tone`) reflects urgency — unless `muted` (done/binned items),
 // which drops all urgency styling and shows a past deadline as the date
-// itself rather than "Overdue". Recomputes off the shared `nowMs()` tick
-// so "Today"/"Overdue" roll over at local midnight on their own.
-export function DeadlineBadge(props: { deadline: string; muted?: boolean }) {
+// itself rather than "Overdue". `pastAsDate` alone keeps the overdue tone
+// but still shows the date that slipped (Upcoming's Today rows, where the
+// word "Overdue" would say nothing the placement doesn't). Recomputes off
+// the shared `nowMs()` tick so "Today"/"Overdue" roll over at local
+// midnight on their own.
+export function DeadlineBadge(props: {
+  deadline: string;
+  muted?: boolean;
+  pastAsDate?: boolean;
+}) {
   const { m, locale } = useAppI18n();
   const info = createMemo(() =>
     formatDeadlineBadge(
@@ -21,7 +28,7 @@ export function DeadlineBadge(props: { deadline: string; muted?: boolean }) {
         tomorrow: m().deadline.tomorrow,
       },
       locale(),
-      { pastAsDate: props.muted },
+      { pastAsDate: props.muted || props.pastAsDate },
     ),
   );
   const tone = () => (props.muted ? "muted" : (info()?.urgency ?? "future"));

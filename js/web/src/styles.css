@@ -26,6 +26,8 @@
   --link: #2563eb;
   --error-bg: #fee2e2;
   --error-text: #991b1b;
+  --overdue-bg: #ffe4e4;
+  --overdue-text: #ff5978;
   --dnd-select-bg: #dbeafe;
   /* Divider under a selected row: a blue-grey a step darker than the
      selection fill so the row's edge still reads against it. */
@@ -54,10 +56,12 @@
   --border-surface: #2e2e2e;
   --border-input: #333;
   --border-row: #222;
-  --row-divider: #1c1c1c;
+  --row-divider: #303030;
   --link: #60a5fa;
   --error-bg: #2a1215;
   --error-text: #f87171;
+  --overdue-bg: #3a1a22;
+  --overdue-text: #ff7a93;
   --dnd-select-bg: #293a5b;
   --dnd-select-border: #33466e;
   --palette-select-bg: #26262a;
@@ -267,7 +271,13 @@ body {
 }
 
 .upcoming-day {
-  margin-bottom: 16px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.upcoming-day:last-child {
+  border-bottom: none;
 }
 
 .upcoming-day-header {
@@ -275,7 +285,6 @@ body {
   align-items: baseline;
   gap: 8px;
   padding: 8px 8px 4px;
-  border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
 }
 
@@ -284,15 +293,6 @@ body {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
-}
-
-.upcoming-day[data-urgency="overdue"] .upcoming-day-label {
-  color: var(--error-text);
-}
-
-.upcoming-day-detail {
-  font-size: 12px;
-  color: var(--text-faint);
 }
 
 .upcoming-empty-day {
@@ -326,13 +326,8 @@ body {
 .upcoming-row-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   flex-shrink: 0;
-}
-
-.upcoming-row-list {
-  font-size: 12px;
-  color: var(--text-faint);
 }
 
 @media (max-width: 768px) and (pointer: coarse) {
@@ -3254,6 +3249,11 @@ input.task-check:hover {
 .deadline-badge-icon svg {
   width: 12px;
   height: 12px;
+}
+
+.deadline-badge[data-tone="overdue"] {
+  color: var(--overdue-text);
+  background: var(--overdue-bg);
 }
 
 .deadline-badge[data-tone="muted"] {

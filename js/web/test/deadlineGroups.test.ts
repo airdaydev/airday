@@ -1,5 +1,5 @@
-// Day bucketing behind the Upcoming view: overdue folds into one leading group, same-day items share a
-// group, and the optional Today anchor lands after Overdue.
+// Day bucketing behind the Upcoming view: Today always leads and absorbs
+// overdue items, and same-day items share a group.
 
 import { describe, expect, test } from "bun:test";
 
@@ -29,7 +29,7 @@ function item(
 }
 
 describe("groupByDeadline", () => {
-  test("buckets by day, soonest first, overdue folded together", () => {
+  test("buckets by day, soonest first, overdue folded into Today", () => {
     const groups = groupByDeadline(
       [
         item("2026-09-03"),
@@ -43,17 +43,16 @@ describe("groupByDeadline", () => {
       "en",
     );
     expect(groups.map((g) => [g.key, g.urgency, g.items.length])).toEqual([
-      ["overdue", "overdue", 2],
-      ["2026-09-02", "today", 1],
+      ["2026-09-02", "today", 3],
       ["2026-09-03", "future", 2],
     ]);
-    expect(groups[0]!.label).toBe("Overdue");
-    expect(groups[1]!.label).toBe("Today");
-    expect(groups[2]!.label).toBe("Tomorrow");
-    // Overdue keeps date order within the fold.
+    expect(groups[0]!.label).toBe("Today");
+    expect(groups[1]!.label).toBe("Tomorrow");
+    // Overdue leads Today, oldest first, then today's own.
     expect(groups[0]!.items.map((i) => i.deadline)).toEqual([
       "2026-08-01",
       "2026-08-30",
+      "2026-09-02",
     ]);
   });
 
@@ -73,26 +72,20 @@ describe("groupByDeadline", () => {
     expect(groups[0]!.items).toHaveLength(1);
   });
 
-  test("ensureToday inserts an empty Today after Overdue", () => {
+  test("Today leads even when nothing is due on it", () => {
     const groups = groupByDeadline(
-      [item("2026-08-30"), item("2026-09-05")],
+      [item("2026-09-05")],
       TODAY,
       LABELS,
       "en",
-      { ensureToday: true },
     );
-    expect(groups.map((g) => g.key)).toEqual([
-      "overdue",
-      TODAY,
-      "2026-09-05",
-    ]);
-    expect(groups[1]!.items).toEqual([]);
+    expect(groups.map((g) => g.key)).toEqual([TODAY, "2026-09-05"]);
+    expect(groups[0]!.items).toEqual([]);
   });
 
-  test("ensureToday leads when nothing is overdue", () => {
-    const groups = groupByDeadline([], TODAY, LABELS, "en", {
-      ensureToday: true,
-    });
+  test("empty input still yields an empty Today", () => {
+    const groups = groupByDeadline([], TODAY, LABELS, "en");
     expect(groups.map((g) => g.key)).toEqual([TODAY]);
+    expect(groups[0]!.items).toEqual([]);
   });
 });
