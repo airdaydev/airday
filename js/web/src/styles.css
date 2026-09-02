@@ -110,14 +110,14 @@ body {
   overflow: hidden;
 }
 
-/* Two columns (nav | content) over a footer strip that spans both — the
-   footer is a direct grid child, not nested in either pane, so its
-   chrome (app menu, sidebar toggle, account/sync widget) stays put when
-   the sidebar hides or the mobile drawer swaps panes. */
+/* Two columns (nav | content), optionally a third for the deadline
+   rail. The app chrome (menu, account/sync widget) lives in the nav's
+   own footer strip; when the nav is hidden that strip floats bottom-left
+   (see `.app.nav-hidden .nav` below). */
 .app {
   display: grid;
   grid-template-columns: 260px 1fr;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr;
   height: 100%;
 }
 
@@ -127,6 +127,18 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* Sidebar-scoped footer: app menu at the left, account/sync widget
+   beside it. Left padding lines the menu up with the nav's scroll-region
+   gutter. */
+.nav-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 12px;
 }
 
 [data-theme="dark"] .nav {
@@ -143,19 +155,49 @@ body {
 }
 
 /* Desktop sidebar collapse: `nav-hidden` drops the nav column and the
-   main surface takes the full width; the footer toggle stays visible to
-   bring it back. Mobile is unaffected — the sidebar isn't rendered there. */
+   main surface takes the full width. The nav itself stays mounted but
+   leaves the grid (position: fixed), its scroll region hidden, so only
+   its footer remains — a floating pill in the bottom-left corner holding
+   the app menu (whose Show sidebar item brings the nav back) and the
+   account/sync widget. Mobile is unaffected — the sidebar isn't rendered
+   there. */
 .app.nav-hidden {
   grid-template-columns: 1fr;
 }
 
 .app.nav-hidden .nav {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 50;
+  padding: 0;
+  overflow: visible;
+}
+
+.app.nav-hidden .nav-scroll {
   display: none;
 }
 
+.app.nav-hidden .nav-footer {
+  height: 40px;
+  padding: 0 6px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .app.nav-hidden .nav-footer {
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.3),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
 /* Desktop deadline rail: `deadlines-open` adds a third column on the
-   right of the main surface. Composes with `nav-hidden`; the footer
-   spans all columns regardless. Mobile never sets the class. */
+   right of the main surface. Composes with `nav-hidden`. Mobile never
+   sets the class. */
 .app.deadlines-open {
   grid-template-columns: 260px 1fr 280px;
 }
@@ -260,11 +302,6 @@ body {
   color: var(--text-faint);
 }
 
-.deadlines-toggle[aria-pressed="true"] {
-  background: var(--bg-active);
-  color: var(--text);
-}
-
 @media (max-width: 768px) and (pointer: coarse) {
   /* Bump the inherited base size on phones; chrome elements with
      explicit px sizes (section labels, chips) keep theirs. ≥16px also
@@ -273,10 +310,10 @@ body {
     font-size: 16px;
   }
 
-  /* Single pane: the desktop sidebar and footer aren't rendered on
-     phones (Workspace.tsx swaps them for MobileBar + ListSheet), so the
-     grid collapses to main alone, leaving room beneath for the fixed
-     bottom bar. */
+  /* Single pane: the desktop sidebar isn't rendered on phones
+     (Workspace.tsx swaps it for MobileBar + ListSheet), so the grid
+     collapses to main alone, leaving room beneath for the fixed bottom
+     bar. */
   .app {
     grid-template-columns: 100vw;
     grid-template-rows: 1fr;
@@ -448,8 +485,7 @@ body {
   pointer-events: none;
 }
 
-/* Right-hand column: the main surface fills the pane row; the footer
-   strip below it belongs to the app grid, not this column. */
+/* Right-hand column: the main surface fills the pane row. */
 .content {
   display: flex;
   flex-direction: column;
@@ -473,7 +509,7 @@ body {
    rule depends on source order. */
 @media not all and (max-width: 768px) and (pointer: coarse) {
   .main {
-    margin: 8px 8px 0 0;
+    margin: 8px 8px 8px 0;
     border-radius: 8px;
     border: 0.5px solid var(--border-surface);
   }
@@ -483,26 +519,6 @@ body {
   .app.nav-hidden .main {
     margin-left: 8px;
   }
-}
-
-/* Unified footer strip on the darker body background, spanning nav +
-   main: sidebar toggle then app menu at the left, account/sync widget
-   at the far right. Left padding lines the toggle up with the nav's
-   scroll-region gutter. */
-.footer {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: 36px;
-  padding: 0 8px 0 12px;
-}
-
-.footer-status {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .main-header {

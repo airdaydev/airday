@@ -21,7 +21,6 @@ import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { Switch } from "@kobalte/core/switch";
 import { Tooltip } from "@kobalte/core/tooltip";
 import archiveSvg from "./icons/archive.svg?raw";
-import calendarSvg from "./icons/calendar.svg?raw";
 import cardStackSvg from "./icons/card-stack.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
@@ -29,7 +28,6 @@ import dotsHorizontalSvg from "./icons/dots-horizontal.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import listBulletSvg from "./icons/list-bullet.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
-import viewVerticalSvg from "./icons/view-vertical.svg?raw";
 import plusSvg from "./icons/card-stack-plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
 import { Board, laneLabel, type BoardImperative } from "./Board.tsx";
@@ -1616,8 +1614,8 @@ export function Workspace(props: {
   document.addEventListener("contextmenu", onContextMenu, true);
   onCleanup(() => document.removeEventListener("contextmenu", onContextMenu, true));
 
-  // Mobile shell: at narrow viewports the sidebar + footer are replaced
-  // by MobileBars (MobileShell.tsx), and the Find palette by FindSheet, a
+  // Mobile shell: at narrow viewports the sidebar (and its footer chrome)
+  // is replaced by MobileBars (MobileShell.tsx), and the Find palette by FindSheet, a
   // tap-first list switcher over the same result set.
   const mobileMq = window.matchMedia("(max-width: 768px) and (pointer: coarse)");
   const [isMobile, setIsMobile] = createSignal(mobileMq.matches);
@@ -1627,8 +1625,8 @@ export function Workspace(props: {
   mobileMq.addEventListener("change", onMqChange);
   onCleanup(() => mobileMq.removeEventListener("change", onMqChange));
 
-  // Desktop sidebar collapse. Toggled from the unified app footer, which stays visible
-  // either way.
+  // Desktop sidebar collapse. Toggled from the app menu, which lives in
+  // the sidebar's footer and floats bottom-left while the sidebar is hidden.
   const [navHidden, setNavHiddenSignal] = createSignal(loadNavHiddenPref());
   const setNavHidden = (hidden: boolean) => {
     setNavHiddenSignal(hidden);
@@ -1640,8 +1638,8 @@ export function Workspace(props: {
     }
   };
 
-  // Desktop deadline rail (right-hand column). Toggled from the calendar
-  // button beside the sync widget; persisted per browser like the nav.
+  // Desktop deadline rail (right-hand column). Toggled from the app menu;
+  // persisted per browser like the nav.
   const [deadlinesOpen, setDeadlinesOpenSignal] = createSignal(
     loadDeadlinesOpenPref(),
   );
@@ -1701,6 +1699,29 @@ export function Workspace(props: {
         showListCounts={state.settings.showListCounts}
         view={view()}
         setView={navigateTo}
+        footer={
+          <>
+            <NavMenu
+              app={app}
+              session={session.session()}
+              logout={session.logout}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenShortcuts={() => setShortcutsOpen(true)}
+              onSession={session.swapSession}
+              navHidden={navHidden()}
+              onToggleNav={() => setNavHidden(!navHidden())}
+              deadlinesOpen={deadlinesOpen()}
+              onToggleDeadlines={() => setDeadlinesOpen(!deadlinesOpen())}
+            />
+            <StatusSlot
+              app={app}
+              online={session.online()}
+              lastSyncAt={session.lastSyncAt()}
+              session={session.session()}
+              onSession={session.swapSession}
+            />
+          </>
+        }
       />
       </Show>
       <Show
@@ -1842,8 +1863,8 @@ export function Workspace(props: {
           </div>
           <div class="main-header-actions">
             {/* Mobile: the sync indicator lives up here (there's no
-                footer). Always mounted while mobile so its first-run
-                auth prompt still fires on load, as on desktop. */}
+                sidebar footer). Always mounted while mobile so its
+                first-run auth prompt still fires on load, as on desktop. */}
             <Show when={isMobile()}>
               <StatusSlot
                 class="glass"
@@ -2234,68 +2255,6 @@ export function Workspace(props: {
             revealItemIn(id, "list");
           }}
         />
-      </Show>
-      <Show when={!isMobile()}>
-        {/* Unified footer strip spanning nav + main (a direct child of the
-            app grid, not nested in either pane), so its chrome stays put
-            when the sidebar hides or the mobile drawer swaps panes. Menu +
-            sidebar toggle sit bottom-left; the account / sync widget sits
-            at the far right. */}
-        <footer class="footer">
-          {/* Desktop-only: mobile's drawer makes a collapsed sidebar
-              meaningless. */}
-          <Tooltip openDelay={200} closeDelay={0} placement="top">
-              <Tooltip.Trigger
-                class="nav-menu-trigger"
-                tabIndex={-1}
-                aria-label={navHidden() ? m().nav.showSidebar : m().nav.hideSidebar}
-                aria-expanded={!navHidden()}
-                onClick={() => setNavHidden(!navHidden())}
-                innerHTML={viewVerticalSvg}
-              />
-              <Tooltip.Portal>
-                <Tooltip.Content class="tooltip-content">
-                  {navHidden() ? m().nav.showSidebar : m().nav.hideSidebar}
-                  <Tooltip.Arrow />
-                </Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip>
-          <NavMenu
-            app={app}
-            session={session.session()}
-            logout={session.logout}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onOpenShortcuts={() => setShortcutsOpen(true)}
-            onSession={session.swapSession}
-          />
-          <div class="footer-status">
-            <Tooltip openDelay={200} closeDelay={0} placement="top">
-              <Tooltip.Trigger
-                class="nav-menu-trigger deadlines-toggle"
-                tabIndex={-1}
-                aria-label={
-                  deadlinesOpen() ? m().deadlines.hide : m().deadlines.show
-                }
-                aria-pressed={deadlinesOpen()}
-                onClick={() => setDeadlinesOpen(!deadlinesOpen())}
-                innerHTML={calendarSvg}
-              />
-              <Tooltip.Portal>
-                <Tooltip.Content class="tooltip-content">
-                  {deadlinesOpen() ? m().deadlines.hide : m().deadlines.show}
-                  <Tooltip.Arrow />
-                </Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip>
-            <StatusSlot
-              app={app}
-              online={session.online()}
-              lastSyncAt={session.lastSyncAt()}
-              session={session.session()}
-              onSession={session.swapSession}
-            />
-          </div>
-        </footer>
       </Show>
       <Show when={isMobile()}>
         <MobileBars

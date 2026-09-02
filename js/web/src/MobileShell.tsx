@@ -1,6 +1,6 @@
 // Mobile chrome: two floating glass pills along the bottom edge.
 //
-// On phones the desktop sidebar + footer are not rendered at all (see
+// On phones the desktop sidebar (and its footer chrome) is not rendered (see
 // Workspace.tsx). The left pill carries Find (FindSheet.tsx, which
 // doubles as the list switcher: it lists every view on an empty query
 // and marks the current one) and Settings; the right pill is Add. The sync indicator moves into the

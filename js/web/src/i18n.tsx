@@ -228,7 +228,7 @@ export type Messages = {
   deadlines: {
     /** Title of the right-hand deadline rail. */
     title: string;
-    /** Footer toggle labels. */
+    /** App-menu toggle labels. */
     show: string;
     hide: string;
     /** Rail body when no open item carries a deadline. */
