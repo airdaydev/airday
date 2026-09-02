@@ -22,6 +22,7 @@
   --border-surface: #e7e7e7;
   --border-input: #d4d4d4;
   --border-row: #efefef;
+  --row-divider: #f1f1f1;
   --link: #2563eb;
   --error-bg: #fee2e2;
   --error-text: #991b1b;
@@ -50,6 +51,7 @@
   --border-surface: #1f1f1f;
   --border-input: #333;
   --border-row: #222;
+  --row-divider: #1c1c1c;
   --link: #60a5fa;
   --error-bg: #2a1215;
   --error-text: #f87171;
@@ -702,10 +704,19 @@ body {
      it to the top as the height animates. */
   align-items: flex-start;
   gap: 8px;
-  padding: 6px;
+  /* Standard density: 8px vertical padding + hairline divider. Compact
+     drops both. Row height is fixed by the virtualizer (density.ts
+     rowHeight), so these paddings must stay in step with it. */
+  padding: 8px 6px;
+  border-bottom: 0.5px solid var(--row-divider);
   height: 100%;
   background: var(--surface);
   transition: 0.2s opacity;
+}
+
+[data-density="compact"] .row {
+  padding: 6px;
+  border-bottom: 0;
 }
 
 .dnd-host[data-expanded] .row:not([data-expanded]) {

@@ -65,6 +65,7 @@ import {
   type RecentDoneEntry,
   type WorkflowState,
 } from "./sync/store.ts";
+import { rowHeight } from "./density.ts";
 import { createTheme, type ThemePreference } from "./theme.ts";
 import {
   encodeView,
@@ -457,9 +458,10 @@ export function Workspace(props: {
   const [expandedKey, setExpandedKey] = createSignal<string | null>(null);
 
   // Touch viewports get taller rows so each item's a comfortable tap
-  // target (the 28px desktop default is too tight for a thumb). Dnd's
-  // cfg() reads itemHeight reactively via setConfig, so flipping this
-  // signal on rotation / resize live-updates the controller.
+  // target (the desktop height is too tight for a thumb). Row height
+  // also follows the density preference (see density.ts). Dnd's cfg()
+  // reads itemHeight reactively via setConfig, so flipping either
+  // signal live-updates the controller.
   const itemsMobileMq = window.matchMedia("(max-width: 768px) and (pointer: coarse)");
   const [itemsIsMobile, setItemsIsMobile] = createSignal(itemsMobileMq.matches);
   const onItemsMqChange = (e: MediaQueryListEvent) => setItemsIsMobile(e.matches);
@@ -2166,7 +2168,7 @@ export function Workspace(props: {
                   onExpandedChange={(k) =>
                     setExpandedKey(k == null ? null : String(k))
                   }
-                  itemHeight={itemsIsMobile() ? 40 : 28}
+                  itemHeight={rowHeight(itemsIsMobile())}
                   expandable
                   clearOnClickOutside
                   fillHeight
