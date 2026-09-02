@@ -247,9 +247,6 @@ export type Messages = {
     /** App-menu toggle labels for the desktop side panel. */
     show: string;
     hide: string;
-    /** Panel body while no item is open: it only ever hosts the task
-     *  surface, so it invites a click. */
-    hint: string;
   };
   order: {
     /** Submenu label for the item-ordering actions. */
@@ -494,7 +491,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       title: "Barra de contexto",
       show: "Mostrar barra de contexto",
       hide: "Ocultar barra de contexto",
-      hint: "Selecciona un elemento para verlo aquí",
     },
     order: {
       label: "Ordenar",
@@ -726,7 +722,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       title: "Context sidebar",
       show: "Show context sidebar",
       hide: "Hide context sidebar",
-      hint: "Select an item to see it here",
     },
     order: {
       label: "Order",

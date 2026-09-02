@@ -1778,8 +1778,6 @@ export function Workspace(props: {
   // Gated on `sidePanelShown` so the dialog falls back to its modal shell
   // the moment the panel closes (the stale element is never handed out).
   const [panelMount, setPanelMount] = createSignal<HTMLElement | null>(null);
-  const taskSurfaceOpen = () =>
-    openItemId() !== null || newItemTarget() !== null;
 
   // Side panel follows the selection: while the panel is showing, the
   // topmost selected item (list view or the board's active lane) opens in
@@ -2447,11 +2445,9 @@ export function Workspace(props: {
         <aside class="side-panel" aria-label={m().sidePanel.title}>
           {/* The task surface portals in here while an item is open (see
               TaskDialog's `panelMount`). The div stays mounted so the
-              portal target is stable; CSS hides it while empty. */}
+              portal target is stable; CSS hides it while empty, and the
+              column sits blank rather than showing a hint. */}
           <div class="side-panel-task" ref={setPanelMount} />
-          <Show when={!taskSurfaceOpen()}>
-            <div class="side-panel-hint">{m().sidePanel.hint}</div>
-          </Show>
         </aside>
       </Show>
       <Show when={isMobile()}>

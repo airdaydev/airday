@@ -207,7 +207,7 @@ body {
 /* Desktop side panel: `side-panel-open` adds a third column on the right
    of the main surface. Composes with `nav-hidden`. Mobile never sets the
    class. The panel hosts the open task surface (`.task-panel`, portaled
-   into `.side-panel-task`); idle, it shows a hint. */
+   into `.side-panel-task`); idle, it sits blank. */
 .app.side-panel-open {
   grid-template-columns: 260px 1fr 300px;
 }
@@ -216,6 +216,10 @@ body {
   grid-template-columns: 1fr 300px;
 }
 
+/* The column carries the surface frame (hairline border, no shadow, same
+   fill as the main surface) itself, so it reads as an empty pane while
+   idle rather than a hole in the layout, and the task pane portaled into
+   it inherits the frame instead of drawing its own. */
 .side-panel {
   display: flex;
   flex-direction: column;
@@ -223,6 +227,8 @@ body {
   min-width: 0;
   overflow: hidden;
   color: var(--text-muted);
+  border: 0.5px solid var(--border-surface);
+  background: var(--surface);
 }
 
 /* Portal host for the task pane. Solid's Portal wraps its content in a
@@ -239,21 +245,13 @@ body {
   display: none;
 }
 
-.side-panel-hint {
-  padding: 20px 16px;
-  color: var(--text-faint);
-}
-
 /* The task surface as an inline pane: fills the panel column and scrolls
-   on its own. Lives beside the main surface so it borrows the same
-   floating-surface frame (hairline border, no shadow). */
+   on its own. The column (`.side-panel`) supplies the frame. */
 .task-panel {
   flex: 1;
   min-height: 0;
   width: auto;
   max-height: none;
-  border: 0.5px solid var(--border-surface);
-  background: var(--surface);
 }
 
 .task-panel .task-dialog-title {
