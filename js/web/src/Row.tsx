@@ -14,7 +14,7 @@ import {
   nowMs,
   todayStamp,
 } from "./format.tsx";
-import { useAppI18n } from "./i18n.tsx";
+import { laneLabel, useAppI18n } from "./i18n.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
 import { setLinkifiedText } from "./linkify.ts";
 import type { ViewKey } from "./prefs.ts";
@@ -72,6 +72,10 @@ export function Row(props: {
   showList?: () => boolean;
   /** Resolves a list id to its display label (see Workspace `listLabel`). */
   listLabel?: (listId: string) => string;
+  /** Flat list view: when true, badge each open row with its lifecycle
+   *  state (client-local per-list display option). The board shows state
+   *  as the lane itself, so cards never take it. */
+  showState?: () => boolean;
   /** Open the shared calendar modal to set a deadline on the target set.
    *  `initial` seeds the calendar (this row's current deadline, or null). */
   onSetDeadline?: (ids: readonly string[], initial: string | null) => void;
@@ -96,6 +100,18 @@ export function Row(props: {
     return (props.viewKind === "focus" || props.viewKind === "done") &&
       props.showList?.()
       ? (props.listLabel?.(props.item().listId) || null)
+      : null;
+  });
+  // Lifecycle-state badge text for the flat list view, when the list's
+  // "show state" option is on. Open items only: done rows already read
+  // as done (strike-through + timestamp) and a lingering done row would
+  // otherwise flash a "Done" pill for its last three seconds.
+  const stateBadge = createMemo(() => {
+    return props.viewKind === "list" &&
+      !props.deadlineInFooter &&
+      props.showState?.() &&
+      isOpen(props.item())
+      ? laneLabel(m(), props.item().state)
       : null;
   });
   // Open state of this row's context menu, mirrored into the shared
@@ -147,6 +163,7 @@ export function Row(props: {
   // slot of the row's gap.
   const showInlineBadges = () =>
     Boolean(originList()) ||
+    Boolean(stateBadge()) ||
     (!props.deadlineInFooter &&
       (Boolean(lifecycleTimestamp(props.item())) ||
         (!props.expanded() &&
@@ -682,6 +699,9 @@ export function Row(props: {
               }
             >
               {(d) => <DeadlineBadge deadline={d()} />}
+            </Show>
+            <Show when={stateBadge()}>
+              {(label) => <span class="badge row-state">{label()}</span>}
             </Show>
             <Show when={originList()}>
               {(name) => (

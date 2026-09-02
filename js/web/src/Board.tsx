@@ -29,7 +29,7 @@ import { Dnd, DndSelection, type DndImperative, type DndOp } from "./dnd/solid";
 import type { DndDragEventDetail } from "./dnd";
 import checkSvg from "./icons/check.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
-import { useAppI18n, type Messages } from "./i18n.tsx";
+import { laneLabel, useAppI18n } from "./i18n.tsx";
 import { isOverlayOpen } from "./overlay.ts";
 import { Row } from "./Row.tsx";
 import { planReorderMoves } from "./reorder.ts";
@@ -47,22 +47,6 @@ import {
  *  handle / selection maps. Item ids are uuid-v7 hex or `inbox`, so
  *  these plain words can never collide with one. */
 const DONE_LANE: WorkflowState = "done";
-
-/** Localized lane header label for a lane key. */
-export function laneLabel(m: Messages, lane: WorkflowState): string {
-  switch (lane) {
-    case "backlog":
-      return m.board.backlogLane;
-    case "todo":
-      return m.board.todoLane;
-    case "in_progress":
-      return m.board.inProgressLane;
-    case "review":
-      return m.board.reviewLane;
-    case "done":
-      return m.board.doneLane;
-  }
-}
 
 /** Imperative handle the workspace holds to steer focus back into the
  *  board (e.g. after the detail dialog closes), mirroring the list view's

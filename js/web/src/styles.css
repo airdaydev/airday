@@ -899,6 +899,12 @@ input.task-check:hover {
   white-space: nowrap;
 }
 
+/* Lifecycle-state badge on flat list rows (per-list "Show state" display
+   option). Same quiet pill as the origin-list badge: metadata, not text. */
+.row-state {
+  color: var(--text-badge-faint);
+}
+
 /* Remove (×) affordance shown inside the Focus lens, at the row's trailing
    edge; stays hidden until the row is hovered / selected — removing a
    pinned item must be as cheap as adding it (spec/focus.md). */

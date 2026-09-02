@@ -9,7 +9,6 @@
 import { Dialog } from "@kobalte/core/dialog";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import { laneLabel } from "./Board.tsx";
 import { DeadlineField } from "./DeadlineField.tsx";
 import { ListPicker, type ListOption } from "./ListPicker.tsx";
 import caretSortSvg from "./icons/caret-sort.svg?raw";
@@ -19,7 +18,7 @@ import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import drawingPinFilledSvg from "./icons/drawing-pin-filled.svg?raw";
 import noteSvg from "./icons/note.svg?raw";
 import { formatDialogStamp, nowMs } from "./format.tsx";
-import { useAppI18n } from "./i18n.tsx";
+import { useAppI18n, laneLabel } from "./i18n.tsx";
 import {
   collapsedCaretOffset,
   locateOffsetInLinkified,

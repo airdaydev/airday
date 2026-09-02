@@ -58,6 +58,14 @@ This is what keeps five states from imposing five columns: a solo user can run
 `Backlog | In Progress | Done`, or even just `In Progress | Done`, while a
 team list shows all five.
 
+### State on the flat list
+
+The list view flattens the four open states into one order, so an item's
+state is otherwise invisible there. Clients may offer a per-list, client-local
+**show state** display option that badges each open row with its state label.
+Like lane hiding it is display-only, never syncs, and is off by default. It
+has no meaning on the board (the lane is the state) or on the Done view.
+
 ## Projection
 
 - The board reads the list's Open projection (the core's per-list `open`

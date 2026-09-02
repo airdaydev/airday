@@ -32,14 +32,14 @@ import listBulletSvg from "./icons/list-bullet.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
 import plusSvg from "./icons/card-stack-plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
-import { Board, laneLabel, type BoardImperative } from "./Board.tsx";
+import { Board, type BoardImperative } from "./Board.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Deadlines } from "./Deadlines.tsx";
 import { DeadlineCalendarDialog } from "./DeadlineCalendarDialog.tsx";
 import { FindPalette } from "./FindPalette.tsx";
 import { FindSheet } from "./FindSheet.tsx";
 import type { FindResult } from "./findResults.tsx";
-import { useAppI18n } from "./i18n.tsx";
+import { laneLabel, useAppI18n } from "./i18n.tsx";
 import { ListIconPicker } from "./ListIconPicker.tsx";
 import { restoreCapturedPositions } from "./linger.ts";
 import { createPopoverTooltipGuard } from "./popoverTooltip.ts";
@@ -156,6 +156,26 @@ function loadLanePrefs(): Record<string, WorkflowState[]> {
         out[listId] = visible;
       }
     }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+// Per-list *local* "badge each row with its lifecycle state" flag for the
+// flat list view. Display-only and client-local like the lane prefs: the
+// board makes state visible as lanes, so the list lens is the only place
+// state is otherwise invisible, and whether that matters is a per-list
+// call (a capture list is all Backlog; a project list is not). Off by
+// default — only the lists with it on get a key.
+const STATE_PREF_KEY = "airday:list-show-state";
+function loadShowStatePrefs(): Record<string, true> {
+  try {
+    const raw = localStorage.getItem(STATE_PREF_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+    if (!Array.isArray(parsed)) return {};
+    const out: Record<string, true> = {};
+    for (const id of parsed) if (typeof id === "string") out[id] = true;
     return out;
   } catch {
     return {};
@@ -460,6 +480,24 @@ export function Workspace(props: {
     const map = { ...viewOverrides() };
     delete map[listId];
     putViewOverrides(map);
+  };
+  // Client-local per-list "show state" flag for the flat list view.
+  const [showStatePrefs, setShowStatePrefs] = createSignal<Record<string, true>>(
+    loadShowStatePrefs(),
+  );
+  const showState = (listId: string): boolean => showStatePrefs()[listId] === true;
+  const setShowState = (listId: string, show: boolean) => {
+    const map = { ...showStatePrefs() };
+    if (show) map[listId] = true;
+    else delete map[listId];
+    setShowStatePrefs(map);
+    try {
+      const ids = Object.keys(map);
+      if (ids.length === 0) localStorage.removeItem(STATE_PREF_KEY);
+      else localStorage.setItem(STATE_PREF_KEY, JSON.stringify(ids));
+    } catch {
+      // Quota/private-mode failures just lose the preference.
+    }
   };
   // Whether the global Done view badges each item with its origin list.
   const [doneShowList, setDoneShowListSignal] = createSignal<boolean>(
@@ -2030,6 +2068,26 @@ export function Workspace(props: {
                     </SegmentedControl.ItemControl>
                   </SegmentedControl.Item>
                 </SegmentedControl>
+                {/* Flat list only: badge rows with their lifecycle state.
+                    The board shows state as the lane, so the switch
+                    yields to the lane rows there. */}
+                <Show when={boardListId() === null && currentListId()}>
+                  {(listId) => (
+                    <Switch
+                      class="done-switch"
+                      checked={showState(listId())}
+                      onChange={(checked) => setShowState(listId(), checked)}
+                    >
+                      <Switch.Label class="done-switch-label">
+                        {m().workspace.showState}
+                      </Switch.Label>
+                      <Switch.Input class="done-switch-input" />
+                      <Switch.Control class="done-switch-control">
+                        <Switch.Thumb class="done-switch-thumb" />
+                      </Switch.Control>
+                    </Switch>
+                  )}
+                </Show>
                 <Show when={boardListId()}>
                   {(listId) => (
                     <>
@@ -2238,6 +2296,10 @@ export function Workspace(props: {
                             : doneShowList()
                         }
                         listLabel={listLabel}
+                        showState={() => {
+                          const v = view();
+                          return v.kind === "list" && showState(v.id);
+                        }}
                         duplicateBlock={duplicateBlock}
                         copyBlock={copyBlock}
                         onDraftSettle={settleDraft}

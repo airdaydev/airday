@@ -1,4 +1,5 @@
 import { I18nProvider as KobalteI18nProvider, useLocale } from "@kobalte/core/i18n";
+import type { WorkflowState } from "./sync/store.ts";
 import {
   createContext,
   createMemo,
@@ -135,6 +136,9 @@ export type Messages = {
     /** Switch label (Done / Focus options popover) toggling the origin-list
      *  badge. */
     showOriginList: string;
+    /** Switch label (list display options) toggling the per-row lifecycle
+     *  state badge on the flat list view. */
+    showState: string;
     /** Done-view header button that opens the modal to record a completed
      *  item directly (defaults to Inbox). */
     log: string;
@@ -414,6 +418,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       currentList: "Actual",
       displayOptions: "Opciones de visualización",
       showOriginList: "Mostrar lista",
+      showState: "Mostrar estado",
       log: "Registrar",
       logCompleted: "Registrar elemento completado",
       listIcon: "Icono de la lista",
@@ -640,6 +645,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       currentList: "Current",
       displayOptions: "Display options",
       showOriginList: "Show list",
+      showState: "Show state",
       log: "Log",
       logCompleted: "Log completed item",
       listIcon: "List icon",
@@ -840,4 +846,22 @@ export function useAppI18n(): {
     locale,
     direction,
   };
+}
+
+/** Localized label for a workflow state: the board lane headers, the
+ *  task dialog's status picker, and the list view's state badge all
+ *  share it so a state reads the same everywhere. */
+export function laneLabel(m: Messages, lane: WorkflowState): string {
+  switch (lane) {
+    case "backlog":
+      return m.board.backlogLane;
+    case "todo":
+      return m.board.todoLane;
+    case "in_progress":
+      return m.board.inProgressLane;
+    case "review":
+      return m.board.reviewLane;
+    case "done":
+      return m.board.doneLane;
+  }
 }
