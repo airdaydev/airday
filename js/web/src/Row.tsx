@@ -57,10 +57,8 @@ export function Row(props: {
    *  Escape / blur / empty-Enter. */
   onDraftSettle?: (text: string, chain: boolean) => void;
   /** Open this item in the detail dialog. `focus` picks which field the
-   *  dialog lands the caret in — the note badge opens straight to notes.
-   *  `caret` is a title character offset (from a double-click) so the dialog
-   *  lands the caret where the user pointed instead of at the end. */
-  onOpen?: (id: string, focus?: "notes", caret?: number) => void;
+   *  dialog lands the caret in — the note badge opens straight to notes. */
+  onOpen?: (id: string, focus?: "notes") => void;
   /** When true (mobile), a plain tap on the row opens the dialog instead
    *  of only selecting — inline editing is unpleasant on touch. */
   openOnTap?: () => boolean;
@@ -251,42 +249,6 @@ export function Row(props: {
     ),
   );
 
-  // Absolute character offset in the row's (plain, pre-linkify) text under
-  // the pointer — handed to the dialog so a double-click lands its title
-  // caret exactly where the user pointed. The collapsed row holds a single
-  // text node, so a hit-tested node offset is already the char position; a
-  // hit outside the text (row padding) snaps to the end.
-  const dblClickCharOffset = (e: MouseEvent): number => {
-    type CPFP = (
-      x: number,
-      y: number,
-    ) => { offsetNode: Node; offset: number } | null;
-    const cpfp = (
-      document as unknown as { caretPositionFromPoint?: CPFP }
-    ).caretPositionFromPoint;
-    let node: Node | null = null;
-    let offset = 0;
-    if (cpfp) {
-      const pos = cpfp.call(document, e.clientX, e.clientY);
-      if (pos) {
-        node = pos.offsetNode;
-        offset = pos.offset;
-      }
-    }
-    if (!node) {
-      const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
-      if (range) {
-        node = range.startContainer;
-        offset = range.startOffset;
-      }
-    }
-    const len = textRef.textContent?.length ?? 0;
-    if (node && node !== textRef && textRef.contains(node)) {
-      return Math.min(offset, len);
-    }
-    return len;
-  };
-
   // Mirror the model into the DOM while not expanded. While expanded
   // we leave the DOM alone so live edits aren't clobbered by reactive
   // updates from peer text changes. Plain text only — the expand path
@@ -465,18 +427,16 @@ export function Row(props: {
         data-binned={isBinned(props.item()) ? "" : undefined}
         data-expanded={props.expanded() ? "" : undefined}
         on:dblclick={(e) => {
-          // Double-click opens the detail dialog with its title caret placed
-          // where the user pointed. Listen at the row level (not the text
-          // span) so double-clicks in the row's padding still resolve a
-          // caret. Native (non-delegated) + stopPropagation so it runs in
-          // the bubble phase and suppresses the dnd listbox's own dblclick
+          // Double-click opens the detail dialog. Listen at the row level
+          // (not the text span) so double-clicks in the row's padding count
+          // too. Native (non-delegated) + stopPropagation so it runs in the
+          // bubble phase and suppresses the dnd listbox's own dblclick
           // (which would otherwise start an inline expansion). Drafts and
           // any already-expanded row keep their inline editor.
           if (props.expanded() || isDraftId(props.item().id)) return;
           e.preventDefault();
           e.stopPropagation();
-          const caret = dblClickCharOffset(e);
-          props.onOpen?.(props.item().id, undefined, caret);
+          props.onOpen?.(props.item().id);
         }}
         on:click={(e) => {
           // Mobile: a plain tap opens the detail dialog. Selection still

@@ -33,7 +33,6 @@ import { formatDialogStamp, nowMs } from "./format.tsx";
 import { useAppI18n, laneLabel } from "./i18n.tsx";
 import {
   collapsedCaretOffset,
-  locateOffsetInLinkified,
   openLinkOnClick,
   placeCaretAtEnd,
   placeCaretAtStart,
@@ -80,9 +79,6 @@ export function TaskDialog(props: {
   lists: () => ListView[];
   /** Which field to focus on open (default title). */
   focusField?: () => "title" | "notes";
-  /** Title character offset to land the caret at on open (from a
-   *  double-click); null/undefined → caret at the end of the title. */
-  caret?: () => number | null;
   /** True when the open was selection-driven (the side panel following
    *  the list selection): the non-modal shells then leave focus on the
    *  list instead of landing the caret. Flipping back to false on an
@@ -486,30 +482,13 @@ export function TaskDialog(props: {
     if (insertNewline(notesRef)) e.preventDefault();
   };
 
-  // Land the caret on open: the title (or notes when asked), at the
-  // pointed-at offset for a double-click. rAF defers past the load effect
-  // that linkifies the title value.
+  // Land the caret on open: at the end of the title (or notes when
+  // asked). rAF defers past the load effect that linkifies the title value.
   const focusOnOpen = () => {
     requestAnimationFrame(() => {
       const toNotes = props.focusField?.() === "notes";
       const el = toNotes ? notesRef : titleRef;
-      if (!el) return;
-      // A double-click passes a title caret offset — place it
-      // exactly where the user pointed (mapped through the
-      // linkified anchors); otherwise land at the end.
-      const caret = toNotes ? null : (props.caret?.() ?? null);
-      if (caret === null) {
-        placeCaretAtEnd(el);
-        return;
-      }
-      el.focus();
-      const pos = locateOffsetInLinkified(el, caret);
-      const sel = window.getSelection();
-      const range = document.createRange();
-      range.setStart(pos.node, pos.offset);
-      range.collapse(true);
-      sel?.removeAllRanges();
-      sel?.addRange(range);
+      if (el) placeCaretAtEnd(el);
     });
   };
 

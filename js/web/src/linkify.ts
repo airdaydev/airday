@@ -38,27 +38,6 @@ export function setLinkifiedText(el: HTMLElement, text: string): void {
   }
 }
 
-// Translate an absolute character offset within el's plain text into a
-// (node, offset) pair that can be fed to Range.setStart, walking through
-// linkified anchors. Used to preserve a caret position across a re-linkify.
-export function locateOffsetInLinkified(
-  el: HTMLElement,
-  charOffset: number,
-): { node: Node; offset: number } {
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-  let remaining = charOffset;
-  let last: Text | null = null;
-  let n: Node | null;
-  while ((n = walker.nextNode())) {
-    const t = n as Text;
-    if (remaining <= t.data.length) return { node: t, offset: remaining };
-    remaining -= t.data.length;
-    last = t;
-  }
-  if (last) return { node: last, offset: last.data.length };
-  return { node: el, offset: el.childNodes.length };
-}
-
 // Absolute character offset of the collapsed caret within `el`, or null when
 // there is no selection inside el or it isn't collapsed. Used to detect
 // "caret at start / end of field" for arrow-key navigation between editors.

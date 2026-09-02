@@ -364,10 +364,6 @@ export function Workspace(props: {
   // Which field the dialog focuses on open — the note badge opens to notes,
   // everything else to the title. Reset to title whenever the dialog closes.
   const [openFocus, setOpenFocus] = createSignal<"title" | "notes">("title");
-  // Title caret offset for the dialog when opened by a double-click, so it
-  // lands where the user pointed; null (→ caret at end) otherwise. Reset
-  // whenever the dialog closes.
-  const [openCaret, setOpenCaret] = createSignal<number | null>(null);
   // Lists this browser renders differently from their saved default.
   // Persisted per browser (not synced); absent ≡ follow the default.
   const [viewOverrides, setViewOverrides] = createSignal<Record<string, string>>(
@@ -542,7 +538,6 @@ export function Workspace(props: {
     if (openItemId() === null) {
       setLiveEdit(null);
       setOpenFocus("title");
-      setOpenCaret(null);
     }
   });
   const matchesKbDevice = createKbDeviceSignal();
@@ -1955,7 +1950,6 @@ export function Workspace(props: {
         app={app}
         lists={activeLists}
         focusField={openFocus}
-        caret={openCaret}
         passive={openPassive}
         onClosed={restoreItemsFocus}
         onLiveText={(text) => {
@@ -2378,9 +2372,8 @@ export function Workspace(props: {
                         duplicateBlock={duplicateBlock}
                         copyBlock={copyBlock}
                         onDraftSettle={settleDraft}
-                        onOpen={(id, focus, caret) => {
+                        onOpen={(id, focus) => {
                           if (focus) setOpenFocus(focus);
-                          if (caret != null) setOpenCaret(caret);
                           setOpenItemId(id);
                         }}
                         onSetDeadline={openDeadlineCalendar}
@@ -2400,9 +2393,8 @@ export function Workspace(props: {
             <Board
               app={app}
               listId={listId}
-              onOpen={(id, focus, caret) => {
+              onOpen={(id, focus) => {
                 if (focus) setOpenFocus(focus);
-                if (caret != null) setOpenCaret(caret);
                 setOpenItemId(id);
               }}
               onSetDeadline={openDeadlineCalendar}
