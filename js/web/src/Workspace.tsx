@@ -908,6 +908,24 @@ export function Workspace(props: {
   document.addEventListener("paste", onPaste);
   onCleanup(() => document.removeEventListener("paste", onPaste));
 
+  // Selection-scoped key actions (⌫, x, move) filter the selection down
+  // to the ids that are actually on screen. On a board, the Done lane's
+  // members come from a scan of `itemsById` (Board's `doneMembers`), not
+  // the list's Open projection — so `items()` covers only the open lanes.
+  // Add this board's done-but-not-binned items so a card selected in the
+  // Done lane is actionable too.
+  const withBoardDone = (visibleSet: Set<string>): Set<string> => {
+    const boardId = boardListId();
+    if (boardId !== null) {
+      for (const it of Object.values(state.itemsById)) {
+        if (it.listId === boardId && isDone(it) && !isBinned(it)) {
+          visibleSet.add(it.id);
+        }
+      }
+    }
+    return visibleSet;
+  };
+
   // Delete / Backspace on the active view: bin live or done items, hard-
   // delete binned ones. Skip when focus is inside an editable surface so
   // the AddForm, row edit, and list rename keep their native behaviour.
@@ -917,19 +935,7 @@ export function Workspace(props: {
     if (!sel) return;
     const v = view();
     const visibleIds = items().map((it) => it.id);
-    const visibleSet = new Set(visibleIds);
-    // On a board, the Done lane's members come from a scan of `itemsById`
-    // (Board's `doneMembers`), not the list's Open projection — so `items()`
-    // covers only Backlog + Live. Add this board's done-but-not-binned items
-    // so ⌫ can bin a card selected in the Done lane.
-    const boardId = boardListId();
-    if (boardId !== null) {
-      for (const it of Object.values(state.itemsById)) {
-        if (it.listId === boardId && isDone(it) && !isBinned(it)) {
-          visibleSet.add(it.id);
-        }
-      }
-    }
+    const visibleSet = withBoardDone(new Set(visibleIds));
     const ids = sel
       .getSelectedKeys()
       .map(String)
@@ -987,7 +993,9 @@ export function Workspace(props: {
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     const sel = actionSelection();
     if (!sel) return;
-    const visibleSet = new Set(items().map((it) => it.id));
+    // Include the board's Done-lane cards so x on one un-does it (back to
+    // Backlog — the core's undone rule, not the prior state).
+    const visibleSet = withBoardDone(new Set(items().map((it) => it.id)));
     const ids = sel
       .getSelectedKeys()
       .map(String)
@@ -1034,15 +1042,7 @@ export function Workspace(props: {
   // the in-view rows.
   const openMovePalette = (sourceIds: readonly string[]) => {
     const visibleIds = items().map((it) => it.id);
-    const visibleSet = new Set(visibleIds);
-    const boardId = boardListId();
-    if (boardId !== null) {
-      for (const it of Object.values(state.itemsById)) {
-        if (it.listId === boardId && isDone(it) && !isBinned(it)) {
-          visibleSet.add(it.id);
-        }
-      }
-    }
+    const visibleSet = withBoardDone(new Set(visibleIds));
     const sourceSet = new Set(sourceIds.map(String));
     const inView = visibleIds.filter((id) => sourceSet.has(id));
     const inViewSet = new Set(inView);
