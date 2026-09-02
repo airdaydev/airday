@@ -1437,6 +1437,18 @@ input.task-check:hover {
   -webkit-user-select: none;
 }
 
+.done-switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Item count beside each lane toggle; faint like .board-col-count. */
+.done-switch-count {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
 .done-switch-input {
   position: absolute;
   width: 1px;

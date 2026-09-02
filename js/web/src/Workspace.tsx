@@ -390,6 +390,30 @@ export function Workspace(props: {
       // Quota/private-mode failures just lose the preference.
     }
   };
+  // Per-lane item counts for the board whose view-mode popover is open,
+  // shown beside each lane toggle so hiding a lane is an informed choice.
+  // Mirrors Board.tsx laneMembers / doneMembers: open items partitioned
+  // by workflow state, plus this list's done-not-binned items. Empty
+  // (all zero) while no board is mounted.
+  const boardLaneCounts = createMemo((): Record<WorkflowState, number> => {
+    const counts: Record<WorkflowState, number> = {
+      backlog: 0,
+      todo: 0,
+      in_progress: 0,
+      review: 0,
+      done: 0,
+    };
+    const listId = boardListId();
+    if (listId === null) return counts;
+    for (const id of state.listOpen[listId] ?? []) {
+      const it = state.itemsById[id];
+      if (it) counts[it.state]++;
+    }
+    for (const it of Object.values(state.itemsById)) {
+      if (it.listId === listId && isDone(it) && !isBinned(it)) counts.done++;
+    }
+    return counts;
+  });
   // Default capture lane for a board: its first visible open lane
   // (Backlog unless hidden), falling back to Backlog when only the Done
   // lane renders.
@@ -1991,6 +2015,9 @@ export function Workspace(props: {
                           >
                             <Switch.Label class="done-switch-label">
                               {laneLabel(m(), lane)}
+                              <span class="done-switch-count">
+                                {boardLaneCounts()[lane]}
+                              </span>
                             </Switch.Label>
                             <Switch.Input class="done-switch-input" />
                             <Switch.Control class="done-switch-control">
@@ -2008,6 +2035,9 @@ export function Workspace(props: {
                       >
                         <Switch.Label class="done-switch-label">
                           {m().board.showDoneColumn}
+                          <span class="done-switch-count">
+                            {boardLaneCounts().done}
+                          </span>
                         </Switch.Label>
                         <Switch.Input class="done-switch-input" />
                         <Switch.Control class="done-switch-control">
