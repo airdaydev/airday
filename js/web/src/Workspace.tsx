@@ -1815,6 +1815,24 @@ export function Workspace(props: {
     });
   });
 
+  // Escape: the dnd (bound on its listbox, so it runs first) has already
+  // cleared the selection; the side panel followed that selection in, so
+  // it follows it out too and closes the item it was showing. Only when
+  // the selection really is empty afterwards — an Escape that merely
+  // collapsed an inline edit leaves the row selected and the panel alone.
+  // `isTrusted` skips the Row's synthetic Escapes (Enter-commit and blur
+  // drive collapse through the dnd by dispatching their own), so clicking
+  // out of an inline edit into the panel doesn't close it underfoot.
+  // Modal / mobile shells take Escape themselves, so nothing to do there.
+  const onEscapeKey = (e: KeyboardEvent) => {
+    if (e.key !== "Escape" || !e.isTrusted) return;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    if (!sidePanelShown() || openItemId() === null) return;
+    if (actionSelection()?.hasSelection()) return;
+    setOpenItemId(null);
+  };
+  onGlobalKey(onEscapeKey);
+
   const navigateTo = (v: ViewKey) => {
       setView(v);
       // Move keyboard focus to the items listbox once Solid has
