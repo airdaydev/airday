@@ -247,6 +247,8 @@ export type Messages = {
     /** App-menu toggle labels for the desktop side panel. */
     show: string;
     hide: string;
+    toPanel: string;
+    toModal: string;
   };
   order: {
     /** Submenu label for the item-ordering actions. */
@@ -491,6 +493,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       title: "Barra de contexto",
       show: "Mostrar barra de contexto",
       hide: "Ocultar barra de contexto",
+      toPanel: "Abrir en la barra de contexto",
+      toModal: "Abrir como diálogo",
     },
     order: {
       label: "Ordenar",
@@ -722,6 +726,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       title: "Context sidebar",
       show: "Show context sidebar",
       hide: "Hide context sidebar",
+      toPanel: "Open in context sidebar",
+      toModal: "Open as dialog",
     },
     order: {
       label: "Order",

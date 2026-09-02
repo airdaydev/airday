@@ -245,6 +245,15 @@ body {
   display: none;
 }
 
+/* Blank panel: the sidebar button sits where the task surface's header
+   buttons land (same 12px inset as `.task-dialog`), so it doesn't jump. */
+.side-panel-blank {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  padding: 12px;
+}
+
 /* The task surface as an inline pane: fills the panel column and scrolls
    on its own. The column (`.side-panel`) supplies the frame. */
 .task-panel {

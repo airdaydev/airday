@@ -29,6 +29,7 @@ import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import drawingPinFilledSvg from "./icons/drawing-pin-filled.svg?raw";
 import noteSvg from "./icons/note.svg?raw";
+import sidebarRightSvg from "./icons/sidebar-right.svg?raw";
 import { formatDialogStamp, nowMs } from "./format.tsx";
 import { useAppI18n, laneLabel } from "./i18n.tsx";
 import {
@@ -100,6 +101,10 @@ export function TaskDialog(props: {
    *  row swaps the open item in place) instead of as the centred dialog.
    *  Ignored on mobile, which keeps its page shell. */
   panelMount?: () => HTMLElement | null;
+  /** Desktop only: move the surface between its modal and side-panel
+   *  shells, keeping the open item (unlike the app menu's toggle, which
+   *  closes it). Renders the header's sidebar button when given. */
+  onSwapShell?: () => void;
 }) {
   const { m, locale } = useAppI18n();
 
@@ -508,6 +513,36 @@ export function TaskDialog(props: {
     }
   };
 
+  // Header buttons shared by the new-item and edit forms: the shell swap
+  // (desktop only) and the close ✕. The panel shell drops the ✕ — the
+  // pane is dismissed by Escape or by leaving the selection, and the
+  // swap button stands in the corner instead.
+  const shellButtons = () => (
+    <>
+      <Show when={!isMobile() && props.onSwapShell}>
+        <button
+          type="button"
+          class="nav-menu-trigger"
+          aria-label={
+            panelMode() ? m().sidePanel.toModal : m().sidePanel.toPanel
+          }
+          onClick={() => props.onSwapShell?.()}
+          innerHTML={sidebarRightSvg}
+        />
+      </Show>
+      <Show when={!panelMode()}>
+        <button
+          type="button"
+          class="task-dialog-close"
+          aria-label={m().common.close}
+          onClick={close}
+        >
+          ✕
+        </button>
+      </Show>
+    </>
+  );
+
   // The surface body, shared by both shells below.
   const body = () => (
     <>
@@ -536,16 +571,7 @@ export function TaskDialog(props: {
               : m().workspace.newItemStamp}
           </span>
         </div>
-        <div class="task-dialog-header-actions">
-          <button
-            type="button"
-            class="task-dialog-close"
-            aria-label={m().common.close}
-            onClick={close}
-          >
-            ✕
-          </button>
-        </div>
+        <div class="task-dialog-header-actions">{shellButtons()}</div>
       </header>
       <div class="task-dialog-body">
         <div class="task-dialog-content">
@@ -670,14 +696,7 @@ export function TaskDialog(props: {
                   </DropdownMenu.Portal>
                 </DropdownMenu>
               </Show>
-              <button
-                type="button"
-                class="task-dialog-close"
-                aria-label={m().common.close}
-                onClick={close}
-              >
-                ✕
-              </button>
+              {shellButtons()}
             </div>
           </header>
 

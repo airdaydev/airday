@@ -32,6 +32,7 @@ import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import eyeNoneSvg from "./icons/eye-none.svg?raw";
 import eyeOpenSvg from "./icons/eye-open.svg?raw";
 import listBulletSvg from "./icons/list-bullet.svg?raw";
+import sidebarRightSvg from "./icons/sidebar-right.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
 import plusSvg from "./icons/card-stack-plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
@@ -1757,13 +1758,15 @@ export function Workspace(props: {
   const [sidePanelOpen, setSidePanelOpenSignal] = createSignal(
     loadSidePanelOpenPref(),
   );
-  const setSidePanelOpen = (open: boolean) => {
+  const setSidePanelOpen = (open: boolean, opts?: { keepItem?: boolean }) => {
     batch(() => {
       // Hiding the sidebar closes whatever it was showing; otherwise the
       // task surface would fall back to its modal shell and pop up. The
       // dialog's load effect settles pending edits on the way out. A
-      // capture in progress is left alone (its text would be lost).
-      if (!open) setOpenItemId(null);
+      // capture in progress is left alone (its text would be lost). The
+      // surface's own swap button opts out (`keepItem`): there the pop
+      // between shells is the point.
+      if (!open && !opts?.keepItem) setOpenItemId(null);
       setSidePanelOpenSignal(open);
     });
     try {
@@ -1798,9 +1801,17 @@ export function Workspace(props: {
       onCleanup(sel.onChange(setSelectionTick));
     }),
   );
+  let panelWasShown = untrack(sidePanelShown);
   createEffect(() => {
+    const shown = sidePanelShown();
+    const justShown = shown && !panelWasShown;
+    panelWasShown = shown;
     const sel = selectionTick();
-    if (!sel || !sidePanelShown() || newItemTarget() !== null) return;
+    if (!sel || !shown || newItemTarget() !== null) return;
+    // The panel appearing under an already-open item (the surface's swap
+    // button moving it out of the modal) keeps that item; only a later
+    // selection change pulls the panel along.
+    if (justShown && untrack(openItemId) !== null) return;
     if (sel !== untrack(actionSelection)) return;
     const top = sel.getSelectionTop();
     if (top === null) return;
@@ -1978,6 +1989,9 @@ export function Workspace(props: {
           if (boardListId() !== null) setBoardRevealIds([id]);
         }}
         panelMount={() => (sidePanelShown() ? panelMount() : null)}
+        onSwapShell={() =>
+          setSidePanelOpen(!sidePanelOpen(), { keepItem: true })
+        }
       />
       <DeadlineCalendarDialog
         open={() => deadlineTarget() !== null}
@@ -2443,6 +2457,21 @@ export function Workspace(props: {
       </div>
       <Show when={sidePanelShown()}>
         <aside class="side-panel" aria-label={m().sidePanel.title}>
+          {/* Blank state: the sidebar button alone, in the corner where
+              the task surface's shell-swap button lands, closing the
+              panel. The surface brings its own, so this hides once it
+              mounts. */}
+          <Show when={openItemId() === null && newItemTarget() === null}>
+            <header class="side-panel-blank">
+              <button
+                type="button"
+                class="nav-menu-trigger"
+                aria-label={m().sidePanel.hide}
+                onClick={() => setSidePanelOpen(false)}
+                innerHTML={sidebarRightSvg}
+              />
+            </header>
+          </Show>
           {/* The task surface portals in here while an item is open (see
               TaskDialog's `panelMount`). The div stays mounted so the
               portal target is stable; CSS hides it while empty, and the
