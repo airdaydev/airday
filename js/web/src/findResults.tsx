@@ -11,6 +11,7 @@ import type { DocApp } from "./sync/store.ts";
 import { matchesName, type SearchResult } from "./search.ts";
 import { useAppI18n } from "./i18n.tsx";
 import archiveSvg from "./icons/archive.svg?raw";
+import calendarSvg from "./icons/calendar.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import fileSvg from "./icons/file.svg?raw";
@@ -20,7 +21,7 @@ import fileSvg from "./icons/file.svg?raw";
 // entries"). The surfaces synthesize them: always present in the default
 // (empty-query) menu, and name-matched into query results so "foc" finds
 // Focus the way it finds a user list.
-export type ViewResultId = "focus" | "inbox" | "done";
+export type ViewResultId = "focus" | "inbox" | "upcoming" | "done";
 export interface ViewResult {
   kind: "view";
   id: ViewResultId;
@@ -33,6 +34,7 @@ export type FindResult = SearchResult | ViewResult;
 const VIEW_ICONS: Record<ViewResultId, string> = {
   focus: drawingPinSvg,
   inbox: archiveSvg,
+  upcoming: calendarSvg,
   done: checkSvg,
 };
 
@@ -57,6 +59,7 @@ export function createFindState(app: DocApp) {
   const builtinViews = (): ViewResult[] => [
     { kind: "view", id: "focus", title: m().nav.focus },
     { kind: "view", id: "inbox", title: m().nav.inbox },
+    { kind: "view", id: "upcoming", title: m().nav.upcoming },
     { kind: "view", id: "done", title: m().nav.done },
   ];
 

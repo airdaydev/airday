@@ -19,6 +19,7 @@ import { STORE_PREFS, openAirdayDb } from "@airday/core/storage/web-db";
 export type ViewKey =
   | { kind: "list"; id: string }
   | { kind: "focus" }
+  | { kind: "upcoming" }
   | { kind: "done" }
   | { kind: "bin" };
 

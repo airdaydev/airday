@@ -21,6 +21,7 @@ import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { Switch } from "@kobalte/core/switch";
 import { Tooltip } from "@kobalte/core/tooltip";
 import archiveSvg from "./icons/archive.svg?raw";
+import calendarSvg from "./icons/calendar.svg?raw";
 import cardStackSvg from "./icons/card-stack.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
@@ -34,7 +35,6 @@ import plusSvg from "./icons/card-stack-plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
 import { Board, type BoardImperative } from "./Board.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
-import { Deadlines } from "./Deadlines.tsx";
 import { DeadlineCalendarDialog } from "./DeadlineCalendarDialog.tsx";
 import { FindPalette } from "./FindPalette.tsx";
 import { FindSheet } from "./FindSheet.tsx";
@@ -55,6 +55,7 @@ import { planReorderMoves } from "./reorder.ts";
 import { Settings } from "./Settings.tsx";
 import { ShortcutsDialog } from "./ShortcutsDialog.tsx";
 import { TaskDialog } from "./TaskDialog.tsx";
+import { Upcoming } from "./Upcoming.tsx";
 import { useSession } from "./SessionContext.tsx";
 import {
   isBinned,
@@ -211,7 +212,7 @@ function loadFocusShowListPref(): boolean {
 // above; visible is the default, so only the hidden state is persisted
 // (stored as "1"). Mobile ignores it — the drawer has its own state.
 const NAV_HIDDEN_PREF_KEY = "airday:nav-hidden";
-const DEADLINES_OPEN_PREF_KEY = "airday:deadlines-open";
+const SIDE_PANEL_OPEN_PREF_KEY = "airday:side-panel-open";
 function loadNavHiddenPref(): boolean {
   try {
     return localStorage.getItem(NAV_HIDDEN_PREF_KEY) === "1";
@@ -220,9 +221,9 @@ function loadNavHiddenPref(): boolean {
   }
 }
 
-function loadDeadlinesOpenPref(): boolean {
+function loadSidePanelOpenPref(): boolean {
   try {
-    return localStorage.getItem(DEADLINES_OPEN_PREF_KEY) === "1";
+    return localStorage.getItem(SIDE_PANEL_OPEN_PREF_KEY) === "1";
   } catch {
     return false;
   }
@@ -703,6 +704,9 @@ export function Workspace(props: {
         .filter((it) => isDone(it) && !isBinned(it))
         .sort((a, b) => b.lifecycleAt - a.lifecycleAt);
     }
+    // Upcoming renders its own day-grouped surface (`Upcoming.tsx`), not
+    // the flat listbox, so it contributes no rows here.
+    if (v.kind === "upcoming") return [];
     return Object.values(state.itemsById)
       .filter(isBinned)
       .sort((a, b) => (b.binnedAt ?? 0) - (a.binnedAt ?? 0));
@@ -1482,6 +1486,7 @@ export function Workspace(props: {
     const seq: ViewKey[] = [
       { kind: "focus" },
       { kind: "list", id: "inbox" },
+      { kind: "upcoming" },
       { kind: "done" },
       ...(state.binCount > 0 ? [{ kind: "bin" } as ViewKey] : []),
       ...activeLists().map((l): ViewKey => ({ kind: "list", id: l.id })),
@@ -1499,7 +1504,8 @@ export function Workspace(props: {
   };
   onGlobalKey(onBracketNavigate);
 
-  // 1–4: jump straight to the fixed nav views (Focus / Inbox / Done / Bin).
+  // 1–5: jump straight to the fixed nav views (Focus / Inbox / Upcoming /
+  // Done / Bin).
   // Bin only counts while non-empty, matching its nav visibility. Mapping
   // and modifier guard live in digitNavTarget (pure, unit-tested);
   // onGlobalKey supplies the overlay / editable-surface guards.
@@ -1735,20 +1741,30 @@ export function Workspace(props: {
     }
   };
 
-  // Desktop deadline rail (right-hand column). Toggled from the app menu;
-  // persisted per browser like the nav.
-  const [deadlinesOpen, setDeadlinesOpenSignal] = createSignal(
-    loadDeadlinesOpenPref(),
+  // Desktop side panel (right-hand column). Toggled from the app menu;
+  // persisted per browser like the nav. While an item is open (or a
+  // capture is in progress) the panel hosts the task surface in place of
+  // the modal dialog; otherwise it just invites a click. Deadlines live
+  // on the Upcoming view, never here.
+  const [sidePanelOpen, setSidePanelOpenSignal] = createSignal(
+    loadSidePanelOpenPref(),
   );
-  const setDeadlinesOpen = (open: boolean) => {
-    setDeadlinesOpenSignal(open);
+  const setSidePanelOpen = (open: boolean) => {
+    setSidePanelOpenSignal(open);
     try {
-      if (open) localStorage.setItem(DEADLINES_OPEN_PREF_KEY, "1");
-      else localStorage.removeItem(DEADLINES_OPEN_PREF_KEY);
+      if (open) localStorage.setItem(SIDE_PANEL_OPEN_PREF_KEY, "1");
+      else localStorage.removeItem(SIDE_PANEL_OPEN_PREF_KEY);
     } catch {
       // Quota/private-mode failures just lose the preference.
     }
   };
+  const sidePanelShown = () => !isMobile() && sidePanelOpen();
+  // The panel's task host element, set by ref while the panel is mounted.
+  // Gated on `sidePanelShown` so the dialog falls back to its modal shell
+  // the moment the panel closes (the stale element is never handed out).
+  const [panelMount, setPanelMount] = createSignal<HTMLElement | null>(null);
+  const taskSurfaceOpen = () =>
+    openItemId() !== null || newItemTarget() !== null;
 
   const navigateTo = (v: ViewKey) => {
       setView(v);
@@ -1783,7 +1799,7 @@ export function Workspace(props: {
       class="app"
       classList={{
         "nav-hidden": navHidden(),
-        "deadlines-open": !isMobile() && deadlinesOpen(),
+        "side-panel-open": sidePanelShown(),
       }}
     >
       <Show when={!isMobile()}>
@@ -1807,8 +1823,8 @@ export function Workspace(props: {
               onSession={session.swapSession}
               navHidden={navHidden()}
               onToggleNav={() => setNavHidden(!navHidden())}
-              deadlinesOpen={deadlinesOpen()}
-              onToggleDeadlines={() => setDeadlinesOpen(!deadlinesOpen())}
+              sidePanelOpen={sidePanelOpen()}
+              onToggleSidePanel={() => setSidePanelOpen(!sidePanelOpen())}
             />
             <StatusSlot
               app={app}
@@ -1896,6 +1912,7 @@ export function Workspace(props: {
           // its own draft/focus flow.
           if (boardListId() !== null) setBoardRevealIds([id]);
         }}
+        panelMount={() => (sidePanelShown() ? panelMount() : null)}
       />
       <DeadlineCalendarDialog
         open={() => deadlineTarget() !== null}
@@ -2238,6 +2255,9 @@ export function Workspace(props: {
           </div>
         </header>
         <Show
+          when={view().kind === "upcoming"}
+          fallback={
+        <Show
           keyed
           when={boardListId()}
           fallback={
@@ -2348,16 +2368,26 @@ export function Workspace(props: {
             />
           )}
         </Show>
+          }
+        >
+          <Upcoming
+            app={app}
+            listLabel={listLabel}
+            onOpen={(id) => setOpenItemId(id)}
+          />
+        </Show>
       </main>
       </div>
-      <Show when={!isMobile() && deadlinesOpen()}>
-        <Deadlines
-          app={app}
-          onReveal={(id) => {
-            setOpenItemId(null);
-            revealItemIn(id, "list");
-          }}
-        />
+      <Show when={sidePanelShown()}>
+        <aside class="side-panel" aria-label={m().sidePanel.title}>
+          {/* The task surface portals in here while an item is open (see
+              TaskDialog's `panelMount`). The div stays mounted so the
+              portal target is stable; CSS hides it while empty. */}
+          <div class="side-panel-task" ref={setPanelMount} />
+          <Show when={!taskSurfaceOpen()}>
+            <div class="side-panel-hint">{m().sidePanel.hint}</div>
+          </Show>
+        </aside>
       </Show>
       <Show when={isMobile()}>
         <MobileBars
@@ -2393,6 +2423,7 @@ function viewTitle(
     return lists.find((l) => l.id === v.id)?.name ?? v.id;
   }
   if (v.kind === "focus") return m.nav.focus;
+  if (v.kind === "upcoming") return m.nav.upcoming;
   if (v.kind === "done") return m.nav.done;
   return m.nav.bin;
 }
@@ -2402,6 +2433,7 @@ function viewTitle(
  *  these in sync with the icons used in `nav.tsx`. */
 function viewIcon(v: ViewKey): string | null {
   if (v.kind === "focus") return drawingPinSvg;
+  if (v.kind === "upcoming") return calendarSvg;
   if (v.kind === "done") return checkSvg;
   if (v.kind === "bin") return crumpledPaperSvg;
   if (v.kind === "list" && v.id === "inbox") return archiveSvg;

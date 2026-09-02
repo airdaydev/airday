@@ -14,6 +14,7 @@ import { createPopoverTooltipGuard } from "./popoverTooltip.ts";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Dnd, DndSelection, type DndOp } from "./dnd/solid";
 import archiveSvg from "./icons/archive.svg?raw";
+import calendarSvg from "./icons/calendar.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import cloudSvg from "./icons/cloud.svg?raw";
 import cloudOffSvg from "./icons/cloud-off.svg?raw";
@@ -433,6 +434,18 @@ export function Nav(props: {
               : "-"}
           </span>
         </button>
+        {/* Upcoming: the deadline lens (proto calendar) — a cross-cutting
+            view like Done / Bin, so a static entry with a fixed icon. */}
+        <button
+          type="button"
+          class="nav-item"
+          data-active={props.view.kind === "upcoming" ? "" : undefined}
+          tabIndex={-1}
+          onClick={() => props.setView({ kind: "upcoming" })}
+        >
+          <span class="nav-item-icon" innerHTML={calendarSvg} />
+          {m().nav.upcoming}
+        </button>
         <button
           type="button"
           class="nav-item"
@@ -618,9 +631,10 @@ export function NavMenu(props: {
    *  sidebar item). */
   navHidden: boolean;
   onToggleNav: () => void;
-  /** Desktop deadline rail state + toggle (Show / Hide deadlines item). */
-  deadlinesOpen: boolean;
-  onToggleDeadlines: () => void;
+  /** Desktop side panel state + toggle (Show / Hide side panel item).
+   *  The panel hosts the open task surface, else the deadline list. */
+  sidePanelOpen: boolean;
+  onToggleSidePanel: () => void;
 }) {
   const { m } = useAppI18n();
   // Auth dialog opened from the menu's Sign in / Sign up items
@@ -751,9 +765,9 @@ export function NavMenu(props: {
             <DropdownMenu.Separator class="dropdown-menu-separator" />
             <DropdownMenu.Item
               class="dropdown-menu-item"
-              onSelect={() => props.onToggleDeadlines()}
+              onSelect={() => props.onToggleSidePanel()}
             >
-              {props.deadlinesOpen ? m().deadlines.hide : m().deadlines.show}
+              {props.sidePanelOpen ? m().sidePanel.hide : m().sidePanel.show}
             </DropdownMenu.Item>
             <DropdownMenu.Item
               class="dropdown-menu-item"

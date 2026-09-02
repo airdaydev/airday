@@ -1,6 +1,7 @@
 // The "open task" detail surface: a centered dialog (full-screen sheet on
-// mobile) driven purely by an item id, so the same component can later back
-// a native detached window. Notes live here only — the inline row editor is
+// mobile, or an inline pane when the desktop side panel is showing) driven
+// purely by an item id, so the same component can later back a native
+// detached window. Notes live here only — the inline row editor is
 // text-only "quick entry". Edits are buffered locally and flushed to the
 // engine on close and before stepping to a neighbour (last-write-on-close
 // wins; live peer edits while open are intentionally ignored, matching the
@@ -8,7 +9,18 @@
 
 import { Dialog } from "@kobalte/core/dialog";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  Match,
+  onCleanup,
+  Show,
+  Switch,
+  untrack,
+} from "solid-js";
+import { Portal } from "solid-js/web";
 import { DeadlineField } from "./DeadlineField.tsx";
 import { ListPicker, type ListOption } from "./ListPicker.tsx";
 import caretSortSvg from "./icons/caret-sort.svg?raw";
@@ -82,8 +94,26 @@ export function TaskDialog(props: {
   /** Fires with the id of a freshly committed new item, so the caller can
    *  select/scroll to it (used by the board's "+" capture). */
   onCreated?: (id: string) => void;
+  /** Desktop side panel host. When it resolves to an element the surface
+   *  renders inline there (non-modal: the list stays live, clicking another
+   *  row swaps the open item in place) instead of as the centred dialog.
+   *  Ignored on mobile, which keeps its page shell. */
+  panelMount?: () => HTMLElement | null;
 }) {
   const { m, locale } = useAppI18n();
+
+  // Shell selection. Mobile: a plain full-screen page under the floating
+  // pills. Desktop with the side panel showing: an inline pane portaled
+  // into it. Otherwise: the centred modal Dialog.
+  const isMobileMq = window.matchMedia("(max-width: 768px) and (pointer: coarse)");
+  const [isMobile, setIsMobile] = createSignal(isMobileMq.matches);
+  const onMq = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+  isMobileMq.addEventListener("change", onMq);
+  onCleanup(() => isMobileMq.removeEventListener("change", onMq));
+  const panelHost = createMemo(() =>
+    isMobile() ? null : (props.panelMount?.() ?? null),
+  );
+  const panelMode = () => panelHost() !== null;
 
   const newItemTarget = createMemo(() => props.newItem?.() ?? null);
   const isNew = createMemo(
@@ -92,7 +122,10 @@ export function TaskDialog(props: {
   const open = createMemo(
     () => props.itemId() !== null || newItemTarget() !== null,
   );
-  trackOverlay(open);
+  // The modal dialog suppresses the workspace's global shortcuts while
+  // open; the inline pane is non-modal by design, so the list behind it
+  // keeps its keys (the editable-surface guard still covers typing here).
+  trackOverlay(() => open() && !panelMode());
 
   const item = createMemo<ItemView | undefined>(() => {
     const id = props.itemId();
@@ -114,6 +147,15 @@ export function TaskDialog(props: {
   // If the open item vanishes (deleted here or by a peer), close.
   createEffect(() => {
     if (props.itemId() !== null && !item()) props.setItemId(null);
+  });
+
+  // A new capture takes over from an open item. Only reachable through the
+  // non-modal shells (the modal blocks the Add buttons); the load effect
+  // below flushes the item's edits before the capture form loads.
+  createEffect(() => {
+    if (newItemTarget() && untrack(() => props.itemId()) !== null) {
+      props.setItemId(null);
+    }
   });
 
   // Move-to-list options: Inbox followed by every *active* user list —
@@ -256,27 +298,46 @@ export function TaskDialog(props: {
     return true;
   };
 
-  // Write the current editor contents back to `id` if they differ. Empty
+  // Write the buffered editor contents back to `id` if they differ. Empty
   // title is ignored (keep the existing text), mirroring the inline editor.
+  // Reads the `text` / `notes` buffers (kept in step with the editors by
+  // their input handlers) rather than the DOM: by the time a target switch
+  // reaches the load effect below, the editors may already show the next
+  // target — or, across the new-item / edit forms, be different elements.
   const flush = (id: string | null) => {
     if (!id) return;
     const it = props.app.state.itemsById[id];
     if (!it) return;
-    const t = editorText(titleRef).trim();
+    const t = text().trim();
     if (t && t !== it.text) props.app.editItemText(id, t);
-    const n = editorText(notesRef);
+    const n = notes();
     if (n !== it.notes) props.app.editItemNotes(id, n);
   };
 
+  // Settle whatever the buffers currently hold: commit a pending capture,
+  // or write an open item's edits back. Idempotent — a second pass finds
+  // nothing changed (or, for a capture already committed, no target).
+  const settle = () => {
+    if (loadedId === "new") commitNew();
+    else flush(loadedId);
+  };
+
   // Load the buffers and the editor DOM when the open target changes (an
-  // item, or a fresh new-item capture). Content is set imperatively — never
-  // value-bound — so reactive re-renders can't clobber a live caret. No
-  // flush here; every transition that swaps the target flushes first.
+  // item, a fresh new-item capture, or nothing). Content is set
+  // imperatively — never value-bound — so reactive re-renders can't
+  // clobber a live caret. The outgoing target is settled first: the modal
+  // shells only ever leave via `close()` (which already flushed), but the
+  // inline pane swaps targets directly when another row is clicked.
   createEffect(() => {
     const id = props.itemId();
     const nw = newItemTarget();
     const key = id ?? (nw ? "new" : null);
-    if (key === null || key === loadedId) return;
+    if (key === loadedId) return;
+    untrack(settle);
+    loadedId = key;
+    // Closed: the editors unmount; forgetting the target means reopening
+    // the same item re-pushes its content into fresh editors.
+    if (key === null) return;
     const it = id ? props.app.state.itemsById[id] : undefined;
     const t = it?.text ?? "";
     const n = it?.notes ?? "";
@@ -284,8 +345,7 @@ export function TaskDialog(props: {
     setNotes(n);
     setNewDeadline(null);
     setNewFocus(false);
-    loadedId = key;
-    // The editors mount when the dialog opens; defer so their refs exist,
+    // The editors mount when the surface opens; defer so their refs exist,
     // then push — but only if this target is still the one showing.
     queueMicrotask(() => {
       const curId = props.itemId();
@@ -296,11 +356,9 @@ export function TaskDialog(props: {
     });
   });
 
-  // The editors unmount on close; forget the loaded target so reopening the
-  // same item re-pushes its content into the freshly mounted editors.
-  createEffect(() => {
-    if (!open()) loadedId = null;
-  });
+  // Unmounting mid-edit (the shell swapping, the workspace tearing down)
+  // must not drop buffered edits.
+  onCleanup(settle);
 
   // Commit new-item mode: create the item in its target lane's workflow
   // state iff the title is non-empty, then close. A capture without an
@@ -309,14 +367,14 @@ export function TaskDialog(props: {
   const commitNew = () => {
     const nw = newItemTarget();
     if (nw) {
-      const t = editorText(titleRef).trim();
+      const t = text().trim();
       if (t) {
         const at = nw.index ?? 0;
         const id =
           nw.state !== "backlog"
             ? props.app.addItemInStateAt(nw.listId, t, nw.state, at)
             : props.app.addItemAt(nw.listId, t, at);
-        const n = editorText(notesRef);
+        const n = notes();
         if (n.trim()) props.app.editItemNotes(id, n);
         const d = newDeadline();
         if (d) props.app.setItemDeadline(id, d);
@@ -450,15 +508,16 @@ export function TaskDialog(props: {
     });
   };
 
-  // Cmd/Ctrl+Enter anywhere in the surface = save & close. The page shell
-  // (mobile) also takes Escape, which Kobalte handles for the dialog.
+  // Cmd/Ctrl+Enter anywhere in the surface = save & close. The non-modal
+  // shells (mobile page, side pane) also take Escape, which Kobalte
+  // handles for the dialog.
   const onShellKeyDown = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
       close();
       return;
     }
-    if (e.key === "Escape" && isMobile()) {
+    if (e.key === "Escape" && (isMobile() || panelMode())) {
       e.preventDefault();
       e.stopPropagation();
       close();
@@ -760,34 +819,39 @@ export function TaskDialog(props: {
     </>
   );
 
-  // Two shells around one body. Desktop: a centred modal Dialog (focus
-  // trap, overlay, Escape from Kobalte). Mobile: a plain full-screen page
-  // under the floating pills — no modal, no portal, so the pills stay
-  // live and nothing counts as an "outside" interaction.
-  const isMobileMq = window.matchMedia("(max-width: 768px) and (pointer: coarse)");
-  const [isMobile, setIsMobile] = createSignal(isMobileMq.matches);
-  const onMq = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-  isMobileMq.addEventListener("change", onMq);
-  onCleanup(() => isMobileMq.removeEventListener("change", onMq));
+  // Three shells around one body. Desktop default: a centred modal Dialog
+  // (focus trap, overlay, Escape from Kobalte). Mobile: a plain
+  // full-screen page under the floating pills — no modal, no portal, so
+  // the pills stay live and nothing counts as an "outside" interaction.
+  // Desktop with the side panel showing: an inline pane portaled into
+  // the panel's host element, non-modal like the page.
 
-  // Page shell: focus the editor on open (Kobalte does this for the
-  // dialog via onOpenAutoFocus) and hand focus back on close.
+  // Non-modal shells: focus the editor whenever the target changes (the
+  // dialog does this via onOpenAutoFocus, but it can't swap targets while
+  // open) and hand focus back once nothing is open.
+  const nonModal = () => isMobile() || panelMode();
   createEffect(() => {
-    if (!isMobile()) return;
-    if (!open()) return;
+    if (!nonModal() || !open()) return;
+    // Re-run per target, not just per open: a row click while the pane
+    // shows another item lands the caret in the new title.
+    props.itemId();
+    newItemTarget();
     focusOnOpen();
+  });
+  createEffect(() => {
+    if (!nonModal() || !open()) return;
     onCleanup(() => props.onClosed?.());
   });
 
   return (
-    <Show
-      when={!isMobile()}
+    <Switch
       fallback={
         <Show when={open()}>
           <section
             class="task-dialog task-page"
             role="region"
             aria-label={m().common.close}
+            data-shortcuts-inert=""
             onKeyDown={onShellKeyDown}
           >
             {body()}
@@ -795,6 +859,24 @@ export function TaskDialog(props: {
         </Show>
       }
     >
+      <Match when={panelHost()}>
+        {(host) => (
+          <Show when={open()}>
+            <Portal mount={host()}>
+              <section
+                class="task-dialog task-panel"
+                role="region"
+                aria-label={m().common.close}
+                data-shortcuts-inert=""
+                onKeyDown={onShellKeyDown}
+              >
+                {body()}
+              </section>
+            </Portal>
+          </Show>
+        )}
+      </Match>
+      <Match when={!isMobile()}>
       <Dialog
         open={open()}
         onOpenChange={(o) => {
@@ -827,7 +909,8 @@ export function TaskDialog(props: {
           </div>
         </Dialog.Portal>
       </Dialog>
-    </Show>
+      </Match>
+    </Switch>
   );
 }
 

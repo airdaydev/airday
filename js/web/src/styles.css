@@ -112,8 +112,7 @@ body {
   overflow: hidden;
 }
 
-/* Two columns (nav | content), optionally a third for the deadline
-   rail. The app chrome (menu, account/sync widget) lives in the nav's
+/* Two columns (nav | content), optionally a third for the side panel. The app chrome (menu, account/sync widget) lives in the nav's
    own footer strip; when the nav is hidden that strip floats bottom-left
    (see `.app.nav-hidden .nav` below). */
 .app {
@@ -197,18 +196,19 @@ body {
     0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-/* Desktop deadline rail: `deadlines-open` adds a third column on the
-   right of the main surface. Composes with `nav-hidden`. Mobile never
-   sets the class. */
-.app.deadlines-open {
-  grid-template-columns: 260px 1fr 280px;
+/* Desktop side panel: `side-panel-open` adds a third column on the right
+   of the main surface. Composes with `nav-hidden`. Mobile never sets the
+   class. The panel hosts the open task surface (`.task-panel`, portaled
+   into `.side-panel-task`); idle, it shows a hint. */
+.app.side-panel-open {
+  grid-template-columns: 260px 1fr 360px;
 }
 
-.app.nav-hidden.deadlines-open {
-  grid-template-columns: 1fr 280px;
+.app.nav-hidden.side-panel-open {
+  grid-template-columns: 1fr 360px;
 }
 
-.deadlines {
+.side-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -218,88 +218,124 @@ body {
   color: var(--text-muted);
 }
 
-.deadlines-header {
-  padding: 12px 16px 8px;
-  color: var(--text);
-}
-
-.deadlines-scroll {
+/* Portal host for the task pane. Solid's Portal wraps its content in a
+   div, so both the host and that wrapper stretch as flex columns. */
+.side-panel-task,
+.side-panel-task > div {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  padding: 0 12px 8px;
 }
 
-.deadlines-empty {
-  padding: 8px 4px;
+.side-panel-task:empty {
+  display: none;
+}
+
+.side-panel-hint {
+  padding: 20px 16px;
   color: var(--text-faint);
 }
 
-.deadlines-group {
-  margin-bottom: 8px;
+/* The task surface as an inline pane: the dialog's card chrome (border,
+   shadow, width cap) comes off; it fills the panel column and scrolls
+   on its own. Lives beside the main surface so it borrows the same
+   floating-surface frame. */
+.task-panel {
+  flex: 1;
+  min-height: 0;
+  width: auto;
+  max-height: none;
+  margin: 0 8px 8px 0;
+  border: 0.5px solid var(--border-surface);
+  border-radius: 8px;
+  box-shadow: none;
+  background: var(--surface);
 }
 
-.deadlines-group-label {
+[data-theme="dark"] .task-panel {
+  box-shadow: none;
+}
+
+.task-panel .task-dialog-title {
+  font-size: 1.35em;
+}
+
+/* Upcoming view (main surface): day sections stacked down the page, each
+   a dated heading over its rows. Proto calendar — see Upcoming.tsx. */
+.upcoming {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 12px 12px;
+  outline: none;
+}
+
+.upcoming-day {
+  margin-bottom: 16px;
+}
+
+.upcoming-day-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 8px 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.upcoming-day-label {
   margin: 0;
-  padding: 6px 4px 2px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text);
 }
 
-.deadlines-group[data-urgency="overdue"] .deadlines-group-label {
+.upcoming-day[data-urgency="overdue"] .upcoming-day-label {
   color: var(--error-text);
 }
 
-.deadlines-group[data-urgency="today"] .deadlines-group-label {
-  color: var(--text);
+.upcoming-day-detail {
+  font-size: 12px;
+  color: var(--text-faint);
 }
 
-.deadlines-row {
+.upcoming-empty-day {
+  padding: 6px 8px;
+  color: var(--text-faint);
+}
+
+.upcoming-row {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  width: 100%;
-  text-align: left;
-  padding: 4px 4px;
-  border: 0;
-  border-radius: 3px;
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border-radius: 4px;
   color: var(--text);
+  cursor: default;
 }
 
-.deadlines-row:hover {
+.upcoming-row:hover {
   background: var(--bg-hover);
 }
 
-.deadlines-row:focus-visible {
-  outline: 2px solid var(--link);
-  outline-offset: 1px;
-}
-
-.deadlines-row-text {
+.upcoming-row-text {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.deadlines-row-meta {
+.upcoming-row-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  min-width: 0;
+  flex-shrink: 0;
 }
 
-.deadlines-row-list {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.upcoming-row-list {
   font-size: 12px;
   color: var(--text-faint);
 }
@@ -2272,6 +2308,7 @@ input.task-check:hover {
    to carry alone. */
 .task-dialog-badges {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   margin-top: 4px;

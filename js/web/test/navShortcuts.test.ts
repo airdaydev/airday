@@ -1,4 +1,4 @@
-// The 1–4 digit shortcuts' decision logic: which fixed nav view a keydown
+// The 1–5 digit shortcuts' decision logic: which fixed nav view a keydown
 // targets, and when it must be a no-op. The overlay / editable-surface
 // guards are centralized in `onGlobalKey` (overlay.ts) and are not
 // re-tested here; the modifier guard belongs to the mapping itself.
@@ -22,21 +22,22 @@ const key = (
 });
 
 describe("digitNavTarget", () => {
-  test("1–3 map to Focus / Inbox / Done regardless of bin state", () => {
+  test("1–4 map to Focus / Inbox / Upcoming / Done regardless of bin state", () => {
     for (const binCount of [0, 5]) {
       expect(digitNavTarget(key("1"), binCount)).toEqual({ kind: "focus" });
       expect(digitNavTarget(key("2"), binCount)).toEqual({
         kind: "list",
         id: "inbox",
       });
-      expect(digitNavTarget(key("3"), binCount)).toEqual({ kind: "done" });
+      expect(digitNavTarget(key("3"), binCount)).toEqual({ kind: "upcoming" });
+      expect(digitNavTarget(key("4"), binCount)).toEqual({ kind: "done" });
     }
   });
 
-  test("4 targets the Bin only while it holds items", () => {
-    // Mirrors the nav: an empty Bin has no row, so 4 must be a no-op.
-    expect(digitNavTarget(key("4"), 1)).toEqual({ kind: "bin" });
-    expect(digitNavTarget(key("4"), 0)).toBeNull();
+  test("5 targets the Bin only while it holds items", () => {
+    // Mirrors the nav: an empty Bin has no row, so 5 must be a no-op.
+    expect(digitNavTarget(key("5"), 1)).toEqual({ kind: "bin" });
+    expect(digitNavTarget(key("5"), 0)).toBeNull();
   });
 
   test("any modifier disqualifies the key", () => {
@@ -53,7 +54,7 @@ describe("digitNavTarget", () => {
   });
 
   test("non-digit and out-of-range keys are ignored", () => {
-    for (const k of ["0", "5", "9", "a", "Enter", "[", " "]) {
+    for (const k of ["0", "6", "9", "a", "Enter", "[", " "]) {
       expect(digitNavTarget(key(k), 5)).toBeNull();
     }
   });

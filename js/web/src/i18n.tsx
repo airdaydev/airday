@@ -64,6 +64,8 @@ export type Messages = {
   nav: {
     inbox: string;
     focus: string;
+    /** The Upcoming view: every open item with a deadline, by day. */
+    upcoming: string;
     done: string;
     bin: string;
     /** Context-menu action that archives a list (the user-facing removal
@@ -232,14 +234,19 @@ export type Messages = {
     /** Accessible label for the calendar's next-month button. */
     nextMonth: string;
   };
-  deadlines: {
-    /** Title of the right-hand deadline rail. */
+  upcoming: {
+    /** Upcoming view's Today group when nothing is due today. */
+    emptyToday: string;
+  };
+  sidePanel: {
+    /** Accessible name of the desktop side panel. */
     title: string;
-    /** App-menu toggle labels. */
+    /** App-menu toggle labels for the desktop side panel. */
     show: string;
     hide: string;
-    /** Rail body when no open item carries a deadline. */
-    empty: string;
+    /** Panel body while no item is open: it only ever hosts the task
+     *  surface, so it invites a click. */
+    hint: string;
   };
   order: {
     /** Submenu label for the item-ordering actions. */
@@ -365,6 +372,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     nav: {
       inbox: "Bandeja de entrada",
       focus: "Enfoque",
+      upcoming: "Próximo",
       done: "Hecho",
       bin: "Papelera",
       archiveList: "Archivar",
@@ -475,11 +483,14 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       prevMonth: "Mes anterior",
       nextMonth: "Mes siguiente",
     },
-    deadlines: {
-      title: "Próximo",
-      show: "Mostrar fechas límite",
-      hide: "Ocultar fechas límite",
-      empty: "Sin fechas límite",
+    upcoming: {
+      emptyToday: "Nada para hoy",
+    },
+    sidePanel: {
+      title: "Panel lateral",
+      show: "Mostrar panel lateral",
+      hide: "Ocultar panel lateral",
+      hint: "Abre un elemento para verlo aquí",
     },
     order: {
       label: "Ordenar",
@@ -500,7 +511,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       bin: "Mover a la papelera",
       switchList: "Cambiar de vista",
       switchLane: "Cambiar de carril",
-      goToView: "Ir a Enfoque / Entrada / Hecho / Papelera",
+      goToView: "Ir a Enfoque / Entrada / Próximo / Hecho / Papelera",
       find: "Buscar",
       showShortcuts: "Mostrar atajos",
     },
@@ -592,6 +603,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     nav: {
       inbox: "Inbox",
       focus: "Focus",
+      upcoming: "Upcoming",
       done: "Done",
       bin: "Bin",
       archiveList: "Archive",
@@ -702,11 +714,14 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       prevMonth: "Previous month",
       nextMonth: "Next month",
     },
-    deadlines: {
-      title: "Upcoming",
-      show: "Show deadlines",
-      hide: "Hide deadlines",
-      empty: "No upcoming deadlines",
+    upcoming: {
+      emptyToday: "Nothing due today",
+    },
+    sidePanel: {
+      title: "Side panel",
+      show: "Show side panel",
+      hide: "Hide side panel",
+      hint: "Open an item to see it here",
     },
     order: {
       label: "Order",
@@ -727,7 +742,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       bin: "Move to bin",
       switchList: "Switch view",
       switchLane: "Switch lane",
-      goToView: "Go to Focus / Inbox / Done / Bin",
+      goToView: "Go to Focus / Inbox / Upcoming / Done / Bin",
       find: "Find",
       showShortcuts: "Show shortcuts",
     },

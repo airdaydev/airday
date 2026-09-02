@@ -32,14 +32,22 @@ export function trackOverlay(open: () => boolean): void {
 
 /** Register a document-level keyboard shortcut that is inert whenever an
  *  overlay is open or focus sits in an editable surface (input, textarea,
- *  contenteditable). Centralises the two guards every workspace shortcut
- *  used to repeat, and auto-cleans on unmount — so it must be called from
- *  a component/reactive scope where `onCleanup` is bound. */
+ *  contenteditable) — or anywhere inside a `data-shortcuts-inert` region:
+ *  the non-modal task shells (side pane, mobile page) hold buttons and
+ *  badges whose keystrokes must not drive the list behind them.
+ *  Centralises the guards every workspace shortcut used to repeat, and
+ *  auto-cleans on unmount — so it must be called from a component/reactive
+ *  scope where `onCleanup` is bound. */
 export function onGlobalKey(handler: (e: KeyboardEvent) => void): void {
   const listener = (e: KeyboardEvent) => {
     if (isOverlayOpen()) return;
     const target = e.target as Element | null;
-    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    if (
+      target?.closest(
+        'input, textarea, [contenteditable="true"], [data-shortcuts-inert]',
+      )
+    )
+      return;
     handler(e);
   };
   document.addEventListener("keydown", listener);
