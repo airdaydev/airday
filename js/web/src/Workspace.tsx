@@ -1483,12 +1483,14 @@ export function Workspace(props: {
   const onBracketNavigate = (e: KeyboardEvent) => {
     if (e.key !== "[" && e.key !== "]") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    // Sidebar order: the fixed views (Bin only while it has a row), then
+    // Inbox at the head of the lists group, then the user lists.
     const seq: ViewKey[] = [
       { kind: "focus" },
-      { kind: "list", id: "inbox" },
       { kind: "upcoming" },
       { kind: "done" },
       ...(state.binCount > 0 ? [{ kind: "bin" } as ViewKey] : []),
+      { kind: "list", id: "inbox" },
       ...activeLists().map((l): ViewKey => ({ kind: "list", id: l.id })),
     ];
     const idx = seq.findIndex((s) => viewKey(s) === viewKey(view()));
@@ -1504,13 +1506,12 @@ export function Workspace(props: {
   };
   onGlobalKey(onBracketNavigate);
 
-  // 1–5: jump straight to the fixed nav views (Focus / Inbox / Upcoming /
-  // Done / Bin).
-  // Bin only counts while non-empty, matching its nav visibility. Mapping
-  // and modifier guard live in digitNavTarget (pure, unit-tested);
-  // onGlobalKey supplies the overlay / editable-surface guards.
+  // 1–4: jump straight to the fixed nav views in sidebar order (Focus /
+  // Upcoming / Done / Inbox). Bin has no digit. Mapping and modifier guard
+  // live in digitNavTarget (pure, unit-tested); onGlobalKey supplies the
+  // overlay / editable-surface guards.
   const onDigitNavigate = (e: KeyboardEvent) => {
-    const target = digitNavTarget(e, state.binCount);
+    const target = digitNavTarget(e);
     if (!target) return;
     e.preventDefault();
     setView(target);

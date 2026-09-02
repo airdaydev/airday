@@ -395,8 +395,8 @@ export function Nav(props: {
       <div class="nav-group">
         {/* Focus: a reserved lens (spec/focus.md), not a `ListMeta` row, so
             it's a static entry with a fixed icon — like Done / Bin. Sits at
-            the very top, above Inbox: it's the "what am I working on now"
-            answer the user reaches for first. */}
+            the very top: it's the "what am I working on now" answer the
+            user reaches for first. */}
         <button
           type="button"
           class="nav-item"
@@ -410,29 +410,6 @@ export function Nav(props: {
           <Show when={props.focusCount > 0}>
             <span class="nav-item-count">{props.focusCount}</span>
           </Show>
-        </button>
-        {/* Inbox is reserved: it has no `ListMeta` row and carries the
-            localized built-in label, so — like Focus / Done / Bin — it's a
-            static entry with no rename affordance and no context menu. */}
-        <button
-          type="button"
-          class="nav-item"
-          data-active={
-            props.view.kind === "list" && props.view.id === "inbox"
-              ? ""
-              : undefined
-          }
-          data-drop-list-id="inbox"
-          tabIndex={-1}
-          onClick={() => props.setView({ kind: "list", id: "inbox" })}
-        >
-          <span class="nav-item-icon" innerHTML={archiveSvg} />
-          {m().nav.inbox}
-          <span class="nav-item-count">
-            {(props.openCountsByList["inbox"] ?? 0) > 0
-              ? props.openCountsByList["inbox"]
-              : "-"}
-          </span>
         </button>
         {/* Upcoming: the deadline lens (proto calendar) — a cross-cutting
             view like Done / Bin, so a static entry with a fixed icon. */}
@@ -489,6 +466,31 @@ export function Nav(props: {
         </Show>
       </div>
       <div class="nav-group">
+        {/* Inbox is reserved: it has no `ListMeta` row and carries the
+            localized built-in label, so it's a static entry with no rename
+            affordance and no context menu. It sits at the head of the lists
+            group — visually one of the lists, but outside the Dnd so it can
+            never be reordered, multi-selected, or dragged. */}
+        <button
+          type="button"
+          class="nav-item"
+          data-active={
+            props.view.kind === "list" && props.view.id === "inbox"
+              ? ""
+              : undefined
+          }
+          data-drop-list-id="inbox"
+          tabIndex={-1}
+          onClick={() => props.setView({ kind: "list", id: "inbox" })}
+        >
+          <span class="nav-item-icon" innerHTML={archiveSvg} />
+          {m().nav.inbox}
+          <span class="nav-item-count">
+            {(props.openCountsByList["inbox"] ?? 0) > 0
+              ? props.openCountsByList["inbox"]
+              : "-"}
+          </span>
+        </button>
         <Show when={props.lists.length > 0}>
           <Dnd
             items={dndLists()}
