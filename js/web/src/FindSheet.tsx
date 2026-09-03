@@ -17,7 +17,6 @@ import type { DocApp } from "./sync/store.ts";
 import type { ViewKey } from "./prefs.ts";
 import { useAppI18n } from "./i18n.tsx";
 import { trackOverlay } from "./overlay.ts";
-import checkSvg from "./icons/check.svg?raw";
 import {
   createFindState,
   findResultLifecycle,
@@ -165,13 +164,6 @@ export function FindSheet(props: {
                   <FindResultBody app={props.app} item={item} />
                   <Show when={countLabel(item)}>
                     {(count) => <span class="find-sheet__count">{count()}</span>}
-                  </Show>
-                  <Show when={isCurrent(item, props.view)}>
-                    <span
-                      class="find-sheet__current"
-                      innerHTML={checkSvg}
-                      aria-hidden="true"
-                    />
                   </Show>
                 </button>
                 </>

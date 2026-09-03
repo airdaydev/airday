@@ -3513,7 +3513,7 @@ input.task-check:hover {
    which the scrim hides), inset from every screen edge so it reads as a
    surface hovering over the page: a search field beside an explicit
    Close, then the palette's row anatomy at thumb scale. The row for the
-   current view carries a trailing check. */
+   current view takes the nav's selected fill. */
 .find-sheet {
   position: fixed;
   inset: 0;
@@ -3645,8 +3645,20 @@ input.task-check:hover {
   background: var(--palette-select-bg);
 }
 
+/* Current view: a selected-row fill, not a check. Light mode runs well
+   darker than the nav's `--bg-active`: that tint is only a few percent
+   off white and vanishes on the translucent glass card. */
 .find-sheet__row[aria-current="true"] {
-  font-weight: 500;
+  background: rgba(15, 23, 42, 0.18);
+}
+
+[data-theme="dark"] .find-sheet__row[aria-current="true"] {
+  background: var(--bg-active);
+  color: #fff;
+}
+
+.find-sheet__row[aria-current="true"] .palette__item-icon {
+  color: inherit;
 }
 
 .find-sheet__row .palette__item-icon {
@@ -3667,8 +3679,7 @@ input.task-check:hover {
   font-size: 14px;
 }
 
-/* Trailing count, mirroring `.nav-item-count`: pushed to the row's end,
-   ahead of the current-view check. */
+/* Trailing count, mirroring `.nav-item-count`: pushed to the row's end. */
 .find-sheet__count {
   margin-left: auto;
   flex-shrink: 0;
@@ -3677,13 +3688,3 @@ input.task-check:hover {
   font-variant-numeric: tabular-nums;
 }
 
-.find-sheet__current {
-  display: inline-flex;
-  flex-shrink: 0;
-  color: var(--text-muted);
-}
-
-.find-sheet__current svg {
-  width: 16px;
-  height: 16px;
-}
