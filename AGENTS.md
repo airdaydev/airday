@@ -2,7 +2,7 @@
 
 Airday is a low-friction, FOSS, single-human-user/small-tteam, E2EE, multi-device capture/clarify/organise tool for ideas, intents, goals, projects. It is flexible but built with particular regard to improving users' productivity & focus.
 
-Workflow: a reserved primary capture list ("Home", id `main`), any number of user-created lists (each viewable as a fixed Backlog/Live/Done board), and a bin. Items move between lists, transition through the lifecycle (Backlog, Live, Done, Binned), can be restored, and deleted.
+Workflow: a reserved primary capture list ("Inbox", id `inbox`), any number of user-created lists (each viewable as a fixed Backlog/Live/Done board), and a bin. Items move between lists, transition through the lifecycle (Backlog, Live, Done, Binned), can be restored, and deleted.
 
 ## Architecture
 
@@ -40,6 +40,7 @@ Migrations: while pre-release, keep exactly one migration file per database (`00
 | [`spec/board.md`](spec/board.md) | Board view: fixed Backlog / Live / Done lanes driven by item lifecycle |
 | [`spec/focus.md`](spec/focus.md) | Focus lens: curated single-tier list-by-reference, FocusRef grammar, auto-remove-on-Done |
 | [`spec/search.md`](spec/search.md) | Local search index + command palette query contract |
+| [`spec/urls.md`](spec/urls.md) | Fragment URLs for items / lists / views, history rules, internal links |
 | [`spec/cli.md`](spec/cli.md) | Commands, local key storage, device bootstrap UX |
 | [`spec/sharing-plan.md`](spec/sharing-plan.md) | Future (not built): multi-doc + sharing design + implementation plan |
 | [`spec/pwa-plan.md`](spec/pwa-plan.md) | PWA conversion plan: manifest, service worker, `/api/session` probe |

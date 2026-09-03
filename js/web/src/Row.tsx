@@ -16,7 +16,8 @@ import {
 } from "./format.tsx";
 import { laneLabel, useAppI18n } from "./i18n.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
-import { setLinkifiedText } from "./linkify.ts";
+import { openLinkOnClick, setLinkifiedText } from "./linkify.ts";
+import { itemUrl } from "./url.ts";
 import type { ViewKey } from "./prefs.ts";
 import {
   isBinned,
@@ -333,6 +334,10 @@ export function Row(props: {
   const onCopy = () => {
     props.copyBlock(targetIds());
   };
+  // One shareable `#item_` URL per targeted row (`spec/urls.md`).
+  const onCopyLink = () => {
+    void navigator.clipboard.writeText(targetIds().map(itemUrl).join("\n"));
+  };
   // Deadline actions apply to the whole target set (the selection when the
   // row is part of it, else this row alone), matching the done/bin actions.
   const onDeadlineToday = () => {
@@ -487,25 +492,11 @@ export function Row(props: {
             contentEditable={props.expanded()}
             onClick={(e) => {
               if (!props.expanded()) return;
-              // Anchors inside contenteditable don't navigate by default —
-              // clicks place the caret. Intercept plain (no-modifier) clicks
-              // on links so they open in a new tab; modifier-clicks fall
-              // through to native behavior so the user can still place the
-              // caret inside a link to edit it.
-              const link = (e.target as HTMLElement | null)?.closest("a");
-              if (
-                link instanceof HTMLAnchorElement &&
-                textRef.contains(link) &&
-                !e.metaKey &&
-                !e.ctrlKey &&
-                !e.shiftKey &&
-                !e.altKey
-              ) {
-                e.preventDefault();
-                e.stopPropagation();
-                window.open(link.href, "_blank", "noopener,noreferrer");
-                return;
-              }
+              // Plain clicks on links open them (a new tab, or an in-app
+              // jump for the app's own item / list links); modifier-clicks
+              // fall through so the user can still place the caret inside
+              // a link to edit it. See `openLinkOnClick`.
+              openLinkOnClick(e, textRef);
               e.stopPropagation();
             }}
             onPointerDown={(e) => {
@@ -842,6 +833,9 @@ export function Row(props: {
           <ContextMenu.Item class="context-menu-item" onSelect={onCopy}>
             <span>{m().common.copy}</span>
             <kbd class="menu-shortcut">⌘C</kbd>
+          </ContextMenu.Item>
+          <ContextMenu.Item class="context-menu-item" onSelect={onCopyLink}>
+            <span>{m().common.copyLink}</span>
           </ContextMenu.Item>
           <Show when={isOpen(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onDuplicate}>

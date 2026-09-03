@@ -43,6 +43,8 @@ export type Messages = {
     close: string;
     menu: string;
     copy: string;
+    /** Copy a shareable `#item_` / `#list_` URL (`spec/urls.md`). */
+    copyLink: string;
     /** Context-menu move-to-list action (opens the move palette). */
     move: string;
     delete: string;
@@ -354,6 +356,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       close: "Cerrar",
       menu: "Menú",
       copy: "Copiar",
+      copyLink: "Copiar enlace",
       move: "Mover",
       delete: "Eliminar",
       restore: "Restaurar",
@@ -587,6 +590,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       close: "Close",
       menu: "Menu",
       copy: "Copy",
+      copyLink: "Copy link",
       move: "Move",
       delete: "Delete",
       restore: "Restore",

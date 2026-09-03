@@ -1,3 +1,5 @@
+import { parseInternalUrl } from "./url.ts";
+
 // Shared helpers for the contenteditable editors (row quick-entry and the
 // task dialog) that turn http(s) URLs into clickable anchors while keeping
 // `el.textContent` the plain string that gets saved back to the model.
@@ -7,6 +9,12 @@
 // sentence like "see https://x.com." doesn't swallow the full stop.
 const URL_RE = /https?:\/\/[^\s<>"'`]+/g;
 const URL_TRAIL_RE = /[.,;:!?)\]}'"]+$/;
+
+// A link to this app's own origin + path with a recognised `#item_` /
+// `#list_` / view hash (`spec/urls.md`). Marked `data-internal` so a
+// click applies the route in place instead of opening a tab; this is how
+// one item refers to another.
+const isInternal = (url: string): boolean => parseInternalUrl(url) !== null;
 
 // Render `text` into `el`, replacing existing children, with URLs wrapped in
 // <a target="_blank"> anchors. `el.textContent` still returns the plain
@@ -27,8 +35,12 @@ export function setLinkifiedText(el: HTMLElement, text: string): void {
     }
     const a = document.createElement("a");
     a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
+    if (isInternal(url)) {
+      a.dataset.internal = "";
+    } else {
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+    }
     a.textContent = url;
     el.appendChild(a);
     lastIndex = match.index + url.length;
@@ -75,7 +87,9 @@ export function placeCaretAtStart(el: HTMLElement): void {
 }
 
 // A plain (no-modifier) click on a linkified anchor inside `el` opens it in a
-// new tab. Anchors inside contenteditable don't navigate by default — clicks
+// new tab, or, for one of the app's own item / list links, navigates the
+// fragment in place (the workspace's popstate handler applies the route).
+// Anchors inside contenteditable don't navigate by default — clicks
 // place the caret — so we intercept them; modifier-clicks fall through to
 // native behaviour so the user can still click into a link to edit it.
 // Returns true if a link was opened.
@@ -90,7 +104,13 @@ export function openLinkOnClick(e: MouseEvent, el: HTMLElement | undefined): boo
     !e.altKey
   ) {
     e.preventDefault();
-    window.open(link.href, "_blank", "noopener,noreferrer");
+    if (link.dataset.internal !== undefined) {
+      // Same-document fragment navigation: pushes a history entry and
+      // fires popstate. A no-op when the hash is already current.
+      location.hash = new URL(link.href).hash;
+    } else {
+      window.open(link.href, "_blank", "noopener,noreferrer");
+    }
     return true;
   }
   return false;

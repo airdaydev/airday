@@ -40,6 +40,7 @@ import {
   setLinkifiedText,
 } from "./linkify.ts";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
+import { itemUrl } from "./url.ts";
 import { trackOverlay } from "./overlay.ts";
 import {
   isBinned,
@@ -687,15 +688,23 @@ export function TaskDialog(props: {
               </span>
             </div>
             <div class="task-dialog-header-actions">
-              <Show when={!isBinned(it())}>
-                <DropdownMenu>
-                  <DropdownMenu.Trigger
-                    class="nav-menu-trigger"
-                    aria-label={m().common.menu}
-                    innerHTML={dotsVerticalSvg}
-                  />
-                  <DropdownMenu.Portal>
-                    <DropdownMenu.Content class="dropdown-menu-content task-dialog-menu-content">
+              <DropdownMenu>
+                <DropdownMenu.Trigger
+                  class="nav-menu-trigger"
+                  aria-label={m().common.menu}
+                  innerHTML={dotsVerticalSvg}
+                />
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content class="dropdown-menu-content task-dialog-menu-content">
+                    <DropdownMenu.Item
+                      class="dropdown-menu-item"
+                      onSelect={() => {
+                        void navigator.clipboard.writeText(itemUrl(it().id));
+                      }}
+                    >
+                      {m().common.copyLink}
+                    </DropdownMenu.Item>
+                    <Show when={!isBinned(it())}>
                       <DropdownMenu.Item
                         class="dropdown-menu-item"
                         onSelect={() => {
@@ -705,10 +714,10 @@ export function TaskDialog(props: {
                       >
                         {m().workspace.moveToBin}
                       </DropdownMenu.Item>
-                    </DropdownMenu.Content>
-                  </DropdownMenu.Portal>
-                </DropdownMenu>
-              </Show>
+                    </Show>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu>
               {shellButtons()}
             </div>
           </header>

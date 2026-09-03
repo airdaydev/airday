@@ -29,6 +29,7 @@ import { useAppI18n } from "./i18n.tsx";
 import { AuthDialog, type Session } from "./Login.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
 import type { ViewKey } from "./prefs.ts";
+import { listUrl } from "./url.ts";
 import type { DocApp } from "./sync/store.ts";
 
 // Whether the anonymous-session sign-in prompt has been dismissed. Auto-
@@ -620,6 +621,14 @@ export function Nav(props: {
                           }}
                         >
                           {m().nav.renameList}
+                        </ContextMenu.Item>
+                        <ContextMenu.Item
+                          class="context-menu-item"
+                          onSelect={() => {
+                            void navigator.clipboard.writeText(listUrl(l().id));
+                          }}
+                        >
+                          {m().common.copyLink}
                         </ContextMenu.Item>
                         <ContextMenu.Item
                           class="context-menu-item"

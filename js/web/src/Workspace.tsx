@@ -73,6 +73,7 @@ import {
 } from "./sync/store.ts";
 import { rowHeight } from "./density.ts";
 import { createTheme, type ThemePreference } from "./theme.ts";
+import { parseHash, stateHash, type Route } from "./url.ts";
 import {
   encodeView,
   LIST_VIEW,
@@ -281,8 +282,14 @@ export function Workspace(props: {
   // shows (Enter on the list after the pane handed focus back) still
   // notifies the surface, which re-lands the caret in the title.
   const [openPassive, setOpenPassive] = createSignal(false, { equals: false });
+  // An `#item_` link whose id isn't in the store yet (not synced, or
+  // gone). Retried on every store change until it resolves or the user
+  // navigates elsewhere (`spec/urls.md`). Declared here so explicit opens
+  // can drop it.
+  const [pendingItemId, setPendingItemId] = createSignal<string | null>(null);
   const setOpenItemId = (id: string | null) =>
     batch(() => {
+      setPendingItemId(null);
       setOpenPassive(false);
       setOpenItemIdRaw(id);
     });
@@ -549,6 +556,8 @@ export function Workspace(props: {
         // away discards it (no save) and collapses.
         setDraft(null);
         setExpandedKey(null);
+        // Moving on abandons an unresolved item link.
+        setPendingItemId(null);
       },
       { defer: true },
     ),
@@ -1673,6 +1682,113 @@ export function Workspace(props: {
       id: listId && app.state.listsById[listId] ? listId : "inbox",
     });
   };
+
+  // ---------- Fragment URLs (`spec/urls.md`) ----------
+  //
+  // The address bar mirrors `(view, openItemId)`; hash navigation (a
+  // pasted link, Back / Forward, an internal note link) applies the
+  // route back onto the same two signals. One effect derives the hash
+  // from both, so a route that sets view + item together writes the
+  // URL once, and a state change that already matches the hash (i.e.
+  // one we just applied from the hash) writes nothing.
+
+  // The view that shows `it`: Bin if binned, Done if done, else its home
+  // list. A stale list id falls back to Inbox; archived lists still render.
+  const viewForItem = (it: ItemView): ViewKey =>
+    isBinned(it)
+      ? { kind: "bin" }
+      : isDone(it)
+        ? { kind: "done" }
+        : { kind: "list", id: state.listsById[it.listId] ? it.listId : "inbox" };
+
+  // Reveal + open an item by id. False when the store doesn't have it.
+  const openItemFromUrl = (id: string): boolean => {
+    const it = state.itemsById[id];
+    if (!it) return false;
+    batch(() => {
+      revealItem(id, viewForItem(it));
+      setOpenItemId(id);
+    });
+    return true;
+  };
+
+  const applyRoute = (route: Route): void => {
+    if (route.kind === "view") {
+      // An unknown list (deleted, or from another account) is ignored.
+      if (route.view.kind === "list" && !state.listsById[route.view.id]) return;
+      batch(() => {
+        setOpenItemId(null);
+        setView(route.view);
+      });
+      return;
+    }
+    if (!openItemFromUrl(route.id)) setPendingItemId(route.id);
+  };
+
+  // Boot: a hash on the URL overrides the prefs-restored view. Applied
+  // synchronously, before the mirror effect below first runs, so the
+  // effect's first pass sees state that already matches the hash and
+  // doesn't clobber it with the restored view.
+  {
+    const route = parseHash(location.hash);
+    if (route) applyRoute(route);
+  }
+
+  // Pending item link: retry whenever the store changes.
+  createEffect(() => {
+    const id = pendingItemId();
+    if (id === null) return;
+    app.version();
+    if (state.itemsById[id]) untrack(() => openItemFromUrl(id));
+  });
+
+  // State → address bar. History rules: a view change pushes; an
+  // explicit open pushes once (so Back closes the item) and is marked
+  // in `history.state`; item → item and passive (selection-driven)
+  // opens replace; closing an item we pushed for goes Back instead of
+  // leaving a duplicate entry. The first run (boot) always replaces.
+  const ITEM_ENTRY = { airdayItem: true };
+  let prevUrlState: { viewKey: string; item: string | null } | undefined;
+  createEffect(() => {
+    const v = view();
+    const item = openItemId();
+    const passive = openPassive();
+    const hash = stateHash(v, item);
+    const cur = { viewKey: viewKey(v), item };
+    const prev = prevUrlState;
+    prevUrlState = cur;
+    if (location.hash === hash) return;
+    if (prev === undefined) {
+      history.replaceState(null, "", hash);
+      return;
+    }
+    const viewChanged = prev.viewKey !== cur.viewKey;
+    const opened = prev.item === null && item !== null;
+    const closed = prev.item !== null && item === null;
+    if (closed && !viewChanged && history.state?.airdayItem === true) {
+      // The popstate handler re-applies the view we're already on.
+      history.back();
+      return;
+    }
+    if (viewChanged) {
+      history.pushState(null, "", hash);
+    } else if (opened && !passive) {
+      history.pushState(ITEM_ENTRY, "", hash);
+    } else {
+      // Keep the entry's marker so a later close still pops it.
+      history.replaceState(history.state, "", hash);
+    }
+  });
+
+  // Address bar → state: Back / Forward, a hand-edited hash, an internal
+  // link click. An unrecognised hash is rewritten to the current state.
+  const onPopState = () => {
+    const route = parseHash(location.hash);
+    if (route) applyRoute(route);
+    else history.replaceState(history.state, "", stateHash(view(), openItemId()));
+  };
+  window.addEventListener("popstate", onPopState);
+  onCleanup(() => window.removeEventListener("popstate", onPopState));
 
   // While a row is expanded: right-click inside it → native browser menu;
   // right-click anywhere else → noop. Capture-phase so we run before
