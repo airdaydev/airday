@@ -43,10 +43,34 @@ export function FindSheet(props: {
   view: ViewKey;
   onOpenChange: (open: boolean) => void;
   onSelect?: (result: FindResult) => void;
+  /** Count badges, same sources and rules as the desktop nav (see
+   *  `Nav`): Focus shows only when non-zero, Bin always, Inbox always
+   *  ("-" for zero), other lists only under `showListCounts`. */
+  focusCount: number;
+  binCount: number;
+  openCountsByList: Record<string, number>;
+  showListCounts: boolean;
 }) {
   const { m } = useAppI18n();
   trackOverlay(() => props.open);
   const find = createFindState(props.app);
+
+  // Trailing count for a row, or null for rows that carry none (Upcoming,
+  // Done, item results, user lists with counts switched off).
+  const countLabel = (item: FindResult): string | null => {
+    const openCount = (id: string) => {
+      const n = props.openCountsByList[id] ?? 0;
+      return n > 0 ? String(n) : "-";
+    };
+    if (item.kind === "view") {
+      if (item.id === "focus") return props.focusCount > 0 ? String(props.focusCount) : null;
+      if (item.id === "bin") return String(props.binCount);
+      if (item.id === "inbox") return openCount("inbox");
+      return null;
+    }
+    if (item.kind === "list") return props.showListCounts ? openCount(item.id) : null;
+    return null;
+  };
   let listRef: HTMLDivElement | undefined;
 
   // Fresh query on every open, and bring the current row into view so a
@@ -83,7 +107,15 @@ export function FindSheet(props: {
   return (
     <Show when={props.open}>
       <Portal>
-        <div class="find-sheet" role="dialog" aria-label={m().find.placeholder}>
+        {/* Scrim + floating card: the outer layer dims the page (and hides
+            the pills beneath); a tap on it, outside the card, dismisses. */}
+        <div
+          class="find-sheet"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) props.onOpenChange(false);
+          }}
+        >
+        <div class="find-sheet__panel" role="dialog" aria-label={m().find.placeholder}>
           <div class="find-sheet__header">
             <input
               class="find-sheet__input"
@@ -131,6 +163,9 @@ export function FindSheet(props: {
                   onClick={() => selectItem(item)}
                 >
                   <FindResultBody app={props.app} item={item} />
+                  <Show when={countLabel(item)}>
+                    {(count) => <span class="find-sheet__count">{count()}</span>}
+                  </Show>
                   <Show when={isCurrent(item, props.view)}>
                     <span
                       class="find-sheet__current"
@@ -149,6 +184,7 @@ export function FindSheet(props: {
               <div class="palette__empty">{m().find.noMatches}</div>
             </Show>
           </div>
+        </div>
         </div>
       </Portal>
     </Show>

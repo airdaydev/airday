@@ -1936,6 +1936,10 @@ export function Workspace(props: {
           view={view()}
           onOpenChange={onFindOpenChange}
           onSelect={onFindPick}
+          focusCount={state.focusOrder.length}
+          binCount={state.binCount}
+          openCountsByList={openCountsByList()}
+          showListCounts={state.settings.showListCounts}
         />
       </Show>
       <MovePalette
