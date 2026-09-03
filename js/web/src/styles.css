@@ -274,6 +274,25 @@ body {
   font-size: 1.25em;
 }
 
+/* Fixed-height hosts (the side pane, the mobile page): let the notes
+   editor grow to fill the leftover height so the whole pane reads as
+   the note, not a short field with a blank tail. `flex-grow` only, no
+   shrink, so once the text outgrows the pane the surface scrolls as
+   before. The modal stays content-sized. */
+.task-panel .task-dialog-body,
+.task-page .task-dialog-body,
+.task-panel .task-dialog-content,
+.task-page .task-dialog-content,
+.task-panel .task-dialog-notes,
+.task-page .task-dialog-notes {
+  flex: 1 0 auto;
+}
+
+.task-panel .task-dialog-body,
+.task-page .task-dialog-body {
+  align-items: stretch;
+}
+
 /* Upcoming view (main surface): day sections stacked down the page, each
    a dated heading over its rows. Proto calendar — see Upcoming.tsx. */
 .upcoming {
@@ -3645,11 +3664,12 @@ input.task-check:hover {
   background: var(--palette-select-bg);
 }
 
-/* Current view: a selected-row fill, not a check. Light mode runs well
-   darker than the nav's `--bg-active`: that tint is only a few percent
-   off white and vanishes on the translucent glass card. */
+/* Current view: a selected-row fill, not a check. Light mode goes solid
+   white rather than the nav's `--bg-active` grey: on the translucent
+   glass card a white row lifts off the tinted surface, where a grey
+   tint only a few percent off white would vanish into it. */
 .find-sheet__row[aria-current="true"] {
-  background: rgba(15, 23, 42, 0.18);
+  background: #fff;
 }
 
 [data-theme="dark"] .find-sheet__row[aria-current="true"] {
