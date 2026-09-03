@@ -274,7 +274,7 @@ impl Doc {
         self.inner.set_list_icon(list_id, icon).map_err(js_err)
     }
 
-    /// Save (`view` = `"list"` / `"board"` / `"board:nodone"`) or clear
+    /// Save (`view` = `"list"` / `"board"` / `"board:<lanes>"`) or clear
     /// (`view` = "") a list's default view. Accepts the reserved `inbox`
     /// too. See `airday_core::Doc::set_default_view`.
     #[wasm_bindgen(js_name = setDefaultView)]
@@ -1570,7 +1570,7 @@ impl SyncEngine {
             .map_err(js_err)
     }
 
-    /// Save (`view` = `"list"` / `"board"` / `"board:nodone"`) or clear
+    /// Save (`view` = `"list"` / `"board"` / `"board:<lanes>"`) or clear
     /// (`view` = "") a list's default view. Accepts the reserved `inbox`
     /// too. See `airday_core::Doc::set_default_view`.
     #[wasm_bindgen(js_name = setDefaultView)]
@@ -1922,7 +1922,7 @@ pub struct AppEventJs {
     /// `None` when the icon was removed or on events that don't carry one.
     icon: Option<String>,
     /// Saved default view in encoded form (`listDefaultViewChanged`):
-    /// `"list"` / `"board"` / `"board:nodone"`, or `None` when the
+    /// `"list"` / `"board"` / `"board:<lanes>"`, or `None` when the
     /// default was cleared or the event doesn't carry one.
     default_view: Option<String>,
     /// Workflow register state name (`itemAdded` / `itemLifecycleChanged`):
@@ -2207,7 +2207,7 @@ impl From<CoreAppEvent> for AppEventJs {
             CoreAppEvent::ListDefaultViewChanged { id, view } => AppEventJs {
                 kind: "listDefaultViewChanged",
                 id,
-                default_view: view.map(|v| v.encode().to_string()),
+                default_view: view.map(|v| v.encode()),
                 ..blank
             },
             CoreAppEvent::ListArchivedChanged { id, archived_at } => AppEventJs {
@@ -2222,7 +2222,7 @@ impl From<CoreAppEvent> for AppEventJs {
             } => AppEventJs {
                 kind: "settingsChanged",
                 show_list_counts: Some(show_list_counts),
-                inbox_view: inbox_view.map(|v| v.encode().to_string()),
+                inbox_view: inbox_view.map(|v| v.encode()),
                 ..blank
             },
         }
@@ -2256,7 +2256,7 @@ fn list_to_json(l: &airday_core::ListView) -> String {
     }
     if let Some(v) = &l.default_view {
         s.push_str(",\"defaultView\":");
-        s.push_str(&json_string(v.encode()));
+        s.push_str(&json_string(&v.encode()));
     }
     if let Some(t) = l.archived_at {
         s.push_str(&format!(",\"archivedAt\":{t}"));
@@ -2269,7 +2269,7 @@ fn settings_to_json(s: &airday_core::SettingsView) -> String {
     let mut out = format!("{{\"showListCounts\":{}", s.show_list_counts);
     if let Some(v) = &s.inbox_view {
         out.push_str(",\"inboxView\":");
-        out.push_str(&json_string(v.encode()));
+        out.push_str(&json_string(&v.encode()));
     }
     out.push('}');
     out

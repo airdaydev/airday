@@ -44,9 +44,10 @@ item between lanes without changing its underlying order entry.
 ## Lane visibility
 
 Clients may hide any lane except one (at least one lane always renders).
-Hiding is a client-local display preference (it travels with neither the doc
-nor the saved default view — see "Default view" for the one synced exception,
-`board:nodone`):
+Hiding is a display preference: it is part of the list's **view** (see
+"Default view"), so it resolves like the lens itself — a client's local
+override, else the saved default — and "Save as default" publishes the visible
+lane set along with the lens. It never touches item state:
 
 - A hidden lane's items keep their state and their place in the shared Open
   order; they simply don't render on this client.
@@ -101,27 +102,27 @@ the target lane *is* the target state, uniformly:
 ## Default view
 
 A list carries an optional **saved default view**: the lens a client renders it
-in before that client overrides it locally. It is synced doc state — one
-encoded scalar register on the list's `ListMeta` (`view`), or on the doc-level
-`settings` map (`inbox_view`) for the reserved `inbox`, which has no ListMeta
-row. See `spec/data-model.md`.
+in before that client overrides it locally, and — for the board lens — which
+lanes it shows. It is synced doc state — one encoded scalar register on the
+list's `ListMeta` (`view`), or on the doc-level `settings` map (`inbox_view`)
+for the reserved `inbox`, which has no ListMeta row. See `spec/data-model.md`.
 
 ```
-DefaultView = "list" | "board" | "board:nodone"
+DefaultView = "list" | "board" | "board:" Lane ("," Lane)*
+Lane        = "backlog" | "todo" | "in_progress" | "review" | "done"
 ```
 
-The whole view is one register, not a mode flag plus a Done-lane flag, so a
+The lane list names the **visible** lanes in ladder order; bare `"board"` is
+the canonical form for all five. Parsing is set-like (order and repeats are
+tolerated and normalised on re-encode), but an unknown lane name or an empty
+lane list is unparseable. Writers never emit an empty set — at least one lane
+always renders.
+
+The whole view is one register, not a mode flag plus a lane set, so a
 concurrent save on another device replaces it atomically rather than merging a
-mode from one device with a lane flag from another (same rationale as
-`Location`). The list lens carries no Done-lane state — it always encodes as
-bare `"list"` — so two specs that render identically also compare identically.
-
-`"board:nodone"` (hide the Done lane) remains the only lane-visibility state
-that syncs. Open-lane visibility is **client-local only** for now (see "Lane
-visibility"); whether the saved default should some day carry a full visible-
-lane set (e.g. `"board:backlog,inprogress,done"`) is an **open question** —
-the register's unparseable ⇒ absent rule means such an extension degrades
-safely on older clients, so nothing needs deciding before it's wanted.
+mode from one device with lanes from another (same rationale as `Location`).
+The list lens carries no lane state — it always encodes as bare `"list"` — so
+two specs that render identically also compare identically.
 
 Resolution, per list, on every client:
 
@@ -146,10 +147,11 @@ local override (if any)  →  saved default (if any)  →  built-in flat list
 
 ## Client (web) contract
 
-- Per-list view mode (list ⇄ board, plus the board's Done lane) resolves as
+- Per-list view (list ⇄ board, plus the board's visible lanes) resolves as
   above: a **local override** in `localStorage` (`airday:list-view`, a map of
   list id ⇒ encoded view) wins over the synced default. The same account may
-  want a board on desktop and a flat list on a phone.
+  want a board on desktop and a flat list on a phone, or fewer lanes on the
+  phone's narrower board.
 - The override map holds only genuinely divergent lists. Choosing a view that
   matches what the client would render anyway *drops* the override rather than
   pinning it, so a client that never diverges keeps following the account.
@@ -162,8 +164,9 @@ local override (if any)  →  saved default (if any)  →  built-in flat list
   infrastructure (placeholder, nudge, foreign-lane drop targets,
   one-transaction remove+insert) is retained; only custom-column-specific
   behaviour is removed.
-- Open-lane visibility lives beside the view override in `localStorage`
-  (client-local, per list). Hiding never mutates the doc.
+- Lane visibility is part of the view spec, so it lives in the same override
+  map and is published by the same "Save as default". Hiding never mutates
+  item state.
 - A drag between open lanes is a same-list lifecycle change: the item is
   **not** spliced out of the list's Open array (`listOpen`), it stays in place
   and its lane is recomputed from the lifecycle state. Only Done/Binned

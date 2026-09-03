@@ -317,7 +317,7 @@ sweep folded into each focus mutation.
 | `id` | string | uuid v7 hex; stable, used in `Location.list_id` |
 | `name` | string | display name |
 | `icon` | string? | user-chosen display icon, stored as the literal emoji grapheme. Absent/empty ≡ no icon; clients render a built-in fallback glyph. |
-| `view` | string? | the list's **saved default view** — an encoded scalar (`"list"` / `"board"` / `"board:nodone"`) written as one register so a concurrent save can't tear the mode apart from the Done-lane flag. Absent (or unparseable, e.g. written by a newer client) ≡ no saved default: clients fall back to their own. Clients may override it locally. See `spec/board.md`. |
+| `view` | string? | the list's **saved default view** — an encoded scalar (`"list"` / `"board"` / `"board:<visible lanes>"`) written as one register so a concurrent save can't tear the mode apart from the lane set. Absent (or unparseable, e.g. written by a newer client) ≡ no saved default: clients fall back to their own. Clients may override it locally. See `spec/board.md`. |
 | `archived_at` | i64? | unix millis when the list was archived. **Absent ≡ active; present ≡ archived.** Written by `set_list_archived`; unarchiving deletes the key. Archiving is pure ListMeta metadata — see "Archived lists" below. |
 | `created_at` | i64 | unix millis |
 

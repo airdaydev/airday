@@ -108,9 +108,10 @@ const KEY_NAME: &str = "name";
 const KEY_ICON: &str = "icon";
 /// Optional saved default view for a list — the lens a client renders
 /// before the user overrides it locally. One **encoded scalar string**
-/// (`DefaultView`, e.g. `"board:nodone"`), so the mode and the Done-lane
-/// flag can never be torn apart by concurrent saves. Absent ≡ no saved
-/// default; clients fall back to their own built-in default.
+/// (`DefaultView`, e.g. `"board:backlog,in_progress,done"`), so the mode
+/// and the visible-lane set can never be torn apart by concurrent saves.
+/// Absent ≡ no saved default; clients fall back to their own built-in
+/// default.
 const KEY_VIEW: &str = "view";
 const KEY_CREATED_AT: &str = "created_at";
 /// Reflection stamp: set on each entry into Done; never cleared, so it
@@ -342,60 +343,126 @@ impl ItemView {
     }
 }
 
+/// The five board lanes in left-to-right (ladder) order.
+const ALL_LANES: [WorkflowState; 5] = [
+    WorkflowState::Backlog,
+    WorkflowState::Todo,
+    WorkflowState::InProgress,
+    WorkflowState::Review,
+    WorkflowState::Done,
+];
+
+/// Which board lanes render (`spec/board.md` "Lane visibility"): a subset
+/// of the five lanes, held as a bitmask over [`WorkflowState::code`].
+/// Callers keep it non-empty — at least one lane always renders — and
+/// [`DefaultView::encode`] treats an empty set as [`LaneSet::ALL`] rather
+/// than write an unparseable register.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct LaneSet(u8);
+
+impl LaneSet {
+    pub const ALL: LaneSet = LaneSet(0b1_1111);
+    pub const NONE: LaneSet = LaneSet(0);
+
+    fn bit(state: WorkflowState) -> u8 {
+        1 << state.code()
+    }
+
+    pub fn contains(self, state: WorkflowState) -> bool {
+        self.0 & Self::bit(state) != 0
+    }
+
+    /// This set with `state` shown or hidden.
+    pub fn with(self, state: WorkflowState, visible: bool) -> LaneSet {
+        if visible {
+            LaneSet(self.0 | Self::bit(state))
+        } else {
+            LaneSet(self.0 & !Self::bit(state))
+        }
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    /// Visible lanes in ladder order.
+    pub fn iter(self) -> impl Iterator<Item = WorkflowState> {
+        ALL_LANES.into_iter().filter(move |s| self.contains(*s))
+    }
+}
+
+impl FromIterator<WorkflowState> for LaneSet {
+    fn from_iter<I: IntoIterator<Item = WorkflowState>>(iter: I) -> LaneSet {
+        iter.into_iter()
+            .fold(LaneSet::NONE, |set, s| set.with(s, true))
+    }
+}
+
 /// A list's saved default view (`spec/board.md`): which lens a client
 /// renders the list in when it has no local override of its own, and —
-/// for the board lens — whether the Done lane is shown.
+/// for the board lens — which lanes it shows.
 ///
 /// Stored as a single encoded scalar string so a concurrent save on
 /// another device replaces the whole view atomically (same rationale as
-/// [`Location`]) rather than merging a mode from one device with a
-/// Done-lane flag from another:
+/// [`Location`]) rather than merging a mode from one device with a lane
+/// set from another:
 ///
 /// ```text
-/// "list" | "board" | "board:nodone"
+/// "list" | "board" | "board:" lane ("," lane)*
+/// lane   = "backlog" | "todo" | "in_progress" | "review" | "done"
 /// ```
 ///
-/// `show_done` is only meaningful for the board lens; the list lens
-/// always encodes as bare `"list"`. Unrecognized strings parse to `None`
-/// (treated as "no saved default"), so a future client writing a lens
-/// this build doesn't know about degrades to the local default instead
-/// of rendering something wrong.
+/// The lane list names the *visible* lanes in ladder order; bare
+/// `"board"` is the canonical form for all five. `lanes` is only
+/// meaningful for the board lens; the list lens always encodes as bare
+/// `"list"`. Unrecognized strings — an unknown lens, an unknown lane name,
+/// an empty lane list — parse to `None` (treated as "no saved default"),
+/// so a future client writing a form this build doesn't know about
+/// degrades to the local default instead of rendering something wrong.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DefaultView {
     /// `true` ≡ the board lens, `false` ≡ the flat list view.
     pub board: bool,
-    /// Board Done-lane visibility. Always `true` for the list lens.
-    pub show_done: bool,
+    /// Visible board lanes. Always [`LaneSet::ALL`] for the list lens.
+    pub lanes: LaneSet,
 }
 
 impl DefaultView {
     pub const LIST: DefaultView = DefaultView {
         board: false,
-        show_done: true,
+        lanes: LaneSet::ALL,
     };
     pub const BOARD: DefaultView = DefaultView {
         board: true,
-        show_done: true,
+        lanes: LaneSet::ALL,
     };
 
-    pub fn encode(&self) -> &'static str {
-        match (self.board, self.show_done) {
-            (false, _) => "list",
-            (true, true) => "board",
-            (true, false) => "board:nodone",
+    pub fn encode(&self) -> String {
+        if !self.board {
+            return "list".to_string();
         }
+        if self.lanes == LaneSet::ALL || self.lanes.is_empty() {
+            return "board".to_string();
+        }
+        let names: Vec<&str> = self.lanes.iter().map(WorkflowState::name).collect();
+        format!("board:{}", names.join(","))
     }
 
     pub fn parse(s: &str) -> Option<DefaultView> {
         match s {
-            "list" => Some(DefaultView::LIST),
-            "board" => Some(DefaultView::BOARD),
-            "board:nodone" => Some(DefaultView {
-                board: true,
-                show_done: false,
-            }),
-            _ => None,
+            "list" => return Some(DefaultView::LIST),
+            "board" => return Some(DefaultView::BOARD),
+            _ => {}
         }
+        let lanes = s.strip_prefix("board:")?;
+        if lanes.is_empty() {
+            return None;
+        }
+        let lanes: LaneSet = lanes
+            .split(',')
+            .map(WorkflowState::parse_name)
+            .collect::<Option<LaneSet>>()?;
+        Some(DefaultView { board: true, lanes })
     }
 }
 
@@ -465,7 +532,7 @@ pub struct ImportSummary {
 pub struct ExportSettings {
     pub show_list_counts: bool,
     /// Inbox's saved default view in its encoded form (`"list"`,
-    /// `"board"`, `"board:nodone"` — see [`DefaultView`]). Skipped when
+    /// `"board"`, `"board:<lanes>"` — see [`DefaultView`]). Skipped when
     /// unset so pre-default-view dumps stay byte-identical.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub inbox_view: Option<String>,
@@ -482,7 +549,7 @@ pub struct ExportList {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub icon: Option<String>,
     /// The list's saved default view in its encoded form (`"list"`,
-    /// `"board"`, `"board:nodone"` — see [`DefaultView`]). Skipped when
+    /// `"board"`, `"board:<lanes>"` — see [`DefaultView`]). Skipped when
     /// unset so pre-default-view dumps stay byte-identical. The reserved
     /// Inbox entry carries none; its default rides on
     /// [`ExportSettings::inbox_view`].
@@ -2766,7 +2833,7 @@ impl Doc {
             id: list.id,
             name: list.name,
             icon: list.icon,
-            view: list.default_view.map(|v| v.encode().to_string()),
+            view: list.default_view.map(|v| v.encode()),
             archived_at: list.archived_at,
             created_at: Some(list.created_at),
             builtin: false,
@@ -2798,7 +2865,7 @@ impl Doc {
             version: 1,
             settings: ExportSettings {
                 show_list_counts: s.show_list_counts,
-                inbox_view: s.inbox_view.map(|v| v.encode().to_string()),
+                inbox_view: s.inbox_view.map(|v| v.encode()),
             },
             lists,
             items,
@@ -2995,8 +3062,8 @@ impl Doc {
                 .encode()
                 .as_str(),
             )?;
-            let open = src_item.binned_at.is_none()
-                && register.is_none_or(|(state, _)| state.is_open());
+            let open =
+                src_item.binned_at.is_none() && register.is_none_or(|(state, _)| state.is_open());
             item_id_map.insert(src_item.id.clone(), (new_item_id, open));
             items_added += 1;
         }
@@ -3785,9 +3852,7 @@ impl Doc {
                 // on the consumer, so an `ItemMoved` candidate
                 // repositions them like any other id.
                 let shown = c.old.as_ref().is_some_and(|o| !o.open);
-                if shown
-                    && (c.keys.contains(KEY_LIFECYCLE) || c.keys.contains(KEY_BINNED_AT))
-                {
+                if shown && (c.keys.contains(KEY_LIFECYCLE) || c.keys.contains(KEY_BINNED_AT)) {
                     let view = view_of(id)?;
                     insert_type.insert(
                         id,
@@ -4587,8 +4652,12 @@ fn read_workflow(map: &LoroMap) -> Option<(WorkflowState, i64)> {
 /// The item's workflow register with the absent/unparseable fallback
 /// applied: `[Backlog, created_at]`.
 fn workflow_of(map: &LoroMap) -> (WorkflowState, i64) {
-    read_workflow(map)
-        .unwrap_or_else(|| (WorkflowState::Backlog, read_i64(map, KEY_CREATED_AT).unwrap_or(0)))
+    read_workflow(map).unwrap_or_else(|| {
+        (
+            WorkflowState::Backlog,
+            read_i64(map, KEY_CREATED_AT).unwrap_or(0),
+        )
+    })
 }
 
 /// Write the workflow register as one atomic plain value — a single op,
@@ -5191,7 +5260,7 @@ mod tests {
 
         let board_nodone = DefaultView {
             board: true,
-            show_done: false,
+            lanes: LaneSet::ALL.with(WorkflowState::Done, false),
         };
         doc.set_default_view(&list, Some(board_nodone)).unwrap();
         assert_eq!(
@@ -5245,28 +5314,77 @@ mod tests {
 
     #[test]
     fn default_view_encoding_round_trips() {
+        let no_done = LaneSet::ALL.with(WorkflowState::Done, false);
+        let two_lanes: LaneSet = [WorkflowState::InProgress, WorkflowState::Done]
+            .into_iter()
+            .collect();
         for view in [
             DefaultView::LIST,
             DefaultView::BOARD,
             DefaultView {
                 board: true,
-                show_done: false,
+                lanes: no_done,
+            },
+            DefaultView {
+                board: true,
+                lanes: two_lanes,
             },
         ] {
-            assert_eq!(DefaultView::parse(view.encode()), Some(view));
+            assert_eq!(DefaultView::parse(&view.encode()), Some(view));
         }
-        // The list lens carries no Done-lane state.
+        // Lanes list in ladder order, and the full set is bare "board".
+        assert_eq!(
+            DefaultView {
+                board: true,
+                lanes: two_lanes,
+            }
+            .encode(),
+            "board:in_progress,done"
+        );
+        assert_eq!(
+            DefaultView {
+                board: true,
+                lanes: no_done,
+            }
+            .encode(),
+            "board:backlog,todo,in_progress,review"
+        );
+        assert_eq!(
+            DefaultView::parse("board:backlog,todo,in_progress,review,done"),
+            Some(DefaultView::BOARD)
+        );
+        // Parsing is set-like: order and repeats don't matter.
+        assert_eq!(
+            DefaultView::parse("board:done,in_progress,done"),
+            Some(DefaultView {
+                board: true,
+                lanes: two_lanes,
+            })
+        );
+        // The list lens carries no lane state.
         assert_eq!(
             DefaultView {
                 board: false,
-                show_done: false,
+                lanes: no_done,
             }
             .encode(),
             "list"
         );
+        // An empty set never reaches the register.
+        assert_eq!(
+            DefaultView {
+                board: true,
+                lanes: LaneSet::NONE,
+            }
+            .encode(),
+            "board"
+        );
         // A value written by a future client reads as "no saved
         // default" rather than something wrong.
         assert_eq!(DefaultView::parse("calendar"), None);
+        assert_eq!(DefaultView::parse("board:"), None);
+        assert_eq!(DefaultView::parse("board:blocked"), None);
+        assert_eq!(DefaultView::parse("board:done,"), None);
         assert_eq!(DefaultView::parse(""), None);
     }
 
@@ -5301,7 +5419,7 @@ mod tests {
         let list = src.add_list("Work").unwrap();
         let nodone = DefaultView {
             board: true,
-            show_done: false,
+            lanes: LaneSet::ALL.with(WorkflowState::Done, false),
         };
         src.set_default_view(&list, Some(nodone)).unwrap();
         src.set_default_view(LIST_INBOX, Some(DefaultView::BOARD))
@@ -5315,7 +5433,10 @@ mod tests {
             .iter()
             .find(|l| l.id == list)
             .expect("user list exported");
-        assert_eq!(exported.view.as_deref(), Some("board:nodone"));
+        assert_eq!(
+            exported.view.as_deref(),
+            Some("board:backlog,todo,in_progress,review")
+        );
 
         let dst = Doc::new().unwrap();
         dst.import_json(&export).unwrap();
@@ -8549,7 +8670,10 @@ mod tests {
             by_text("backlog").lifecycle.as_ref().unwrap().state,
             "backlog"
         );
-        assert_eq!(by_text("review").lifecycle.as_ref().unwrap().state, "review");
+        assert_eq!(
+            by_text("review").lifecycle.as_ref().unwrap().state,
+            "review"
+        );
         assert_eq!(
             by_text("started").lifecycle.as_ref().unwrap().state,
             "in_progress"

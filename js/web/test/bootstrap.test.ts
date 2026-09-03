@@ -70,7 +70,7 @@ test("a saved default view survives materializing a fresh store", () => {
 
   const engine = newEngine();
   const listId = engine.addList("Work");
-  engine.setDefaultView(listId, "board:nodone");
+  engine.setDefaultView(listId, "board:backlog,todo,in_progress,review");
   engine.setDefaultView("inbox", "board");
   const saved = engine.save();
 
@@ -86,7 +86,7 @@ test("a saved default view survives materializing a fresh store", () => {
     new MemEngineStorage() as unknown as EngineStorage,
   );
   const app = createSyncedApp(reloaded);
-  expect(app.state.listsById[listId]?.defaultView).toBe("board:nodone");
+  expect(app.state.listsById[listId]?.defaultView).toBe("board:backlog,todo,in_progress,review");
   expect(app.state.settings.inboxView).toBe("board");
 
   // Clearing the default has to survive the same round trip as absence,

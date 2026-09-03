@@ -78,6 +78,7 @@ import {
   LIST_VIEW,
   parseView,
   viewsEqual,
+  withLane,
   type ViewSpec,
 } from "./view.ts";
 
@@ -109,13 +110,6 @@ function loadViewPrefs(): Record<string, string> {
   }
 }
 
-// Per-list *local* open-lane visibility for the board (spec/board.md
-// "Lane visibility"): which of the four open lanes this browser renders.
-// Client-local and display-only — hiding never mutates the doc and never
-// syncs (the Done lane's bit is the one exception, riding the saved view
-// as "board:nodone"). Absent ≡ all four lanes; only lists with hidden
-// lanes get a key, stored as the *visible* lane names in ladder order.
-const LANES_PREF_KEY = "airday:board-lanes";
 /** One lane in the view-mode popover: name, item count, and an eye
  *  button toggling client-local visibility (spec/board.md "Lane
  *  visibility"). Hidden lanes dim so the icon state needn't be read
@@ -145,25 +139,6 @@ function LaneRow(props: {
       />
     </div>
   );
-}
-
-function loadLanePrefs(): Record<string, WorkflowState[]> {
-  try {
-    const raw = localStorage.getItem(LANES_PREF_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const out: Record<string, WorkflowState[]> = {};
-    for (const [listId, lanes] of Object.entries(parsed)) {
-      if (!Array.isArray(lanes)) continue;
-      const visible = OPEN_STATES.filter((s) => lanes.includes(s));
-      if (visible.length > 0 && visible.length < OPEN_STATES.length) {
-        out[listId] = visible;
-      }
-    }
-    return out;
-  } catch {
-    return {};
-  }
 }
 
 // Per-list *local* "badge each row with its lifecycle state" flag for the
@@ -422,39 +397,22 @@ export function Workspace(props: {
     const cur = listView(listId);
     setLocalView(listId, { ...cur, board: !cur.board });
   };
-  const showDoneColumn = (listId: string): boolean => listView(listId).showDone;
-  const setShowDoneColumn = (listId: string, show: boolean) => {
-    // At least one lane must stay visible (spec/board.md "Lane
-    // visibility"): refuse to hide Done while it is the only lane left.
-    if (!show && visibleOpenLanes(listId).length === 0) return;
-    setLocalView(listId, { ...listView(listId), showDone: show });
-  };
-
-  // Client-local open-lane visibility per list (spec/board.md "Lane
-  // visibility"). Display-only: hiding never mutates the doc, and a
-  // hidden lane simply doesn't render (so it is not a drop target).
-  const [lanePrefs, setLanePrefs] = createSignal<Record<string, WorkflowState[]>>(
-    loadLanePrefs(),
-  );
+  // Lane visibility (spec/board.md "Lane visibility") is part of the
+  // view spec, so it resolves like the lens itself — local override,
+  // else the saved default — and "Save as default" publishes it. Hiding
+  // is display-only: a hidden lane simply doesn't render (so it is not a
+  // drop target); no item's state changes.
+  const showDoneColumn = (listId: string): boolean =>
+    listView(listId).lanes.includes("done");
+  const setShowDoneColumn = (listId: string, show: boolean) =>
+    setLaneVisible(listId, "done", show);
   const visibleOpenLanes = (listId: string): WorkflowState[] =>
-    lanePrefs()[listId] ?? [...OPEN_STATES];
+    listView(listId).lanes.filter((l) => l !== "done");
   const setLaneVisible = (listId: string, lane: WorkflowState, show: boolean) => {
-    const cur = visibleOpenLanes(listId);
-    const next = show
-      ? OPEN_STATES.filter((s) => s === lane || cur.includes(s))
-      : cur.filter((s) => s !== lane);
-    // At least one lane always renders: refuse to hide the last open
-    // lane unless the Done lane is still on.
-    if (next.length === 0 && !showDoneColumn(listId)) return;
-    const map = { ...lanePrefs() };
-    if (next.length === OPEN_STATES.length) delete map[listId];
-    else map[listId] = next;
-    setLanePrefs(map);
-    try {
-      localStorage.setItem(LANES_PREF_KEY, JSON.stringify(map));
-    } catch {
-      // Quota/private-mode failures just lose the preference.
-    }
+    // At least one lane always renders: `withLane` refuses the hide that
+    // would blank the board.
+    const next = withLane(listView(listId), lane, show);
+    if (next) setLocalView(listId, next);
   };
   // Per-lane item counts for the board whose view-mode popover is open,
   // shown beside each lane toggle so hiding a lane is an informed choice.
@@ -2185,10 +2143,11 @@ export function Workspace(props: {
                 <Show when={boardListId()}>
                   {(listId) => (
                     <>
-                      {/* Open-lane visibility (client-local, display-only —
-                          spec/board.md "Lane visibility"). At least one
-                          lane always stays on; the setters refuse the
-                          hide that would blank the board. */}
+                      {/* Lane visibility (display-only — spec/board.md
+                          "Lane visibility"), part of the view spec that
+                          "Save as default" publishes. At least one lane
+                          always stays on; the setters refuse the hide
+                          that would blank the board. */}
                       <For each={OPEN_STATES}>
                         {(lane) => (
                           <LaneRow

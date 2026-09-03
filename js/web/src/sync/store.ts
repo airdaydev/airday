@@ -119,7 +119,7 @@ export interface ListView {
    *  unset — consumers render a built-in fallback glyph. */
   icon?: string;
   /** Saved default view in encoded form (`"list"` / `"board"` /
-   *  `"board:nodone"` — see `parseDefaultView`), or absent when the user
+   *  `"board:<lanes>"` — see `view.ts`), or absent when the user
    *  has never saved one. Synced doc state; a client with a local
    *  override of its own ignores it. See `spec/board.md`. */
   defaultView?: string;

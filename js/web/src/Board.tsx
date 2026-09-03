@@ -157,9 +157,9 @@ export function Board(props: {
   const membersOf = (laneKey: WorkflowState): ItemView[] =>
     laneKey === DONE_LANE ? doneMembers() : laneMembers()[laneKey];
 
-  // Which lanes render, in fixed left-to-right order. Open-lane hiding is
-  // client-local and display-only; the Done lane bit can ride the saved
-  // default view ("board:nodone").
+  // Which lanes render, in fixed left-to-right order. Lane hiding is
+  // display-only and rides the list's view spec (local override or the
+  // saved default — see view.ts).
   const doneVisible = (): boolean => props.showDoneColumn?.() ?? true;
   const visibleOpen = (): readonly WorkflowState[] =>
     props.visibleOpenLanes?.() ?? OPEN_STATES;

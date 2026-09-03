@@ -172,18 +172,18 @@ describe("doc passthrough", () => {
     const listId = eng.addList("Work");
     drainAppEvents(eng);
 
-    eng.setDefaultView(listId, "board:nodone");
+    eng.setDefaultView(listId, "board:backlog,todo,in_progress,review");
     const events = drainAppEvents(eng);
     const changed = events.find((e) => e.kind === "listDefaultViewChanged");
     expect(changed?.id).toBe(listId);
-    expect(changed?.defaultView).toBe("board:nodone");
+    expect(changed?.defaultView).toBe("board:backlog,todo,in_progress,review");
 
     const snap = JSON.parse(eng.workspaceSnapshotJson()) as {
       settings: { inboxView?: string };
       lists: Array<{ id: string; defaultView?: string }>;
     };
     expect(snap.lists.find((l) => l.id === listId)?.defaultView).toBe(
-      "board:nodone",
+      "board:backlog,todo,in_progress,review",
     );
 
     // Clearing drops the key rather than persisting a "none" value.
