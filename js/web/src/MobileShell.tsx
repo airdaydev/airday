@@ -3,11 +3,12 @@
 // On phones the desktop sidebar (and its footer chrome) is not rendered (see
 // Workspace.tsx). The left pill carries Find (FindSheet.tsx, which
 // doubles as the list switcher: it lists every view on an empty query
-// and marks the current one) and Settings; the right pill is Add. The sync indicator moves into the
-// main header's action slot. No custom drawer: the DOM can't fake a
-// native sheet convincingly, so we don't try.
+// and marks the current one), Settings, and the account/sync indicator
+// (`status`, mirroring the desktop sidebar footer); the right pill is
+// Add. No custom drawer: the DOM can't fake a native sheet convincingly,
+// so we don't try.
 
-import { Show } from "solid-js";
+import { Show, type JSX } from "solid-js";
 import { useAppI18n } from "./i18n.tsx";
 import caretUpDownSvg from "./icons/caret-up-down.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
@@ -19,6 +20,10 @@ export function MobileBars(props: {
   /** null hides the add pill (views that can't capture). */
   onAdd: (() => void) | null;
   addDisabled: boolean;
+  /** The account/sync indicator (StatusSlot), rendered last in the left
+      pill. Passed in rather than owned here so it stays mounted exactly
+      once per session (its first-run auth prompt fires on mount). */
+  status: JSX.Element;
 }) {
   const { m } = useAppI18n();
   return (
@@ -38,6 +43,7 @@ export function MobileBars(props: {
           onClick={props.onOpenSettings}
           innerHTML={mixerHzSvg}
         />
+        {props.status}
       </nav>
       <Show when={props.onAdd}>
         {(onAdd) => (

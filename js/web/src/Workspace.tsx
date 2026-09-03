@@ -2062,19 +2062,26 @@ export function Workspace(props: {
             </Show>
           </div>
           <div class="main-header-actions">
-            {/* Mobile: the sync indicator lives up here (there's no
-                sidebar footer). Always mounted while mobile so its
-                first-run auth prompt still fires on load, as on desktop. */}
-            <Show when={isMobile()}>
-              <StatusSlot
-                class="glass"
-                app={app}
-                online={session.online()}
-                lastSyncAt={session.lastSyncAt()}
-                session={session.session()}
-                onSession={session.swapSession}
-              />
+            <Show
+              when={
+                view().kind === "bin" &&
+                items().length > 0
+              }
+            >
+              <button
+                type="button"
+                class="add-button"
+                tabIndex={-1}
+                onClick={() => setEmptyBinConfirmOpen(true)}
+              >
+                <span class="add-button-icon" innerHTML={trashSvg} />
+                <span>{m().workspace.emptyBin}</span>
+              </button>
             </Show>
+            {/* The view's icon buttons (list menu, display options, add)
+                share one group. Hidden via CSS when the view contributes
+                none; on mobile the group is a single glass bubble. */}
+            <div class={isMobile() ? "header-group glass" : "header-group"}>
             {/* List actions menu: the same Archive / Unarchive the nav's
                 context menu offers, kept here so restoring an archived
                 list stays discoverable with the sidebar collapsed. Only
@@ -2108,26 +2115,6 @@ export function Workspace(props: {
                 </DropdownMenu>
               )}
             </Show>
-            <Show
-              when={
-                view().kind === "bin" &&
-                items().length > 0
-              }
-            >
-              <button
-                type="button"
-                class="add-button"
-                tabIndex={-1}
-                onClick={() => setEmptyBinConfirmOpen(true)}
-              >
-                <span class="add-button-icon" innerHTML={trashSvg} />
-                <span>{m().workspace.emptyBin}</span>
-              </button>
-            </Show>
-            {/* Desktop: the view's icon buttons (display options, add)
-                share one rounded glass group instead of per-button
-                chrome. Hidden via CSS when the view contributes none. */}
-            <div class="header-group">
             <Show when={view().kind === "list"}>
               <DisplayOptionsPopover>
                 <SegmentedControl
@@ -2502,6 +2489,19 @@ export function Workspace(props: {
               : null
           }
           addDisabled={draft() !== null}
+          status={
+            /* Mobile: the sync indicator rides in the left pill (there's
+               no sidebar footer). Always mounted while mobile so its
+               first-run auth prompt still fires on load, as on desktop. */
+            <StatusSlot
+              class="mobile-bar-btn"
+              app={app}
+              online={session.online()}
+              lastSyncAt={session.lastSyncAt()}
+              session={session.session()}
+              onSession={session.swapSession}
+            />
+          }
         />
       </Show>
     </div>

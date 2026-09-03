@@ -713,7 +713,7 @@ body {
 @media (max-width: 768px) and (pointer: coarse) {
   /* The bottom bar carries Add on mobile, so the header drops its own.
      Display options stays: it has no other home on a phone and sits to
-     the right of the title as a glass disc beside the sync indicator. */
+     the right of the title in the header's glass bubble. */
   .main-header .add-button:not(.view-mode-trigger) {
     display: none;
   }
@@ -723,7 +723,7 @@ body {
   .main-header {
     height: auto;
     padding: 16px 12px 8px;
-    /* The glass sync disc's shadow must paint over the list below;
+    /* The glass bubble's shadow must paint over the list below;
        .dnd-parent is positioned at z-index 2 and would otherwise sit on
        top of it. */
     position: relative;
@@ -3399,25 +3399,12 @@ input.task-check:hover {
   opacity: 0.4;
 }
 
-@media (max-width: 768px) and (pointer: coarse) {
-  /* Header sync indicator as a small glass disc, matching the pills. */
-  .main-header .connection-indicator {
-    width: 36px;
-    height: 36px;
-    margin: 0;
-    padding: 0;
-    border-radius: 99px;
-    color: var(--text);
-  }
-
-  .main-header .connection-indicator svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  .main-header .connection-indicator:active {
-    transform: scale(0.92);
-  }
+/* The sync indicator rides in the left pill as one more pill button:
+   drop the sidebar-footer negative margin and let `.mobile-bar-btn`
+   size it. */
+.mobile-bar .connection-indicator {
+  margin: 0;
+  color: var(--text);
 }
 
 /* Mobile board lanes: the per-lane Add is a primary capture affordance
@@ -3447,45 +3434,45 @@ input.task-check:hover {
   }
 }
 
-/* Mobile header: display options as a glass disc to the right of the
-   title, matching the sync indicator disc it sits next to. */
+/* Mobile header: the view's remaining buttons (list menu, display
+   options) share one glass bubble to the right of the title, the same
+   pill geometry as the bottom bars. Workspace adds `.glass` to
+   `.header-group` on mobile; the buttons inside go chromeless. */
 @media (max-width: 768px) and (pointer: coarse) {
   .main-header-actions {
     gap: 8px;
   }
 
-  .main-header .view-mode-trigger {
+  .main-header .header-group {
+    gap: 2px;
+    height: var(--mobile-bar-h);
+    padding: 0 5px;
+    border-radius: 99px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .main-header .header-group .nav-menu-trigger,
+  .main-header .header-group .view-mode-trigger {
     width: 36px;
     height: 36px;
     padding: 0;
+    border: 0;
     border-radius: 99px;
+    background: transparent;
     color: var(--text);
-    border: 1px solid rgba(255, 255, 255, 0.45);
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    box-shadow:
-      0 4px 14px rgba(0, 0, 0, 0.08),
-      0 1px 2px rgba(0, 0, 0, 0.05),
-      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    transition: transform 0.1s ease, background 0.15s ease;
   }
 
-  [data-theme="dark"] .main-header .view-mode-trigger {
-    border-color: rgba(255, 255, 255, 0.12);
-    background: rgba(30, 30, 32, 0.6);
-    box-shadow:
-      0 4px 14px rgba(0, 0, 0, 0.3),
-      0 1px 2px rgba(0, 0, 0, 0.2),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  }
-
-  .main-header .view-mode-trigger svg {
+  .main-header .header-group .nav-menu-trigger svg,
+  .main-header .header-group .view-mode-trigger svg {
     width: 18px;
     height: 18px;
   }
 
-  .main-header .view-mode-trigger:active {
+  .main-header .header-group .nav-menu-trigger:active,
+  .main-header .header-group .view-mode-trigger:active {
     transform: scale(0.92);
+    background: rgba(127, 127, 127, 0.18);
   }
 }
 
