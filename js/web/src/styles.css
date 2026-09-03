@@ -280,7 +280,7 @@ body {
 .upcoming-day {
   padding-bottom: 8px;
   margin-bottom: 8px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0.5px solid var(--row-divider);
 }
 
 .upcoming-day:last-child {
@@ -3540,6 +3540,14 @@ input.task-check:hover {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 6px 8px calc(24px + env(safe-area-inset-bottom));
+}
+
+/* Group break between the fixed views and the lists in the default
+   menu: a hairline with breathing room, inset to the row's radius. */
+.find-sheet__divider {
+  height: 0.5px;
+  margin: 6px 8px;
+  background: var(--border);
 }
 
 /* Buttons rather than option divs — plain tap targets, no listbox

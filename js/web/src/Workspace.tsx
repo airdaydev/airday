@@ -302,7 +302,10 @@ export function Workspace(props: {
   // list/board selection) rather than explicit (row open icon, Enter, a
   // find pick). Passive opens must not pull focus off the list, or arrow
   // keys would land in the panel's title editor after the first step.
-  const [openPassive, setOpenPassive] = createSignal(false);
+  // `equals: false` so an explicit open of the item the panel already
+  // shows (Enter on the list after the pane handed focus back) still
+  // notifies the surface, which re-lands the caret in the title.
+  const [openPassive, setOpenPassive] = createSignal(false, { equals: false });
   const setOpenItemId = (id: string | null) =>
     batch(() => {
       setOpenPassive(false);
@@ -1415,8 +1418,10 @@ export function Workspace(props: {
   };
 
   // Enter: open the topmost selected item in the detail dialog. The dialog
-  // owns Enter while open (commits & closes), and onGlobalKey's overlay /
-  // editable-surface guards keep this from firing there.
+  // owns Enter while open (commits & closes, or in the side pane commits
+  // & hands focus back here — a second Enter then re-enters the pane),
+  // and onGlobalKey's overlay / editable-surface guards keep this from
+  // firing there.
   const onOpenKey = (e: KeyboardEvent) => {
     if (e.key !== "Enter") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
@@ -1652,7 +1657,8 @@ export function Workspace(props: {
   };
 
   // Selecting a palette result: jump to the view that contains it. Built-in
-  // views (Focus / Inbox / Done) and lists go straight to that view. Items
+  // views (Focus / Upcoming / Done / Bin / Inbox) and lists go straight to
+  // that view. Items
   // pick the view based on their lifecycle — binned items live in the Bin,
   // done-only items in Done, otherwise their list.
   const onFindSelect = (r: FindResult) => {
@@ -1979,6 +1985,7 @@ export function Workspace(props: {
         focusField={openFocus}
         passive={openPassive}
         onClosed={restoreItemsFocus}
+        onReleaseFocus={restoreItemsFocus}
         onLiveText={(text) => {
           const id = openItemId();
           if (id) setLiveEdit({ id, text });

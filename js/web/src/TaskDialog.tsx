@@ -89,6 +89,10 @@ export function TaskDialog(props: {
    *  list). Fires from Kobalte's close-auto-focus hook, which we take over
    *  to steer focus back to the listbox instead of the trigger. */
   onClosed?: () => void;
+  /** Side-panel shell only: plain Enter in the title hands keyboard focus
+   *  back to the list/board without closing the item (the pane keeps
+   *  showing it). The owner focuses its items listbox here. */
+  onReleaseFocus?: () => void;
   /** Pushes the in-progress title into a UI-only channel so the list row
    *  mirrors the edit live — without a sync op per keystroke. The real
    *  write still happens once, via the close/flush path. */
@@ -409,8 +413,12 @@ export function TaskDialog(props: {
   // editors are contenteditable, so "caret at start/end" is derived from
   // the collapsed selection offset rather than textarea selection props.
   const onTitleKeyDown = (e: KeyboardEvent) => {
-    // Enter commits & closes (the title is one line); Shift+Enter is left
-    // to the browser, but the title never wraps to multiple lines in use.
+    // Enter commits (the title is one line); Shift+Enter is left to the
+    // browser, but the title never wraps to multiple lines in use. The
+    // modal / mobile shells close on commit. The side pane stays open on
+    // the item and just returns focus to the list/board — the pane is
+    // ambient, so "done editing" shouldn't blank it. A capture in the
+    // pane still commits via close() (there's no item to stay on yet).
     if (
       e.key === "Enter" &&
       !e.shiftKey &&
@@ -420,6 +428,11 @@ export function TaskDialog(props: {
       !e.isComposing
     ) {
       e.preventDefault();
+      if (panelMode() && !isNew()) {
+        flush(loadedId);
+        props.onReleaseFocus?.();
+        return;
+      }
       close();
       return;
     }

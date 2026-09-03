@@ -22,6 +22,7 @@ import {
   createFindState,
   findResultLifecycle,
   FindResultBody,
+  isFixedView,
   type FindResult,
 } from "./findResults.tsx";
 
@@ -104,7 +105,22 @@ export function FindSheet(props: {
           </div>
           <div ref={listRef} class="find-sheet__results">
             <For each={find.items()}>
-              {(item) => (
+              {(item, index) => (
+                <>
+                {/* Default menu only: the sidebar's break between the
+                    fixed views and the lists group (Inbox + user lists),
+                    drawn above the first non-fixed row. Query results
+                    are one ranked run and get no break. */}
+                <Show
+                  when={
+                    !find.input().trim() &&
+                    index() > 0 &&
+                    !isFixedView(item) &&
+                    isFixedView(find.items()[index() - 1]!)
+                  }
+                >
+                  <div class="find-sheet__divider" role="separator" />
+                </Show>
                 <button
                   type="button"
                   class="palette__item find-sheet__row"
@@ -123,6 +139,7 @@ export function FindSheet(props: {
                     />
                   </Show>
                 </button>
+                </>
               )}
             </For>
             {/* An empty query always yields the default menu (built-ins are

@@ -13,21 +13,29 @@ import { useAppI18n } from "./i18n.tsx";
 import archiveSvg from "./icons/archive.svg?raw";
 import calendarSvg from "./icons/calendar.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
+import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import fileSvg from "./icons/file.svg?raw";
 
-// The built-in views (Focus / Inbox / Done) aren't `ListMeta` rows, so the
-// search engine never indexes them (spec/search.md "Palette-level
-// entries"). The surfaces synthesize them: always present in the default
-// (empty-query) menu, and name-matched into query results so "foc" finds
-// Focus the way it finds a user list.
-export type ViewResultId = "focus" | "inbox" | "upcoming" | "done";
+// The built-in views (Focus / Upcoming / Done / Bin / Inbox) aren't
+// `ListMeta` rows, so the search engine never indexes them
+// (spec/search.md "Palette-level entries"). The surfaces synthesize them:
+// present in the default (empty-query) menu, and name-matched into query
+// results so "foc" finds Focus the way it finds a user list. Bin follows
+// the sidebar's rule and only exists while it holds items.
+export type ViewResultId = "focus" | "inbox" | "upcoming" | "done" | "bin";
 export interface ViewResult {
   kind: "view";
   id: ViewResultId;
   title: string;
 }
 export type FindResult = SearchResult | ViewResult;
+
+/** A fixed nav view (Focus / Upcoming / Done / Bin) as opposed to Inbox, which
+ *  sits with the lists. Lets a surface draw the sidebar's group break. */
+export function isFixedView(item: FindResult): boolean {
+  return item.kind === "view" && item.id !== "inbox";
+}
 
 // Fixed nav icons, mirrored so a built-in reads the same here as in the
 // sidebar.
@@ -36,6 +44,7 @@ const VIEW_ICONS: Record<ViewResultId, string> = {
   inbox: archiveSvg,
   upcoming: calendarSvg,
   done: checkSvg,
+  bin: crumpledPaperSvg,
 };
 
 /** Query state + result set for a Find surface. `setInput` feeds the
@@ -55,12 +64,18 @@ export function createFindState(app: DocApp) {
     onCleanup(() => window.clearTimeout(timer));
   });
 
-  // Localized labels re-derive when the language changes; nav order.
+  // Localized labels re-derive when the language changes; sidebar order:
+  // the fixed views first (Bin only while non-empty, as in the nav), then
+  // Inbox heading the lists group (it's the reserved primary list, filed
+  // with the user's lists in the nav).
   const builtinViews = (): ViewResult[] => [
     { kind: "view", id: "focus", title: m().nav.focus },
-    { kind: "view", id: "inbox", title: m().nav.inbox },
     { kind: "view", id: "upcoming", title: m().nav.upcoming },
     { kind: "view", id: "done", title: m().nav.done },
+    ...(app.state.binCount > 0
+      ? [{ kind: "view", id: "bin", title: m().nav.bin } as ViewResult]
+      : []),
+    { kind: "view", id: "inbox", title: m().nav.inbox },
   ];
 
   // Re-run on every doc version bump too, so a peer or local mutation
