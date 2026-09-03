@@ -28,6 +28,8 @@
   --error-text: #991b1b;
   --overdue-bg: #ffe4e4;
   --overdue-text: #ff5978;
+  --due-today-bg: #ffecd6;
+  --due-today-text: #ff8a1f;
   --dnd-select-bg: #dbeafe;
   /* Divider under a selected row: a blue-grey a step darker than the
      selection fill so the row's edge still reads against it. */
@@ -62,6 +64,8 @@
   --error-text: #f87171;
   --overdue-bg: #3a1a22;
   --overdue-text: #ff7a93;
+  --due-today-bg: #3a2614;
+  --due-today-text: #ffa04d;
   --dnd-select-bg: #293a5b;
   --dnd-select-border: #33466e;
   --palette-select-bg: #26262a;
@@ -3247,9 +3251,10 @@ input.task-check:hover {
 }
 
 /* Compact deadline pill — the shared `.badge` styles as-is, plus a
-   `data-tone` urgency color role: overdue = danger, today = accent,
-   future = neutral, muted = done/binned (no urgency). Shared by list
-   rows and board cards. */
+   `data-tone` urgency color role: overdue = danger (red), today = warning
+   (orange, same pastel-fill / fluoro-text pairing as overdue), future =
+   neutral, muted = done/binned (no urgency). Shared by list rows and
+   board cards. */
 .deadline-badge-icon {
   display: inline-flex;
   align-items: center;
@@ -3264,6 +3269,11 @@ input.task-check:hover {
 .deadline-badge[data-tone="overdue"] {
   color: var(--overdue-text);
   background: var(--overdue-bg);
+}
+
+.deadline-badge[data-tone="today"] {
+  color: var(--due-today-text);
+  background: var(--due-today-bg);
 }
 
 .deadline-badge[data-tone="muted"] {
