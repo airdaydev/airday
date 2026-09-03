@@ -136,6 +136,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  border-right: 0.5px solid var(--border-surface);
 }
 
 /* Sidebar-scoped footer: app menu at the left, account/sync widget
@@ -181,6 +182,7 @@ body {
   z-index: 50;
   padding: 0;
   overflow: visible;
+  border-right: 0;
 }
 
 .app.nav-hidden .nav-scroll {
@@ -216,10 +218,11 @@ body {
   grid-template-columns: 1fr 300px;
 }
 
-/* The column carries the surface frame (hairline border, no shadow, same
-   fill as the main surface) itself, so it reads as an empty pane while
-   idle rather than a hole in the layout, and the task pane portaled into
-   it inherits the frame instead of drawing its own. */
+/* The column carries the surface frame (hairline left edge against the
+   main surface, no shadow, same fill as the main surface) itself, so it
+   reads as an empty pane while idle rather than a hole in the layout, and
+   the task pane portaled into it inherits the frame instead of drawing
+   its own. */
 .side-panel {
   display: flex;
   flex-direction: column;
@@ -227,7 +230,7 @@ body {
   min-width: 0;
   overflow: hidden;
   color: var(--text-muted);
-  border: 0.5px solid var(--border-surface);
+  border-left: 0.5px solid var(--border-surface);
   background: var(--surface);
 }
 
