@@ -44,6 +44,7 @@ Migrations: while pre-release, keep exactly one migration file per database (`00
 | [`spec/cli.md`](spec/cli.md) | Commands, local key storage, device bootstrap UX |
 | [`spec/sharing-plan.md`](spec/sharing-plan.md) | Future (not built): multi-doc + sharing design + implementation plan |
 | [`spec/pwa-plan.md`](spec/pwa-plan.md) | PWA conversion plan: manifest, service worker, `/api/session` probe |
+| [`spec/notes-plan.md`](spec/notes-plan.md) | Plan (not built): `notes` / `text` as mergeable `LoroText`, wasm delta bridge, flat rich text, images by reference |
 | [`spec/subtasks-plan.md`](spec/subtasks-plan.md) | Exploration (not built): subtasks as items located under a parent item, lifecycle cascade, "which part is next" rule |
 | [`spec/tui-plan.md`](spec/tui-plan.md) | CLI load-time assessment (measured) + offline compaction fixes + TUI host plan |
 | [`spec/testing.md`](spec/testing.md) | Integration test pattern, CLI driver |
