@@ -1709,7 +1709,13 @@ export function Workspace(props: {
   const applyRoute = (route: Route): void => {
     if (route.kind === "view") {
       // An unknown list (deleted, or from another account) is ignored.
-      if (route.view.kind === "list" && !state.listsById[route.view.id]) return;
+      // The reserved inbox has no ListMeta row, so it is exempt.
+      if (
+        route.view.kind === "list" &&
+        route.view.id !== "inbox" &&
+        !state.listsById[route.view.id]
+      )
+        return;
       batch(() => {
         setOpenItemId(null);
         setView(route.view);
