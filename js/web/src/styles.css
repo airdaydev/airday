@@ -262,8 +262,10 @@ body {
 }
 
 /* The task surface as an inline pane: fills the panel column and scrolls
-   on its own. The column (`.side-panel`) supplies the frame. */
-.task-panel {
+   on its own. The column (`.side-panel`) supplies the frame. Compound
+   selector so this out-specifies the shared `.task-dialog` rule, which
+   is declared later in the file and would otherwise win on source order. */
+.task-dialog.task-panel {
   flex: 1;
   min-height: 0;
   width: auto;
