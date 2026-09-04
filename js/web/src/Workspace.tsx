@@ -1121,24 +1121,20 @@ export function Workspace(props: {
     ...activeLists().map((l) => ({ id: l.id, name: l.name, icon: l.icon })),
   ]);
 
-  // Commit a palette pick: mirrors the drag-into-nav drop above — un-done
-  // and un-bin first, then land as the first items of the target list in
-  // visible order, all one undo step. Picking the view's own list is a
-  // no-op (not a reorder-to-top surprise), matching the task dialog's
-  // picker.
+  // Commit a palette pick: mirrors the drag-into-nav drop above — un-bin
+  // first, then land as the first items of the target list in visible
+  // order, all one undo step. A cross-list move is a relocation only: Done
+  // items stay Done and land in the target's Done lane (`spec/board.md`).
+  // Picking the view's own list is a no-op (not a reorder-to-top
+  // surprise), matching the task dialog's picker.
   const moveBlockToList = (ids: readonly string[], targetListId: string) => {
     const v = view();
     if (v.kind === "list" && v.id === targetListId) return;
-    const toUndone = ids.filter((id) => {
-      const it = app.getItem(id);
-      return it !== undefined && isDone(it);
-    });
     const toUnbin = ids.filter((id) => {
       const it = app.getItem(id);
       return it !== undefined && isBinned(it);
     });
     app.withActionBatch(() => {
-      if (toUndone.length > 0) app.setDoneMany(toUndone, false);
       if (toUnbin.length > 0) app.setBinnedMany(toUnbin, false);
       for (const [i, id] of ids.entries()) {
         app.moveItem(id, targetListId, i);
@@ -1574,16 +1570,14 @@ export function Workspace(props: {
       selection.clear();
       return;
     }
-    const toUndone = idsInOrder.filter((id) => {
-      const it = app.getItem(id);
-      return it !== undefined && isDone(it);
-    });
+    // Relocation only: binned rows are restored into the target (the Bin
+    // is outside the workspace, so "move while binned" has no meaning),
+    // but Done rows stay Done — reopening is the lane drag / un-done key.
     const toUnbin = idsInOrder.filter((id) => {
       const it = app.getItem(id);
       return it !== undefined && isBinned(it);
     });
     app.withActionBatch(() => {
-      if (toUndone.length > 0) app.setDoneMany(toUndone, false);
       if (toUnbin.length > 0) app.setBinnedMany(toUnbin, false);
       for (const [i, id] of idsInOrder.entries()) {
         app.moveItem(id, target.listId, i);

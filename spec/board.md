@@ -92,6 +92,15 @@ the target lane *is* the target state, uniformly:
   the Open order at its preserved entry position (drops naming a position fold
   the reorder in, as above).
 
+Lanes are the state axis; lists are the location axis. A **cross-list move**
+(the `m` palette, the task dialog's list picker, or a drag onto a list in the
+nav) is a relocation only: it never changes lifecycle. A Done item moved to
+another list stays Done and appears in the target's Done lane; reopening it is
+a separate lane drop or un-done. The one exception is a *binned* item, which
+is restored into the target list on move — the Bin is outside the workspace,
+so a move while binned has no meaning (restore reveals the preserved state, so
+a done-then-binned item arrives Done).
+
 ## Capture
 
 - Adding in an **open lane** creates the item directly in that lane's state
