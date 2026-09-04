@@ -93,12 +93,33 @@ not a blocker.
 
 ### Index units
 
-Airday does not enable Loro's `wasm` cargo feature, so every text index in
-core, including inside the web wasm build, is a **Unicode scalar index**.
-Browser editors speak UTF-16. The bridge converts at the wasm boundary
-(`LoroText::convert_pos`, or the `_utf16` method variants where they
-exist; `apply_delta` has no UTF-16 variant, so the Rust bridge walks the
-delta and converts retain / delete lengths against the current text).
+Loro has three index systems for one text: Unicode scalars, UTF-8 bytes,
+and UTF-16 code units. The unqualified methods and the positions inside
+`Diff::Text` events use the "event" unit, which is UTF-16 only when
+`loro-internal`'s `wasm` feature is on. That feature is not forwarded by
+the public `loro` crate (its features are `counter`, `jsonpath`,
+`logging`); it exists for `loro-wasm`, the crate behind the `loro-crdt`
+npm package. Airday depends on `loro`, so in every Airday build, the
+browser wasm included, **core text indices are Unicode scalars**.
+
+Browser editors count UTF-16 code units. The two agree until the first
+emoji or astral-plane character, which is one scalar but two UTF-16 units;
+after it every editor position is off and Loro inserts in the wrong place
+or rejects the op as out of bounds. The bridge converts in one place, on the
+Rust side of the wasm boundary:
+
+- Inbound: use the `_utf16` method variants (`insert_utf16`,
+  `delete_utf16`, `mark_utf16`, `unmark_utf16`, `splice_utf16`).
+  `apply_delta` has no UTF-16 variant, so walk the delta and convert
+  retain / delete lengths with `LoroText::convert_pos` against the current
+  text before applying.
+- Outbound: `Diff::Text` deltas arrive in Unicode units; convert to UTF-16
+  with `convert_pos` against the post-change text before emitting
+  `itemNotesDelta`.
+- The JS adaptor never handles units.
+
+Phase 1 is unaffected because `update` takes a whole string and diffs it
+internally. The unit question arrives with the delta bridge in Phase 2.
 
 ## 2. Core changes (Phase 1, plain text, merge-correct)
 
