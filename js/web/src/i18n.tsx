@@ -132,6 +132,7 @@ export type Messages = {
     searchLists: string;
     /** Placeholder for the standalone move-to-list palette's filter box. */
     moveItem: string;
+    moveItems: string;
     /** Empty state shown when the move-to-list filter excludes every list. */
     noMatchingLists: string;
     /** Tag marking the row for the list an item is already filed under, in
@@ -428,6 +429,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       changeStatus: "Cambiar estado",
       searchLists: "Buscar listas",
       moveItem: "Mover elemento",
+      moveItems: "Mover elementos",
       noMatchingLists: "No hay listas coincidentes",
       currentList: "Actual",
       displayOptions: "Opciones de visualización",
@@ -662,6 +664,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       changeStatus: "Change status",
       searchLists: "Search lists",
       moveItem: "Move item",
+      moveItems: "Move items",
       noMatchingLists: "No matching lists",
       currentList: "Current",
       displayOptions: "Display options",

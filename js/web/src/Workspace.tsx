@@ -2022,6 +2022,7 @@ export function Workspace(props: {
         }}
         options={moveListOptions}
         currentId={moveCurrentId}
+        count={() => moveIds()?.length ?? 0}
         onPick={(listId) => {
           const ids = moveIds();
           if (ids) moveBlockToList(ids, listId);

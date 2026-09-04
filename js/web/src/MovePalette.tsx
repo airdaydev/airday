@@ -31,6 +31,9 @@ export function MovePalette(props: {
    *  Enter straight after opening is a no-op rather than a surprise
    *  move. */
   currentId: () => string | null;
+  /** Number of rows the pick acts on — drives the singular / plural
+   *  placeholder. */
+  count: () => number;
   onPick: (listId: string) => void;
 }) {
   const { m } = useAppI18n();
@@ -151,7 +154,11 @@ export function MovePalette(props: {
                 inputRef = el;
               }}
               type="text"
-              placeholder={m().workspace.moveItem}
+              placeholder={
+                props.count() > 1
+                  ? m().workspace.moveItems
+                  : m().workspace.moveItem
+              }
               aria-label={m().workspace.moveToList}
               value={query()}
               onInput={(e) => {
