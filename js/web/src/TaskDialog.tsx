@@ -726,6 +726,30 @@ export function TaskDialog(props: {
                         {m().workspace.moveToBin}
                       </DropdownMenu.Item>
                     </Show>
+                    {/* Binned items: the bin's two exits live here rather
+                        than as buttons in the body, mirroring the row
+                        context menu. Both close the dialog — the item
+                        either leaves the bin or stops existing. */}
+                    <Show when={isBinned(it())}>
+                      <DropdownMenu.Item
+                        class="dropdown-menu-item"
+                        onSelect={() => {
+                          props.app.setBinnedMany([it().id], false);
+                          props.setItemId(null);
+                        }}
+                      >
+                        {m().common.restore}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        class="dropdown-menu-item"
+                        onSelect={() => {
+                          props.app.deleteBinnedMany([it().id]);
+                          props.setItemId(null);
+                        }}
+                      >
+                        {m().common.delete}
+                      </DropdownMenu.Item>
+                    </Show>
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu>
@@ -805,47 +829,6 @@ export function TaskDialog(props: {
             onPaste={pasteAsPlainText}
             onClick={(e) => openLinkOnClick(e, notesRef)}
           />
-
-          {/* The done stamp lives in the header now; only the bin
-              stamp still needs a meta row. */}
-          <Show when={isBinned(it())}>
-            <div class="task-dialog-meta">
-              <div class="task-dialog-meta-row">
-                <span class="task-dialog-meta-label">
-                  {m().nav.bin}
-                </span>
-                <span>
-                  {formatDialogStamp(it().binnedAt!, nowMs(), locale())}
-                </span>
-              </div>
-            </div>
-          </Show>
-
-          <Show when={isBinned(it())}>
-            <div class="task-dialog-actions">
-              <span class="task-dialog-actions-spacer" />
-              <button
-                type="button"
-                class="task-dialog-btn"
-                onClick={() => {
-                  props.app.setBinnedMany([it().id], false);
-                  props.setItemId(null);
-                }}
-              >
-                {m().common.restore}
-              </button>
-              <button
-                type="button"
-                class="task-dialog-btn destructive"
-                onClick={() => {
-                  props.app.deleteBinnedMany([it().id]);
-                  props.setItemId(null);
-                }}
-              >
-                {m().common.delete}
-              </button>
-            </div>
-          </Show>
 
             </div>
           </div>
