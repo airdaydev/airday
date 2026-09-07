@@ -232,7 +232,7 @@ function DisplayOptionsPopover(props: { children: JSX.Element }) {
       <Tooltip {...guard.tooltip} openDelay={200} closeDelay={0} placement="bottom">
         <Tooltip.Trigger
           as={Popover.Trigger}
-          class="add-button view-mode-trigger"
+          class="icon-button view-mode-trigger"
           tabIndex={-1}
           aria-label={m().workspace.displayOptions}
           innerHTML={mixerHzSvg}
@@ -2285,7 +2285,7 @@ export function Workspace(props: {
             </Show>
           </h1>
             <Show when={archivedViewListId()}>
-              <span class="badge">{m().nav.archived}</span>
+              <span class="badge archived-badge">{m().nav.archived}</span>
             </Show>
           </div>
           <div class="main-header-actions">
@@ -2317,7 +2317,7 @@ export function Workspace(props: {
               {(listId) => (
                 <DropdownMenu>
                   <DropdownMenu.Trigger
-                    class="nav-menu-trigger"
+                    class="icon-button"
                     tabIndex={-1}
                     aria-label={m().common.menu}
                     innerHTML={dotsHorizontalSvg}
@@ -2471,7 +2471,7 @@ export function Workspace(props: {
                 <Tooltip.Trigger
                   as="button"
                   type="button"
-                  class="add-button"
+                  class="icon-button header-add-button"
                   tabIndex={-1}
                   aria-label={m().workspace.log}
                   onClick={() =>
@@ -2514,7 +2514,7 @@ export function Workspace(props: {
               <Tooltip.Trigger
                 as="button"
                 type="button"
-                class="add-button"
+                class="icon-button header-add-button"
                 tabIndex={-1}
                 onClick={(e) => {
                   // The dnd controller has a document-level click listener
@@ -2687,7 +2687,7 @@ export function Workspace(props: {
             <header class="side-panel-blank">
               <button
                 type="button"
-                class="nav-menu-trigger"
+                class="icon-button"
                 aria-label={m().sidePanel.hide}
                 onClick={() => setSidePanelOpen(false)}
                 innerHTML={sidebarRightSvg}

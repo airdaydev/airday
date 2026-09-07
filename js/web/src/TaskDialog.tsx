@@ -536,7 +536,7 @@ export function TaskDialog(props: {
       <Show when={!isMobile() && props.onSwapShell}>
         <button
           type="button"
-          class="nav-menu-trigger"
+          class="icon-button"
           aria-label={
             panelMode() ? m().sidePanel.toModal : m().sidePanel.toPanel
           }
@@ -547,7 +547,7 @@ export function TaskDialog(props: {
       <Show when={!panelMode()}>
         <button
           type="button"
-          class="task-dialog-close"
+          class="icon-button task-dialog-close"
           aria-label={m().common.close}
           onClick={close}
         >
@@ -690,7 +690,7 @@ export function TaskDialog(props: {
             <div class="task-dialog-header-actions">
               <DropdownMenu>
                 <DropdownMenu.Trigger
-                  class="nav-menu-trigger"
+                  class="icon-button"
                   aria-label={m().common.menu}
                   innerHTML={dotsVerticalSvg}
                 />

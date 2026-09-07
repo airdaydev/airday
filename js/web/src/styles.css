@@ -481,32 +481,54 @@ body {
   margin-bottom: 8px;
 }
 
-.nav-menu-trigger {
+/* The one square icon button on desktop: the nav footer menu, the list
+   header's menu / display options / add, the list-icon picker, the side
+   panel's hide button and the task surface's swap / menu / close. Marker
+   classes beside it (`view-mode-trigger`, `list-icon-trigger`,
+   `task-dialog-close`, `header-add-button`) carry no desktop styling of
+   their own; the mobile media queries below re-size some instances to
+   thumb scale. */
+.icon-button {
+  appearance: none;
+  -webkit-appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  padding: 6px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: 0;
+  border-radius: 6px;
   background: transparent;
   color: var(--text-muted);
-  border-radius: 4px;
+  font: inherit;
   cursor: pointer;
 }
 
-.nav-menu-trigger:hover {
+.icon-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-button:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-.nav-menu-trigger[data-expanded] {
+.icon-button[data-expanded] {
   background: var(--bg-active);
   color: var(--text);
 }
 
-.nav-menu-trigger:focus-visible {
+.icon-button:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: 1px;
+}
+
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .nav-section {
@@ -728,7 +750,14 @@ body {
 .main-header-title {
   display: flex;
   align-items: center;
+  gap: 2px;
   min-width: 0;
+}
+
+/* The archived marker sits a touch further from the title than the
+   flex gap alone gives. */
+.main-header-title .archived-badge {
+  margin-left: 2px;
 }
 
 .editable-title {
@@ -770,19 +799,8 @@ body {
   gap: 2px;
 }
 
-.header-group:not(:has(.add-button)) {
+.header-group:not(:has(.icon-button)) {
   display: none;
-}
-
-.header-group .add-button {
-  box-shadow: none;
-  border-radius: 8px;
-  padding: 4px;
-}
-
-.header-group .add-button svg {
-  width: 16px;
-  height: 16px;
 }
 
 .add-button-icon {
@@ -820,7 +838,7 @@ body {
   /* The bottom bar carries Add on mobile, so the header drops its own.
      Display options stays: it has no other home on a phone and sits to
      the right of the title in the header's glass bubble. */
-  .main-header .add-button:not(.view-mode-trigger) {
+  .main-header .header-add-button {
     display: none;
   }
 
@@ -1390,8 +1408,8 @@ input.task-check:hover {
 
 /* Board/list view-mode switcher: the display-options trigger in the header
    opens a popover with a segmented control (reusing .theme-segment*). The
-   trigger itself is styled by `.header-group .add-button` on desktop and
-   by the mobile glass-disc rules below. */
+   trigger itself is a plain `.icon-button` on desktop and styled by the
+   mobile glass-disc rules below. */
 .view-mode-popover {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -1419,37 +1437,16 @@ input.task-check:hover {
 }
 
 /* ---- list-icon picker (header) ---- */
-.list-icon-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.list-icon-trigger:hover {
-  background: var(--bg-hover);
-}
-
+/* The trigger is a plain `.icon-button`; only the emoji glyph needs a
+   size of its own. */
 .list-icon-emoji {
   font-size: 18px;
   line-height: 1;
 }
 
-.list-icon-trigger svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* Static counterpart to `.list-icon-trigger` for reserved views whose
-   icon is fixed and not user-editable (Focus, Home, Done, Bin). */
+/* Static counterpart to the list-icon trigger for reserved views whose
+   icon is fixed and not user-editable (Focus, Home, Done, Bin). Same
+   28px box as `.icon-button` so the title sits at the same x either way. */
 .list-icon-static {
   display: inline-flex;
   align-items: center;
@@ -2390,28 +2387,6 @@ input.task-check:hover {
   color: var(--text-faint);
 }
 
-.task-dialog-close {
-  appearance: none;
-  -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  font: inherit;
-}
-
-.task-dialog-close:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
 /* Content column: the title, notes, badges, metadata and actions all
    share one left edge. The checkbox lives in the header, on its own line
    above the title. */
@@ -2827,8 +2802,7 @@ input.task-check:hover {
     gap: 6px;
   }
 
-  .task-dialog-header .task-dialog-close,
-  .task-dialog-header .nav-menu-trigger {
+  .task-dialog-header .icon-button {
     width: 40px;
     height: 40px;
     padding: 0;
@@ -2841,13 +2815,12 @@ input.task-check:hover {
     font-size: 20px;
   }
 
-  .task-dialog-header .nav-menu-trigger svg {
+  .task-dialog-header .icon-button svg {
     width: 22px;
     height: 22px;
   }
 
-  .task-dialog-header .task-dialog-close:active,
-  .task-dialog-header .nav-menu-trigger:active {
+  .task-dialog-header .icon-button:active {
     transform: scale(0.92);
     background: rgba(127, 127, 127, 0.18);
   }
@@ -3616,8 +3589,7 @@ input.task-check:hover {
     -webkit-tap-highlight-color: transparent;
   }
 
-  .main-header .header-group .nav-menu-trigger,
-  .main-header .header-group .view-mode-trigger {
+  .main-header .header-group .icon-button {
     width: 36px;
     height: 36px;
     padding: 0;
@@ -3628,14 +3600,12 @@ input.task-check:hover {
     transition: transform 0.1s ease, background 0.15s ease;
   }
 
-  .main-header .header-group .nav-menu-trigger svg,
-  .main-header .header-group .view-mode-trigger svg {
+  .main-header .header-group .icon-button svg {
     width: 18px;
     height: 18px;
   }
 
-  .main-header .header-group .nav-menu-trigger:active,
-  .main-header .header-group .view-mode-trigger:active {
+  .main-header .header-group .icon-button:active {
     transform: scale(0.92);
     background: rgba(127, 127, 127, 0.18);
   }

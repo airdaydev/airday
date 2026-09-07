@@ -787,7 +787,7 @@ export function NavMenu(props: {
         <Tooltip openDelay={200} closeDelay={0} placement="top">
           <Tooltip.Trigger
             as={DropdownMenu.Trigger}
-            class="nav-menu-trigger"
+            class="icon-button"
             tabIndex={-1}
             aria-label={m().common.menu}
             innerHTML={dotsVerticalSvg}
