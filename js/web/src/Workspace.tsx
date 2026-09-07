@@ -1747,7 +1747,14 @@ export function Workspace(props: {
         return;
       batch(() => {
         setOpenItemId(null);
-        setView(route.view);
+        // Only switch when the route names a different view. Closing an
+        // explicitly opened item pops the history entry it pushed, and
+        // that popstate routes back to the view already on screen: a
+        // fresh `ViewKey` object for the same view would still trip the
+        // view-change effect (selection cleared, draft dropped), which is
+        // how Enter-to-close in the list view used to lose the row's
+        // selection. Board selections live inside Board and never saw it.
+        if (viewKey(route.view) !== viewKey(untrack(view))) setView(route.view);
       });
       return;
     }
@@ -1797,14 +1804,15 @@ export function Workspace(props: {
     if (closed && !viewChanged && history.state?.airdayItem === true) {
       if (passive) {
         // A selection-driven close (the side panel swapping to its
-        // multi-select surface) stays on this entry: popping would
-        // re-apply the view, which clears the selection that caused it.
-        // Drop the marker so a later close doesn't pop for it either;
-        // the spare entry is inert (Back re-lands on the same view).
+        // multi-select surface) stays on this entry rather than popping
+        // it mid-interaction. Drop the marker so a later close doesn't
+        // pop for it either; the spare entry is inert (Back re-lands on
+        // the same view).
         history.replaceState(null, "", hash);
         return;
       }
-      // The popstate handler re-applies the view we're already on.
+      // The popstate handler sees the view we're already on and leaves
+      // it (and the selection) alone.
       history.back();
       return;
     }
@@ -2030,9 +2038,8 @@ export function Workspace(props: {
     // the topmost row explicitly over it, until the selection next moves.
     if (multiSelectIds() !== null) {
       if (untrack(openItemId) !== null) {
-        // Passive, like the opens: the address-bar mirror must replace
-        // rather than pop, since a popstate re-applies the view and that
-        // clears the very selection being acted on.
+        // Passive, like the opens: the address-bar mirror replaces
+        // rather than pops, so the entry stays put mid-interaction.
         batch(() => {
           setPendingItemId(null);
           setOpenPassive(true);
