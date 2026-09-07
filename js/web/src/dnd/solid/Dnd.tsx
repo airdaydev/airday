@@ -115,6 +115,15 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     return m;
   });
 
+  // Key of the final item in logical order. Exposed as `data-last` on the
+  // item wrapper so CSS can drop the trailing divider: DOM order is
+  // insertion-stable (see renderKeys) and the window is virtualized, so
+  // `:last-child` does not identify the last row.
+  const lastKey = createMemo<Key | null>(() => {
+    const items = props.items;
+    return items.length > 0 ? props.getKey(items[items.length - 1]) : null;
+  });
+
   let controller: DndController | null = null;
   let source: DndSource<T> | null = null;
   let syncingControlledExpanded = false;
@@ -478,6 +487,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
               const selFirst = createMemo(() => state()?.selFirst ?? false);
               const selLast = createMemo(() => state()?.selLast ?? false);
               const hidden = createMemo(() => state()?.hidden ?? false);
+              const last = createMemo(() => lastKey() === key);
               const top = createMemo(() => state()?.top ?? 0);
               const height = createMemo(
                 () => state()?.height ?? props.itemHeight ?? 32,
@@ -498,6 +508,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
                   data-selected={selected() ? "" : undefined}
                   data-sel-first={selFirst() ? "" : undefined}
                   data-sel-last={selLast() ? "" : undefined}
+                  data-last={last() ? "" : undefined}
                   aria-selected={selected() ? "true" : "false"}
                   draggable={isNative()}
                   onDragStart={(e) => {

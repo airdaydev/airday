@@ -910,6 +910,16 @@ body {
   transition: 0.2s opacity;
 }
 
+/* The final row in a list has nothing beneath it to divide from. Colour,
+   not width, so the row's box (and the virtualizer's fixed row height) is
+   unchanged. `data-last` is set by the dnd host on the last item's wrapper;
+   `:last-child` is unreliable there because DOM order is insertion-stable
+   and the window is virtualized. `.row-card` (board lanes) draws a full
+   border, so its last card keeps its bottom edge. */
+.dnd-item[data-last] .row:not(.row-card) {
+  border-bottom-color: transparent;
+}
+
 [data-density="compact"] .row {
   padding: 6px;
   border-bottom: 0;
