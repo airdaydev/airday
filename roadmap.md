@@ -78,3 +78,4 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 - habit tracking?!
 - foreign keyboard shortcuts?
 - indexeddb smoke tests? do we have an in-mem storage adapter? via playwright?
+- dependency/dependent links? e.g. "blocked by", "solved by", "duplicate of"

@@ -272,11 +272,22 @@ body {
   max-height: none;
   /* Tighter than the modal's 12px: the pane is narrow, so give the
      text the width back. */
-  padding: 8px;
+  padding: 8px 12px;
 }
 
 .task-panel .task-dialog-title {
   font-size: 1.25em;
+  /* Padding lives on the base rule so focusing does not shift the
+     text; only the surface colour changes. */
+  padding: 2px;
+  background: transparent;
+  border-radius: 3px;
+}
+
+/* Editing state: a light field surface so the pane title reads as
+   editable while it holds focus. */
+.task-panel .task-dialog-title:focus {
+  background: var(--bg-badge);
 }
 
 /* Fixed-height hosts (the side pane, the mobile page): let the notes
