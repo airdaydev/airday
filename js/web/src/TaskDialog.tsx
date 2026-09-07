@@ -410,6 +410,28 @@ export function TaskDialog(props: {
     props.setItemId(null);
   };
 
+  // Side pane capture: the pane is non-modal, so there's no overlay to
+  // catch a click-away. Pointing anywhere else in the app (a row, the
+  // nav, the board) commits the capture like Enter / Escape do, rather
+  // than leaving a half-typed item stranded in the pane. Portaled layers
+  // (the lifecycle / deadline menus, the list picker) live outside the
+  // app root, so opening or clicking inside them doesn't count as leaving.
+  let shellRef: HTMLElement | undefined;
+  createEffect(() => {
+    if (!panelMode() || !isNew()) return;
+    const root = document.getElementById("root");
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (!target || !root?.contains(target)) return;
+      if (shellRef?.contains(target)) return;
+      commitNew();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    onCleanup(() =>
+      document.removeEventListener("pointerdown", onPointerDown, true),
+    );
+  });
+
   // Title/notes keyboard nav, shared by the edit and new-item forms. The
   // editors are contenteditable, so "caret at start/end" is derived from
   // the collapsed selection offset rather than textarea selection props.
@@ -885,6 +907,7 @@ export function TaskDialog(props: {
           <Show when={open()}>
             <Portal mount={host()}>
               <section
+                ref={shellRef}
                 class="task-dialog task-panel"
                 role="region"
                 aria-label={m().common.close}
