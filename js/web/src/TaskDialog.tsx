@@ -513,7 +513,12 @@ export function TaskDialog(props: {
 
   // Cmd/Ctrl+Enter anywhere in the surface = save & close. The non-modal
   // shells (mobile page, side pane) also take Escape, which Kobalte
-  // handles for the dialog.
+  // handles for the dialog. In the side pane Escape on an existing item
+  // steps out rather than closing: the edit is flushed and focus returns
+  // to the list with the row still selected, so the pane keeps showing
+  // it. A second Escape on the list clears the selection, and the
+  // workspace closes the pane behind it. A capture in the pane still
+  // closes (there's no item to stay on yet), as does the mobile page.
   const onShellKeyDown = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
@@ -523,14 +528,20 @@ export function TaskDialog(props: {
     if (e.key === "Escape" && (isMobile() || panelMode())) {
       e.preventDefault();
       e.stopPropagation();
+      if (panelMode() && !isNew()) {
+        flush(loadedId);
+        props.onReleaseFocus?.();
+        return;
+      }
       close();
     }
   };
 
   // Header buttons shared by the new-item and edit forms: the shell swap
   // (desktop only) and the close ✕. The panel shell drops the ✕ — the
-  // pane is dismissed by Escape or by leaving the selection, and the
-  // swap button stands in the corner instead.
+  // pane is dismissed by leaving the selection (Escape steps out to the
+  // list first, and a second Escape clears it), and the swap button
+  // stands in the corner instead.
   const shellButtons = () => (
     <>
       <Show when={!isMobile() && props.onSwapShell}>
