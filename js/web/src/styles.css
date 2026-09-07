@@ -323,11 +323,15 @@ body {
   color: var(--error-text);
 }
 
-/* Clear selection: set apart from the mutations by a hairline. */
-.selection-panel-clear {
-  margin-top: 8px;
-  padding-top: 10px;
+/* Hairline between the mutations and Clear selection. */
+.selection-panel-rule {
+  width: 100%;
+  margin: 8px 0;
+  border: 0;
   border-top: 0.5px solid var(--border-surface);
+}
+
+.selection-panel-clear {
   color: var(--text-muted);
 }
 

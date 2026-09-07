@@ -59,6 +59,7 @@ export function SelectionPanel(props: {
           )}
         </For>
       </div>
+      <hr class="selection-panel-rule" />
       <button
         type="button"
         class="selection-panel-action selection-panel-clear"
