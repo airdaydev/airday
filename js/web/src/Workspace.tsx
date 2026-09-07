@@ -55,6 +55,7 @@ import { isOverlayOpen, onGlobalKey } from "./overlay.ts";
 import type { ViewKey } from "./prefs.ts";
 import { Row, DRAFT_ID_PREFIX } from "./Row.tsx";
 import { planReorderMoves } from "./reorder.ts";
+import { SelectionPanel, type SelectionAction } from "./SelectionPanel.tsx";
 import { Settings } from "./Settings.tsx";
 import { ShortcutsDialog } from "./ShortcutsDialog.tsx";
 import { TaskDialog } from "./TaskDialog.tsx";
@@ -979,22 +980,29 @@ export function Workspace(props: {
     return visibleSet;
   };
 
-  // Delete / Backspace on the active view: bin live or done items, hard-
-  // delete binned ones. Skip when focus is inside an editable surface so
-  // the AddForm, row edit, and list rename keep their native behaviour.
-  const onDeleteKey = (e: KeyboardEvent) => {
-    if (e.key !== "Delete" && e.key !== "Backspace") return;
+  // The active selection's ids, filtered to what's actually on screen
+  // (visible order). `boardDone` also admits the board's Done-lane cards
+  // (see `withBoardDone`); the Focus toggle leaves them out since a done
+  // item can't be pinned. Empty when nothing's selected.
+  const selectedVisibleIds = (boardDone: boolean): string[] => {
     const sel = actionSelection();
-    if (!sel) return;
-    const v = view();
-    const visibleIds = items().map((it) => it.id);
-    const visibleSet = withBoardDone(new Set(visibleIds));
-    const ids = sel
+    if (!sel) return [];
+    const visible = new Set(items().map((it) => it.id));
+    const visibleSet = boardDone ? withBoardDone(visible) : visible;
+    return sel
       .getSelectedKeys()
       .map(String)
       .filter((id) => visibleSet.has(id));
-    if (ids.length === 0) return;
-    e.preventDefault();
+  };
+
+  // Bin live or done items, hard-delete binned ones (the Bin view), then
+  // move the selection onto a survivor. Shared by ⌫ and the side panel's
+  // multi-select actions; `ids` are already visibility-filtered.
+  const binOrDeleteIds = (ids: string[]) => {
+    const sel = actionSelection();
+    if (!sel || ids.length === 0) return;
+    const v = view();
+    const visibleIds = items().map((it) => it.id);
     const deleteSet = new Set(ids);
     // Pick the survivor to focus next: first surviving id after the
     // bottom-most deleted row, else the new last surviving id.
@@ -1034,57 +1042,78 @@ export function Workspace(props: {
       queueMicrotask(() => sel.selectOnly(target));
     }
   };
+
+  // Delete / Backspace on the active view: bin live or done items, hard-
+  // delete binned ones. Skip when focus is inside an editable surface so
+  // the AddForm, row edit, and list rename keep their native behaviour.
+  const onDeleteKey = (e: KeyboardEvent) => {
+    if (e.key !== "Delete" && e.key !== "Backspace") return;
+    const ids = selectedVisibleIds(true);
+    if (ids.length === 0) return;
+    e.preventDefault();
+    binOrDeleteIds(ids);
+  };
   onGlobalKey(onDeleteKey);
+
+  // Every id resolves to a done item. False for an empty set.
+  const allDoneIds = (ids: string[]): boolean =>
+    ids.length > 0 &&
+    ids.every((id) => {
+      const it = app.getItem(id);
+      return it !== undefined && isDone(it);
+    });
+
+  // Toggle done on `ids`. Direction follows the group: any not-done →
+  // mark all done, only flip back to not-done when every item is already
+  // done. Shared by `x` and the side panel's multi-select actions.
+  const toggleDoneIds = (ids: string[]) => {
+    if (ids.length === 0) return;
+    const allDone = allDoneIds(ids);
+    if (allDone && view().kind === "focus") app.undoneIntoFocus(ids);
+    else app.setDoneMany(ids, !allDone);
+  };
 
   // x: toggle done on the current selection. Mirrors the row checkbox and
   // the context menu's Mark done / Mark not done. Skip when focus is in an
   // editable surface so a literal "x" typed into a row/AddForm lands as
-  // text. Toggle direction follows the group: any not-done → mark all done,
-  // only flip back to not-done when every selected item is already done.
+  // text. Includes the board's Done-lane cards so x on one un-does it
+  // (back to Backlog — the core's undone rule, not the prior state).
   const onToggleDoneKey = (e: KeyboardEvent) => {
     if (e.key !== "x" && e.key !== "X") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-    const sel = actionSelection();
-    if (!sel) return;
-    // Include the board's Done-lane cards so x on one un-does it (back to
-    // Backlog — the core's undone rule, not the prior state).
-    const visibleSet = withBoardDone(new Set(items().map((it) => it.id)));
-    const ids = sel
-      .getSelectedKeys()
-      .map(String)
-      .filter((id) => visibleSet.has(id));
+    const ids = selectedVisibleIds(true);
     if (ids.length === 0) return;
     e.preventDefault();
-    const allDone = ids.every((id) => {
-      const it = app.getItem(id);
-      return it !== undefined && isDone(it);
-    });
-    if (allDone && view().kind === "focus") app.undoneIntoFocus(ids);
-    else app.setDoneMany(ids, !allDone);
+    toggleDoneIds(ids);
   };
   onGlobalKey(onToggleDoneKey);
 
+  // Every id is in the Focus lens. False for an empty set.
+  const allFocusedIds = (ids: string[]): boolean => {
+    if (ids.length === 0) return false;
+    const focusedSet = new Set(app.state.focusOrder);
+    return ids.every((id) => focusedSet.has(id));
+  };
+
+  // Toggle Focus on `ids`. Direction follows the group like toggle-done:
+  // any not-focused → add all (the core skips ids that are already
+  // focused or not Open), only remove when every item is already in the
+  // Focus lens. Shared by `f` and the side panel's multi-select actions.
+  const toggleFocusIds = (ids: string[]) => {
+    if (ids.length === 0) return;
+    if (allFocusedIds(ids)) app.removeFromFocusMany(ids);
+    else app.addToFocusMany(ids);
+  };
+
   // f: toggle Focus on the current selection. Mirrors the row context
-  // menu's Add to focus / Remove from focus. Direction follows the group
-  // like toggle-done: any not-focused → add all (the core skips ids that
-  // are already focused or not Open), only remove when every selected item
-  // is already in the Focus lens.
+  // menu's Add to focus / Remove from focus.
   const onToggleFocusKey = (e: KeyboardEvent) => {
     if (e.key !== "f" && e.key !== "F") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-    const sel = actionSelection();
-    if (!sel) return;
-    const visibleSet = new Set(items().map((it) => it.id));
-    const ids = sel
-      .getSelectedKeys()
-      .map(String)
-      .filter((id) => visibleSet.has(id));
+    const ids = selectedVisibleIds(false);
     if (ids.length === 0) return;
     e.preventDefault();
-    const focusedSet = new Set(app.state.focusOrder);
-    const allFocused = ids.every((id) => focusedSet.has(id));
-    if (allFocused) app.removeFromFocusMany(ids);
-    else app.addToFocusMany(ids);
+    toggleFocusIds(ids);
   };
   onGlobalKey(onToggleFocusKey);
 
@@ -1766,6 +1795,15 @@ export function Workspace(props: {
     const opened = prev.item === null && item !== null;
     const closed = prev.item !== null && item === null;
     if (closed && !viewChanged && history.state?.airdayItem === true) {
+      if (passive) {
+        // A selection-driven close (the side panel swapping to its
+        // multi-select surface) stays on this entry: popping would
+        // re-apply the view, which clears the selection that caused it.
+        // Drop the marker so a later close doesn't pop for it either;
+        // the spare entry is inert (Back re-lands on the same view).
+        history.replaceState(null, "", hash);
+        return;
+      }
       // The popstate handler re-applies the view we're already on.
       history.back();
       return;
@@ -1881,6 +1919,99 @@ export function Workspace(props: {
       onCleanup(sel.onChange(setSelectionTick));
     }),
   );
+  // A multi-row selection: the visible ids of the active selection while
+  // it spans more than one row, else null. The side panel shows its bulk
+  // actions surface (`SelectionPanel`) for it in place of a single item.
+  // Tracks `selectionTick` (every block mutation) plus the view's rows, so
+  // it re-derives once rows the actions removed have left the list.
+  const multiSelectIds = createMemo((): string[] | null => {
+    const sel = selectionTick();
+    if (!sel || sel !== actionSelection()) return null;
+    const ids = selectedVisibleIds(true);
+    return ids.length > 1 ? ids : null;
+  });
+
+  // Bulk actions for that selection, mirroring the row context menu's
+  // multi-target entries (same labels, same shortcut hints) for the view
+  // the rows are in: Bin rows restore / delete, everything else toggles
+  // done / focus, re-dates, moves, copies, duplicates or bins. Each action
+  // closes over the ids it was built for, so it still acts on what the
+  // user saw even if the selection shifts underfoot.
+  const multiSelectActions = createMemo((): SelectionAction[] => {
+    const ids = multiSelectIds();
+    if (!ids) return [];
+    const msgs = m();
+    const kind = view().kind;
+    if (kind === "bin") {
+      return [
+        {
+          label: msgs.common.restore,
+          run: () => app.setBinnedMany(ids, false),
+        },
+        { label: msgs.common.copy, shortcut: "⌘C", run: () => copyBlock(ids) },
+        {
+          label: msgs.common.delete,
+          shortcut: "⌫",
+          destructive: true,
+          run: () => binOrDeleteIds(ids),
+        },
+      ];
+    }
+    const openIds = ids.filter((id) => {
+      const it = app.getItem(id);
+      return it !== undefined && isOpen(it);
+    });
+    const out: SelectionAction[] = [
+      {
+        label: allDoneIds(ids) ? msgs.workspace.markNotDone : msgs.workspace.markDone,
+        shortcut: "X",
+        run: () => toggleDoneIds(ids),
+      },
+    ];
+    // Focus membership: pin / unpin from a list or board (open rows only,
+    // like the row menu's `canPinToFocus`); the Focus lens itself only
+    // ever removes.
+    if (kind === "list" && openIds.length > 0) {
+      out.push({
+        label: allFocusedIds(openIds) ? msgs.focus.remove : msgs.focus.add,
+        shortcut: "F",
+        run: () => toggleFocusIds(openIds),
+      });
+    } else if (kind === "focus") {
+      out.push({
+        label: msgs.focus.remove,
+        shortcut: "F",
+        run: () => app.removeFromFocusMany(ids),
+      });
+    }
+    // Deadlines only matter while an item is open (the row badge and menu
+    // entry hide for done rows too).
+    if (openIds.length > 0) {
+      out.push({
+        label: msgs.deadline.setDate,
+        run: () => openDeadlineCalendar(openIds, null),
+      });
+    }
+    out.push(
+      { label: msgs.common.move, shortcut: "M", run: () => openMovePalette(ids) },
+      { label: msgs.common.copy, shortcut: "⌘C", run: () => copyBlock(ids) },
+    );
+    if (openIds.length > 0) {
+      out.push({
+        label: msgs.workspace.duplicate,
+        shortcut: "⌘D",
+        run: () => duplicateBlock(openIds),
+      });
+    }
+    out.push({
+      label: msgs.workspace.moveToBin,
+      shortcut: "⌫",
+      destructive: true,
+      run: () => binOrDeleteIds(ids),
+    });
+    return out;
+  });
+
   let panelWasShown = untrack(sidePanelShown);
   createEffect(() => {
     const shown = sidePanelShown();
@@ -1893,6 +2024,23 @@ export function Workspace(props: {
     // selection change pulls the panel along.
     if (justShown && untrack(openItemId) !== null) return;
     if (sel !== untrack(actionSelection)) return;
+    // Growing to a multi-row selection hands the panel to the bulk
+    // actions surface: close the single item it was showing (the load
+    // effect settles its pending edits on the way out). Enter still opens
+    // the topmost row explicitly over it, until the selection next moves.
+    if (multiSelectIds() !== null) {
+      if (untrack(openItemId) !== null) {
+        // Passive, like the opens: the address-bar mirror must replace
+        // rather than pop, since a popstate re-applies the view and that
+        // clears the very selection being acted on.
+        batch(() => {
+          setPendingItemId(null);
+          setOpenPassive(true);
+          setOpenItemIdRaw(null);
+        });
+      }
+      return;
+    }
     const top = sel.getSelectionTop();
     if (top === null) return;
     const id = String(top);
@@ -2545,6 +2693,18 @@ export function Workspace(props: {
                 innerHTML={sidebarRightSvg}
               />
             </header>
+            {/* Multi-row selection: the count and the bulk actions stand
+                in for the task surface until the selection is back to
+                one row (or an explicit Enter opens the topmost). */}
+            <Show when={multiSelectIds()}>
+              {(ids) => (
+                <SelectionPanel
+                  count={ids().length}
+                  actions={multiSelectActions()}
+                  onClear={() => actionSelection()?.clear()}
+                />
+              )}
+            </Show>
           </Show>
           {/* The task surface portals in here while an item is open (see
               TaskDialog's `panelMount`). The div stays mounted so the

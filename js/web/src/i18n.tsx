@@ -252,6 +252,12 @@ export type Messages = {
     hide: string;
     toPanel: string;
     toModal: string;
+    /** Panel heading while more than one row is selected (`n` ≥ 2). */
+    selectedCount: (n: number) => string;
+    /** Accessible name of the bulk-action group under that heading. */
+    selectionActions: string;
+    /** Bulk-action button that drops the whole selection. */
+    clearSelection: string;
   };
   order: {
     /** Submenu label for the item-ordering actions. */
@@ -500,6 +506,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       hide: "Ocultar barra de contexto",
       toPanel: "Abrir en la barra de contexto",
       toModal: "Abrir como diálogo",
+      selectedCount: (n) => `${n} elementos seleccionados`,
+      selectionActions: "Acciones sobre la selección",
+      clearSelection: "Deseleccionar",
     },
     order: {
       label: "Ordenar",
@@ -735,6 +744,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       hide: "Hide context sidebar",
       toPanel: "Open in context sidebar",
       toModal: "Open as dialog",
+      selectedCount: (n) => `${n} items selected`,
+      selectionActions: "Selection actions",
+      clearSelection: "Clear selection",
     },
     order: {
       label: "Order",

@@ -260,12 +260,75 @@ body {
 }
 
 /* Blank panel: the sidebar button sits where the task surface's header
-   buttons land (same 8px inset as `.task-panel`), so it doesn't jump. */
+   buttons land (same 8px 12px inset as `.task-panel`), so it doesn't jump. */
 .side-panel-blank {
   display: flex;
   justify-content: flex-end;
   flex-shrink: 0;
-  padding: 8px;
+  padding: 8px 12px;
+}
+
+/* Multi-select surface (`SelectionPanel.tsx`): sits under the blank
+   header, matching the task pane's 12px side inset. The actions read as
+   a menu (same row shape and shortcut chips as `.context-menu-item`) but
+   are plain buttons, always visible, so the bulk action is one click. */
+.selection-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0 12px 12px;
+  overflow-y: auto;
+  color: var(--text);
+}
+
+.selection-panel-title {
+  margin: 0 0 12px;
+  padding: 2px;
+  font-size: 1.25em;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.selection-panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.selection-panel-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.selection-panel-action:hover,
+.selection-panel-action:focus-visible {
+  background: var(--bg-active);
+  outline: none;
+}
+
+.selection-panel-action.destructive {
+  color: var(--error-text);
+}
+
+/* Clear selection: set apart from the mutations by a hairline. */
+.selection-panel-clear {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 0.5px solid var(--border-surface);
+  color: var(--text-muted);
 }
 
 /* The task surface as an inline pane: fills the panel column and scrolls
