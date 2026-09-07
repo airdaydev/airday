@@ -480,21 +480,37 @@ export function Board(props: {
   let boardRef: HTMLDivElement | undefined;
 
   // ArrowLeft / ArrowRight: hop the selection to the nearest lane in that
-  // direction that holds cards, keeping the same vertical slot (clamped to
-  // the target lane's length). Lanes render in the fixed ladder order
-  // (visible ones only). No wrap — left/right is spatial. Empty lanes are
-  // skipped (nothing to land on); with nothing selected, → enters at the
-  // first non-empty lane and ← at the last.
+  // direction that holds cards, landing on the card at the same *screen*
+  // height as the current one (clamped to the target lane's length). Lanes
+  // render in the fixed ladder order (visible ones only). No wrap —
+  // left/right is spatial. Empty lanes are skipped (nothing to land on);
+  // with nothing selected, → enters at the first non-empty lane and ← at
+  // the last.
+  //
+  // Matching by screen height rather than by slot index is what keeps the
+  // hop from scrolling: two lanes scrolled to different offsets put slot N
+  // at different heights, so landing on the target's slot N would drag its
+  // viewport to wherever that card happens to be. Every lane's listbox
+  // lays card N out at N × CARD_HEIGHT from its own top (the board never
+  // expands cards), so the listboxes' viewport offsets are the whole story.
   const orderedLaneKeys = (): WorkflowState[] => [
     ...visibleOpen(),
     ...(doneVisible() ? [DONE_LANE] : []),
   ];
+  const laneListboxTop = (laneKey: WorkflowState): number | null => {
+    const el = boardRef?.querySelector(
+      `[data-drop-column-id="${laneKey}"] [role="listbox"]`,
+    );
+    return el ? el.getBoundingClientRect().top : null;
+  };
   const jumpLane = (dir: -1 | 1): void => {
     const order = orderedLaneKeys();
     const active = activeSelection();
-    // Locate the active lane and the caret's vertical slot within it.
+    // Locate the active lane, the caret's slot within it, and the caret
+    // card's vertical midpoint on screen.
     let curIdx = dir === 1 ? -1 : order.length;
     let curPos = 0;
+    let curMidY: number | null = null;
     if (active) {
       for (const [laneKey, sel] of laneSelections) {
         if (sel !== active) continue;
@@ -502,6 +518,10 @@ export function Board(props: {
         const ids = membersOf(laneKey).map((it) => it.id);
         const top = active.getSelectionTop();
         curPos = top != null ? Math.max(0, ids.indexOf(String(top))) : 0;
+        const listboxTop = laneListboxTop(laneKey);
+        if (listboxTop != null) {
+          curMidY = listboxTop + (curPos + 0.5) * CARD_HEIGHT;
+        }
         break;
       }
     }
@@ -509,7 +529,15 @@ export function Board(props: {
       const laneKey = order[i];
       const ids = membersOf(laneKey).map((it) => it.id);
       if (ids.length === 0) continue;
-      const key = ids[Math.min(curPos, ids.length - 1)];
+      // Prefer the card under the caret's midpoint in the target lane's
+      // own scrolled frame; fall back to the slot index when there's no
+      // geometry to read (no active lane, or a lane not yet laid out).
+      let pos = curPos;
+      const targetTop = curMidY == null ? null : laneListboxTop(laneKey);
+      if (curMidY != null && targetTop != null) {
+        pos = Math.floor((curMidY - targetTop) / CARD_HEIGHT);
+      }
+      const key = ids[Math.max(0, Math.min(pos, ids.length - 1))];
       const sel = selectionFor(laneKey);
       sel.updateOrder(ids);
       // Selecting here clears the other lanes via selectionFor's onChange.
