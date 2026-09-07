@@ -480,7 +480,10 @@ export function Row(props: {
         />
         <Show when={leadingStamp() && rowStamp()}>
           {(ts) => (
-            <span class="badge row-timestamp" title={formatDateTime(ts(), locale())}>
+            <span
+              class="row-timestamp row-timestamp-lead"
+              title={formatDateTime(ts(), locale())}
+            >
               {formatDoneStamp(ts(), nowMs(), locale())}
             </span>
           )}

@@ -34,6 +34,11 @@
   /* Divider under a selected row: a blue-grey a step darker than the
      selection fill so the row's edge still reads against it. */
   --dnd-select-border: #c8d7ef;
+  /* The blue pair again, under a stable name: the listbox re-points
+     `--dnd-select-*` to a neutral grey when it lacks focus and needs a
+     way back to blue when it regains it (see the listbox rules). */
+  --dnd-select-live-bg: #dbeafe;
+  --dnd-select-live-border: #c8d7ef;
   /* Neutral highlight for palette / picker rows (no blue). */
   --palette-select-bg: #eceff3;
   --dnd-placeholder-color: #cbd5e1;
@@ -68,6 +73,8 @@
   --due-today-text: #ffa04d;
   --dnd-select-bg: #293a5b;
   --dnd-select-border: #33466e;
+  --dnd-select-live-bg: #293a5b;
+  --dnd-select-live-border: #33466e;
   --palette-select-bg: #26262a;
   --dnd-placeholder-color: #475569;
 }
@@ -831,6 +838,24 @@ body {
   opacity: 0.5;
 }
 
+/* Selection reads differently depending on whether the keyboard is live
+   on it. The listbox owns the key handler, so while focus sits inside it
+   the selection is blue (keys act here); once focus moves elsewhere (the
+   task pane, a dialog) the same selection drops to a quiet neutral fill
+   that says "this is your item" without promising keyboard control.
+   Done by re-pointing the two selection tokens on the listbox so every
+   consumer (the row, the board card, the dnd slot painted from
+   Dnd.tsx's injected stylesheet) follows without its own rule. */
+.dnd-parent > [role="listbox"] {
+  --dnd-select-bg: var(--bg-active);
+  --dnd-select-border: var(--border);
+}
+
+.dnd-parent > [role="listbox"]:focus-within {
+  --dnd-select-bg: var(--dnd-select-live-bg);
+  --dnd-select-border: var(--dnd-select-live-border);
+}
+
 [aria-selected="true"] .row {
   background: var(--dnd-select-bg);
   border-color: var(--dnd-select-border);
@@ -980,6 +1005,15 @@ input.task-check:hover {
 .row-timestamp {
   color: var(--text-faint);
   background: none;
+}
+
+/* Global Done view: the leading stamp is plain row text, not a badge —
+   it inherits the row's font size and shares .row-text's line-height so
+   it sits on the title's baseline, just in the faint colour. */
+.row-timestamp-lead {
+  flex-shrink: 0;
+  white-space: nowrap;
+  line-height: 1.3em;
 }
 
 .row-timestamp-icon {
