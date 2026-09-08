@@ -287,7 +287,7 @@ body {
   white-space: nowrap;
   color: var(--text);
   font-size: 1em;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 /* Multi-select surface (`SelectionPanel.tsx`): sits under the blank
