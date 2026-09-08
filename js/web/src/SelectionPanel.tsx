@@ -1,8 +1,10 @@
 // The desktop side panel's multi-select surface: shown in place of the
 // task pane while the active list / board lane selection spans more than
-// one row. A heading with the count, then one button per bulk action.
-// Workspace builds the action list (it owns the selection, the view and
-// the batch mutations); this file is only the chrome.
+// one row. One button per bulk action, then Clear selection. The
+// "N items selected" heading lives in the side panel's header row
+// (Workspace), beside the sidebar button. Workspace builds the action
+// list (it owns the selection, the view and the batch mutations); this
+// file is only the chrome.
 //
 // The buttons deliberately use native (non-delegated) listeners:
 // mousedown is cancelled so a click never pulls keyboard focus off the
@@ -23,7 +25,6 @@ export interface SelectionAction {
 }
 
 export function SelectionPanel(props: {
-  count: number;
   actions: readonly SelectionAction[];
   onClear: () => void;
 }) {
@@ -31,9 +32,6 @@ export function SelectionPanel(props: {
   const keepListFocus = (e: MouseEvent) => e.preventDefault();
   return (
     <div class="selection-panel">
-      <h2 class="selection-panel-title">
-        {m().sidePanel.selectedCount(props.count)}
-      </h2>
       <div
         class="selection-panel-actions"
         role="group"

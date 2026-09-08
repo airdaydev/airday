@@ -2692,6 +2692,16 @@ export function Workspace(props: {
               mounts. */}
           <Show when={openItemId() === null && newItemTarget() === null}>
             <header class="side-panel-blank">
+              {/* Multi-select: the count shares the header row with the
+                  sidebar button (space-between), so the actions below
+                  start where the task surface's body would. */}
+              <Show when={multiSelectIds()}>
+                {(ids) => (
+                  <h2 class="selection-panel-title">
+                    {m().sidePanel.selectedCount(ids().length)}
+                  </h2>
+                )}
+              </Show>
               <button
                 type="button"
                 class="icon-button"
@@ -2700,17 +2710,14 @@ export function Workspace(props: {
                 innerHTML={sidebarRightSvg}
               />
             </header>
-            {/* Multi-row selection: the count and the bulk actions stand
-                in for the task surface until the selection is back to
-                one row (or an explicit Enter opens the topmost). */}
+            {/* Multi-row selection: the bulk actions stand in for the
+                task surface until the selection is back to one row (or
+                an explicit Enter opens the topmost). */}
             <Show when={multiSelectIds()}>
-              {(ids) => (
-                <SelectionPanel
-                  count={ids().length}
-                  actions={multiSelectActions()}
-                  onClear={() => actionSelection()?.clear()}
-                />
-              )}
+              <SelectionPanel
+                actions={multiSelectActions()}
+                onClear={() => actionSelection()?.clear()}
+              />
             </Show>
           </Show>
           {/* The task surface portals in here while an item is open (see

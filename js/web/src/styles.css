@@ -46,7 +46,7 @@
 }
 
 [data-theme="dark"] {
-  --bg: #161618;
+  --bg: #1a1a1d;
   --bg-board-col: #171718;
   --bg-elevated: #1a1a1c;
   --surface: #1a1a1d;
@@ -263,9 +263,31 @@ body {
    buttons land (same 8px 12px inset as `.task-panel`), so it doesn't jump. */
 .side-panel-blank {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   flex-shrink: 0;
   padding: 8px 12px;
+}
+
+/* Lone sidebar button (no selection count) keeps to the right edge. */
+.side-panel-blank > .icon-button:only-child {
+  margin-left: auto;
+}
+
+/* Multi-select count, leading the blank header row opposite the sidebar
+   button. */
+.selection-panel-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 1em;
+  font-weight: 500;
 }
 
 /* Multi-select surface (`SelectionPanel.tsx`): sits under the blank
@@ -277,16 +299,9 @@ body {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  padding: 0 12px 12px;
+  padding: 4px 12px 12px;
   overflow-y: auto;
   color: var(--text);
-}
-
-.selection-panel-title {
-  margin: 0 0 12px;
-  padding: 2px;
-  font-size: 1em;
-  font-weight: 500;
 }
 
 .selection-panel-actions {
