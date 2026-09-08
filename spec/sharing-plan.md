@@ -198,7 +198,7 @@ Premise at the time of writing: rip-and-replace (no v1 transition window) — pr
 - Confirm no production deployments need data preserved.
 - Tag current `main` so a known-good pre-sharing commit is easy to reference.
 - Skim CLI and web local storage to confirm migration paths drop-and-recreate cleanly.
-- Convert item `text` and `notes` from plain-string registers to `LoroText` containers (see "Text fields must be mergeable before sharing" below). This is a doc-layout change and is far cheaper before any doc is shared.
+- Convert item `notes` from a plain-string register to a `LoroText` container (see "Text fields must be mergeable before sharing" below; `text` stays a register, per `notes-plan.md`). This is a doc-layout change and is far cheaper before any doc is shared.
 
 ### Phase 1 — Protocol types + server schema (foundation)
 
@@ -286,7 +286,7 @@ Plus: sharing UI (invite flow, member management, doc switcher) is **separate fr
 
 ## Text fields must be mergeable before sharing
 
-**Status: not done. Blocking for sharing; strongly recommended before that for multi-device.**
+**Status: not done. Blocking for sharing; strongly recommended before that for multi-device. Superseded for the storage question by `notes-plan.md` (Phase 1), which also decides that `text` stays a register.**
 
 Today an item's `text` and `notes` are plain string values in the item `LoroMap` (`map.insert(KEY_NOTES, notes)` in `core/src/doc.rs`). A map value is a last-writer-wins register over the *whole string*: two concurrent edits to the same item's notes merge by discarding one of them entirely. This already applies to a single user's phone and laptop editing offline; with sharing it becomes two people losing each other's work, which is the one CRDT failure users actually notice.
 
@@ -294,12 +294,12 @@ Today an item's `text` and `notes` are plain string values in the item `LoroMap`
 
 | Field | Today | Target |
 |---|---|---|
-| `text` | string register | `LoroText` child container |
-| `notes` | string register | `LoroText` child container |
+| `text` | string register | string register (unchanged; see `notes-plan.md`, "Why `text` stays a register") |
+| `notes` | string register | mergeable `LoroText` child container |
 
 - Character-level merges come for free from Loro; no new crate, no new protocol surface, op blobs stay opaque to the server.
 - Pre-release, so rip-and-replace per the premise above: no in-doc migration, no dual-read. The `001_init.sql` rule applies in spirit to the doc layout too. Do it before any doc has more than one member, or a notes migration has to run inside every shared doc.
-- `data-model.md` item table gets the two type changes. `edit_item_text` / `edit_item_notes` in core keep their signatures (take a full string) and diff it into the container with `LoroText::update`, so CLI and existing callers are untouched.
+- `data-model.md` item table gets the `notes` type change. `edit_item_notes` in core keeps its signature (takes a full string) and diffs it into the container with `LoroText::update`, so CLI and existing callers are untouched. `edit_item_text` is unchanged: a title is a short phrase rewritten whole, and a character merge of two concurrent rewrites interleaves them, so LWW is the better outcome there.
 - Diff translation (`id` kept inside the map so a container handle resolves to its item, see data-model.md) already anticipates child containers under an item; text containers slot into the same path.
 
 ### What this does not commit to

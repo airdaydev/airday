@@ -21,7 +21,7 @@ so the bump is a floor change only.
 | Editor connector | **None fits as-is.** Every Loro editor binding needs a JS `LoroDoc`; Airday's doc lives in Rust wasm. We write a thin delta bridge across the wasm boundary instead. |
 | Rich text model | **Flat rich text in one `LoroText`** (Quill delta model: inline marks, line formats as attributes on `\n`). Not a ProseMirror node tree. |
 | Images | **By reference**, never bytes in the CRDT. A `U+FFFC` placeholder character carrying an `image` attribute that names an encrypted attachment. Attachments are a new dumb server surface (own spec, later phase). |
-| `text` field | Ride the same cutover: `text` also becomes a mergeable `LoroText`, plain only, edited via `update`. One schema bump instead of two. |
+| `text` field | **Stays a string register.** A title is one short phrase rewritten whole, so a character merge of two concurrent rewrites interleaves them into nonsense; LWW gives one clean title. Also saves a container per item. Decided 2026-09-08 (see "Why `text` stays a register"). |
 | Schema | **v3 to v4**, clean break, export / wipe / import per `data-model.md` policy. |
 
 ## 1. Storage
@@ -83,11 +83,36 @@ and the merge is safe. This is the one place the eager-create workaround
 
 | Field | v3 | v4 |
 |---|---|---|
-| `text` | string register | mergeable `LoroText`, plain (no marks), never empty |
+| `text` | string register | string register (unchanged) |
 | `notes` | string register | mergeable `LoroText`, absent until first write, empty (not absent) after a clear, may carry marks |
 
-Everything else unchanged. `data-model.md` gets these two rows plus a
+Everything else unchanged. `data-model.md` gets the `notes` row plus a
 "v3 to v4" paragraph under schema versioning.
+
+### Why `text` stays a register
+
+An earlier draft converted `text` in the same cutover ("one schema bump
+instead of two"). Dropped 2026-09-08:
+
+- A title is rewritten whole, not edited in place. Two concurrent
+  `update` calls each diff to "delete most of it, insert a new phrase",
+  and Loro merges those into an interleaving ("Buy oat milk" and "Get
+  milk from Coles" becoming "Get Buy oat milk from Coles"). LWW keeps one
+  clean title; the dropped edit is a visible, comprehensible loss.
+  Character merge suits notes because notes are longer and concurrent
+  edits usually touch different regions.
+- Every item would carry a text container plus its marker op, and every
+  item view would call `to_string()` on it. Notes pay that only on items
+  that have notes. Boot replay (`tui-plan.md`) is sensitive to op and
+  container counts per item.
+- The never-empty invariant is one line in `edit_item_text` today. With a
+  text container it becomes a property of the merged result rather than of
+  any single write.
+- Sharing does not need it. The `sharing-plan.md` "text fields must be
+  mergeable" line is about not silently dropping edits; losing one
+  concurrent title rewrite to LWW is the acceptable case.
+- No second bump is implied: `text` stays a register on purpose, so there
+  is no deferred migration.
 
 ### Loro version bump
 
@@ -168,10 +193,9 @@ The live-under-caret case is Phase 2.
   never a key delete (see the resurface note under Mergeable containers).
   Signature unchanged, so CLI, wasm bindings, import, and duplicate-list
   callers are untouched.
-- `edit_item_text`: same shape with `KEY_TEXT`, keeping the non-empty
-  validation. Item creation writes `text` through `ensure_mergeable_text`
-  + `insert(0, ..)` in the same commit as the item map.
-- Reads: `item_view` reads `LoroText::to_string()` for both fields
+- `edit_item_text`, item creation, and the row renderer: untouched.
+  `text` stays a string register.
+- Reads: `item_view` reads `LoroText::to_string()` for `notes`
   (`read_text_or_string` helper: accept a text container; a stray string
   value is a v3 leftover and, per the clean-break policy, is not read).
 - Diff classifier: in the `None` (nested) arm under `ROOT_ITEMS`, a
@@ -180,9 +204,9 @@ The live-under-caret case is Phase 2.
   Today it falls through to `Opaque`, which forces a `FullResync` on every
   remote keystroke. Also keep the marker write (a `Map` diff on the item
   with key `notes`) mapping to the same key set, which it already does.
-- Events: `ItemNotesChanged { id, notes }` and `ItemTextChanged` keep
-  carrying the full string (the store, search index, and CLI want plain
-  text). Add `ItemNotesDelta { id, delta }` later in Phase 2; not needed for
+- Events: `ItemNotesChanged { id, notes }` keeps carrying the full string
+  (the store, search index, and CLI want plain text); `ItemTextChanged`
+  is unchanged. Add `ItemNotesDelta { id, delta }` later in Phase 2; not needed for
   Phase 1.
 - Hash (`hash_str(&i.notes)`), JSON export / import, duplicate-list copy:
   unchanged because they go through `ItemView` strings and the edit
@@ -366,7 +390,7 @@ Estimate: 3 days including the server spec, tests, and the web upload path.
 | Phase | What | Days |
 |---|---|---|
 | 0 | Raise the `loro` floor to 1.13 (lock already there), build wasm, run tests. **Done 2026-09-08.** | 0.25 |
-| 1 | `text` + `notes` as mergeable `LoroText`, `update` diffing, content-clear (no key delete), classifier arm, schema v4 cutover, merge tests | 1 |
+| 1 | `notes` as mergeable `LoroText` (`text` stays a register), `update` diffing, content-clear (no key delete), classifier arm, schema v4 cutover, merge tests | 1 |
 | 2 | Delta bridge (`_utf16` inbound, shadow-string outbound), coalesced commits, dialog writes deltas, live remote edits under caret | 1.5 |
 | 3 | Rich text: style config, Quill 2 adaptor (or CodeMirror fallback), toolbar, paste whitelist, plain projection with `[image]` | 3 |
 | 4 | Attachments spec + server + client upload, image insert | 3 |
@@ -379,8 +403,8 @@ product decisions and can wait.
 
 ## Open questions
 
-- Should `text` (the title) ever carry marks? Plan says no: plain
-  `LoroText`, `update` only, so the row renderer never parses attributes.
+- ~~Should `text` (the title) ever carry marks?~~ Settled: `text` stays a
+  plain string register, so the row renderer never parses attributes.
 - Line-format vocabulary: headers and lists yes; tables, embeds other than
   images, and nested lists no. Revisit if notes grow.
 - Whether the CLI should print marks (Markdown-ish) or plain text.
