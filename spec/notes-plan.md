@@ -6,9 +6,11 @@ from there to rich text with images. Companion to `sharing-plan.md` ("Text
 fields must be mergeable before sharing"), which this plan supersedes for the
 storage question.
 
-Research date: 2026-09-04. Loro versions at that date: Rust crate `loro`
-1.13.9 (2026-08-01), npm `loro-crdt` 1.15.1 (2026-08-29). Airday pins
-`loro = "1.10"` and resolves 1.12.0.
+Research date: 2026-09-04, amended 2026-09-08 after a source read of
+`loro` / `loro-internal` 1.13.9. Loro versions at that date: Rust crate
+`loro` 1.13.9 (2026-08-01), npm `loro-crdt` 1.15.1 (2026-08-29). Airday
+pins `loro = "1.10"` in `Cargo.toml`; `Cargo.lock` already resolves 1.13.9,
+so the bump is a floor change only.
 
 ## Decisions in one screen
 
@@ -60,8 +62,13 @@ Shipped 2026-06 (Loro blog "Mergeable Containers", PR #991, issue #759):
   two peers calling `ensure_mergeable_text("notes")` concurrently produce
   the same container and their inserts interleave as one text.
 - First call writes one small marker op into the map slot; repeat calls are
-  idempotent and write nothing. Delete removes the marker (LWW), and the
-  child's history stays in the doc, so a later `ensure` resurfaces it.
+  idempotent and write nothing. Deleting the map key removes the marker
+  (LWW) but the child's state stays in the doc, and the Loro docs are
+  explicit that a later `ensure` on the same key "writes the ref back and
+  resurfaces the preserved child state". **Consequence: never clear notes
+  by deleting the key.** A user who cleared `hello` and later typed `h`
+  would get `hhello` once edits are deltas (Phase 2). Clear notes by
+  deleting the text content (`delete(0, len)`); the key and marker stay.
 - `get_or_create_container` is now deprecated in favour of this.
 - Contrast with today's `insert_container` on the same key from two peers:
   LWW on the map key, one text hidden. The loser is recoverable only by
@@ -77,14 +84,16 @@ and the merge is safe. This is the one place the eager-create workaround
 | Field | v3 | v4 |
 |---|---|---|
 | `text` | string register | mergeable `LoroText`, plain (no marks), never empty |
-| `notes` | string register | mergeable `LoroText`, absent until first write, may carry marks |
+| `notes` | string register | mergeable `LoroText`, absent until first write, empty (not absent) after a clear, may carry marks |
 
 Everything else unchanged. `data-model.md` gets these two rows plus a
 "v3 to v4" paragraph under schema versioning.
 
 ### Loro version bump
 
-Root `Cargo.toml`: `loro = "1.13"`. Verify `bun run test` and
+Root `Cargo.toml`: `loro = "1.13"`. The lockfile is already at 1.13.9, so
+nothing recompiles differently; this only stops a future `cargo update`
+from resolving below `ensure_mergeable_text`. Verify `bun run test` and
 `bun run build:wasm`. Note the Rust crate lags the npm package: the
 1.14 / 1.15 fixes (atomic `import_batch`, O(n^2) styled-text read fix,
 redundant mark dedupe) are not on crates.io yet. The styled-read fix matters
@@ -102,21 +111,38 @@ the public `loro` crate (its features are `counter`, `jsonpath`,
 npm package. Airday depends on `loro`, so in every Airday build, the
 browser wasm included, **core text indices are Unicode scalars**.
 
-Browser editors count UTF-16 code units. The two agree until the first
-emoji or astral-plane character, which is one scalar but two UTF-16 units;
-after it every editor position is off and Loro inserts in the wrong place
-or rejects the op as out of bounds. The bridge converts in one place, on the
-Rust side of the wasm boundary:
+Browser editors count UTF-16 code units. Scalars and UTF-16 agree until
+the first astral-plane character (emoji and friends), which is one scalar
+but two UTF-16 units; after it every editor position is off and Loro
+inserts in the wrong place, deletes a neighbour, or rejects the op as out
+of bounds. Integers cross the wasm boundary untouched (only strings are
+re-encoded, to UTF-8), so a UTF-16 offset lands in Rust still reading as
+the same number. The bridge converts in one place, on the Rust side:
 
-- Inbound: use the `_utf16` method variants (`insert_utf16`,
-  `delete_utf16`, `mark_utf16`, `unmark_utf16`, `splice_utf16`).
-  `apply_delta` has no UTF-16 variant, so walk the delta and convert
-  retain / delete lengths with `LoroText::convert_pos` against the current
-  text before applying.
-- Outbound: `Diff::Text` deltas arrive in Unicode units; convert to UTF-16
-  with `convert_pos` against the post-change text before emitting
-  `itemNotesDelta`.
-- The JS adaptor never handles units.
+- Inbound, Phase 2 (no marks): do not use `apply_delta`. Walk the delta
+  with a UTF-16 cursor and call `insert_utf16` / `delete_utf16` directly.
+  Loro validates every boundary (`UTF16InUnicodeCodePoint` on a split
+  surrogate pair) and resolves the index through the rope's cached
+  counts. `convert_pos` on an attached container flattens the text to a
+  `String` and walks it linearly for the source unit, so a convert-then-
+  `apply_delta` path is both slower and more code to get wrong.
+- Inbound, Phase 3 (marks): `apply_delta` is needed for attributes and
+  only speaks the event unit (scalars here). A Quill delta is expressed
+  against the pre-change text, so convert once, before applying: walk the
+  delta over the pre-change string with a UTF-16 cursor and a scalar
+  cursor, rewrite each retain / delete count, count each insert string
+  directly, then call `apply_delta` on the rewritten delta.
+- Outbound: `Diff::Text` deltas arrive in scalars. `TextDelta::Delete` is
+  only a count and the deleted characters are gone from the post-change
+  text, so **conversion must run against the pre-change text**. The bridge
+  keeps a shadow `String` per subscribed item: convert each retain / delete
+  count against the shadow at the running cursor, count insert strings
+  directly, then apply the scalar delta to the shadow. Emit
+  `itemNotesDelta` in UTF-16.
+- The JS adaptor never handles units. It should send editor changes only
+  after `compositionend`; a lone surrogate mid-composition becomes
+  `U+FFFD` in the wasm string encoder and would leave the editor and the
+  CRDT holding different text of the same width.
 
 Phase 1 is unaffected because `update` takes a whole string and diffs it
 internally. The unit question arrives with the delta bridge in Phase 2.
@@ -126,11 +152,22 @@ internally. The unit question arrives with the delta bridge in Phase 2.
 Goal: character-level merges with zero UI change. This is the
 `sharing-plan.md` pre-flight item, done properly.
 
+Scope of the fix: **offline and cross-device edits merge; an open dialog
+still overwrites.** The dialog writes on close or target switch
+(`flush` in `TaskDialog.tsx`), never per keystroke, and does not reload
+notes while open. `update(local)` makes the text equal the local string,
+so a remote edit that arrives while the dialog is open is diffed away,
+exactly as today. Two devices editing offline and syncing later are
+merged character by character, because each side's ops are concurrent.
+The live-under-caret case is Phase 2.
+
 - `edit_item_notes(id, notes: &str)`: `ensure_mergeable_text(KEY_NOTES)`
-  then `text.update(notes, UpdateOptions::default())` (Myers diff). Empty
-  string: delete the key (removes the marker; history retained). Signature
-  unchanged, so CLI, wasm bindings, import, and duplicate-list callers are
-  untouched.
+  then `text.update(notes, UpdateOptions::default())` (Myers diff; the
+  default has no timeout, so the `UpdateTimeoutError` arm cannot fire).
+  Empty string: `update("")`, which deletes the content and keeps the key,
+  never a key delete (see the resurface note under Mergeable containers).
+  Signature unchanged, so CLI, wasm bindings, import, and duplicate-list
+  callers are untouched.
 - `edit_item_text`: same shape with `KEY_TEXT`, keeping the non-empty
   validation. Item creation writes `text` through `ensure_mergeable_text`
   + `insert(0, ..)` in the same commit as the item map.
@@ -164,8 +201,11 @@ Tests (extend the existing multi-peer tests in `core/src/doc.rs`):
 3. Same-region concurrent edits: character-level merge, nothing dropped.
 4. Remote notes edit produces `ItemNotesChanged` for that item only, no
    `FullResync` (asserts the classifier arm).
-5. Clear notes on one peer while another appends: converges
-   deterministically (marker LWW vs. resurfaced text); document the result.
+5. Clear notes on one peer while another appends: the appended text
+   survives (content delete and a concurrent insert merge as ordinary text
+   ops; no marker race because the key is never deleted). Also assert that
+   clear-then-type on one peer yields only the typed text, which is the
+   resurface bug the key-delete design would have had.
 6. Export v3 JSON, import into v4, hash equal.
 
 Estimate: 1 day including the cutover.
@@ -196,12 +236,29 @@ applyNotesDelta(itemId, deltaJson)    // UTF-16 in, converted, one commit, origi
 itemNotesDelta { id, delta }          // remote (and other-tab) changes as a UTF-16 delta
 ```
 
-Rust side: convert UTF-16 to Unicode positions, `ensure_mergeable_text`,
-`apply_delta`, commit. Event side: subscribe to `Diff::Text` under the
-item's `notes` key, convert Unicode to UTF-16, emit. The web adaptor is the
-`loro-codemirror` pattern: local editor change with source `user` goes to
-`applyNotesDelta`; `itemNotesDelta` arriving goes to the editor with source
-`api`, guarded against echo by origin.
+Rust side: `ensure_mergeable_text`, walk the delta with a UTF-16 cursor
+calling `insert_utf16` / `delete_utf16`, commit with origin
+`notes:<itemId>`. Event side: subscribe to `Diff::Text` under the item's
+`notes` key, convert scalars to UTF-16 against the per-item shadow string
+(see Index units), emit. The web adaptor is the `loro-codemirror` pattern:
+local editor change with source `user` goes to `applyNotesDelta`;
+`itemNotesDelta` arriving goes to the editor with source `api`, guarded
+against echo by origin.
+
+Commit policy: one commit per editor change is one encrypted op blob per
+keystroke, which is the exact input the measured boot-replay cost grows
+on (`tui-plan.md`; uncompacted offline ops replay superlinearly).
+`applyNotesDelta` applies immediately but the commit is coalesced on a
+short idle timer (proposal 300 ms, flushed on blur / close / visibility
+change), so a typing burst becomes one op. Compaction for the
+offline-by-default case (fold with retained outbox rows) becomes a
+prerequisite rather than a nice-to-have once notes are deltas.
+
+Undo consequence: with notes commits excluded from the workspace
+`UndoManager` by origin prefix (see Undo under Rich text; the prefix hook
+already exists in core for `remote`), closing the dialog leaves no undo
+for notes at all. The editor's own history owns notes undo while open.
+Accepted.
 
 Phase 2 deliverable: this bridge plus the current plain contenteditable
 dialog switched from full-string writes to deltas, so a live remote edit
@@ -308,15 +365,17 @@ Estimate: 3 days including the server spec, tests, and the web upload path.
 
 | Phase | What | Days |
 |---|---|---|
-| 0 | Bump `loro` to 1.13, build wasm, run tests | 0.5 |
-| 1 | `text` + `notes` as mergeable `LoroText`, `update` diffing, classifier arm, schema v4 cutover, merge tests | 1 |
-| 2 | Delta bridge (wasm API + event), dialog writes deltas, live remote edits under caret | 1.5 |
+| 0 | Raise the `loro` floor to 1.13 (lock already there), build wasm, run tests | 0.25 |
+| 1 | `text` + `notes` as mergeable `LoroText`, `update` diffing, content-clear (no key delete), classifier arm, schema v4 cutover, merge tests | 1 |
+| 2 | Delta bridge (`_utf16` inbound, shadow-string outbound), coalesced commits, dialog writes deltas, live remote edits under caret | 1.5 |
 | 3 | Rich text: style config, Quill 2 adaptor (or CodeMirror fallback), toolbar, paste whitelist, plain projection with `[image]` | 3 |
 | 4 | Attachments spec + server + client upload, image insert | 3 |
 
 Phase 1 is worth doing alone: it removes the one CRDT failure users notice
-(the dropped notes edit between phone and laptop) and is a prerequisite for
-sharing. Phases 3 and 4 are product decisions and can wait.
+(the dropped notes edit between phone and laptop when both were offline)
+and is a prerequisite for sharing. It does not fix an open dialog being
+overwritten by a live remote edit; that is Phase 2. Phases 3 and 4 are
+product decisions and can wait.
 
 ## Open questions
 
