@@ -332,7 +332,11 @@ mid-composition; a remote delta that lands during one is applied to
 `synced` and the composed text is re-placed on top at `compositionend`
 (its position shifted through the inbound delta, its deletion kept only
 if the remote edit did not touch that range). Closing, target switch,
-blur, `visibilitychange` (hidden) and `pagehide` flush.
+blur, `visibilitychange` (hidden) and `pagehide` flush. The dialog renders
+**two** notes editors (the new-item capture form and the existing-item
+edit form); both bind the same handlers. The first Phase 2 cut wired only
+the capture form, so typing in an existing item sent nothing until Enter
+or close. Fixed 2026-09-08.
 
 Commit policy, as built: `applyNotesDelta` commits on every editor
 change, but that is not one op blob per keystroke. Loro merges

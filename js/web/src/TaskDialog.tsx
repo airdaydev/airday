@@ -296,7 +296,10 @@ export function TaskDialog(props: {
     try {
       synced = props.app.subscribeNotes(id);
       subscribedId = id;
-    } catch {
+    } catch (e) {
+      // Loud on purpose: unsubscribed, the editor silently degrades to
+      // one whole-string write on close, which looks like lost typing.
+      console.error("subscribeNotes failed; notes will save on close only:", e);
       synced = fallback;
     }
     composing = false;
@@ -365,6 +368,13 @@ export function TaskDialog(props: {
     applyInboundToEditor(ops);
   });
   onCleanup(offNotesDelta);
+  // Every editor change refreshes the buffer and sends the pending
+  // delta. Both forms (new-item capture, existing-item edit) render
+  // their own notes editor; they share these handlers.
+  const onNotesInput = () => {
+    setNotes(editorText(notesRef));
+    commitLocalEdit();
+  };
   const onNotesCompositionStart = () => {
     if (!subscribedId) return;
     commitLocalEdit();
@@ -881,10 +891,7 @@ export function TaskDialog(props: {
             role="textbox"
             aria-multiline="true"
             data-placeholder={m().workspace.notes}
-            onInput={() => {
-              setNotes(editorText(notesRef));
-              commitLocalEdit();
-            }}
+            on:input={onNotesInput}
             onBlur={flushNotesNow}
             on:compositionstart={onNotesCompositionStart}
             on:compositionend={onNotesCompositionEnd}
@@ -1046,7 +1053,10 @@ export function TaskDialog(props: {
             role="textbox"
             aria-multiline="true"
             data-placeholder={m().workspace.notes}
-            onInput={() => setNotes(editorText(notesRef))}
+            on:input={onNotesInput}
+            onBlur={flushNotesNow}
+            on:compositionstart={onNotesCompositionStart}
+            on:compositionend={onNotesCompositionEnd}
             onKeyDown={onNotesKeyDown}
             on:beforeinput={onNotesBeforeInput}
             onPaste={pasteAsPlainText}
