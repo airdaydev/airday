@@ -21,6 +21,7 @@
     "test": "cargo test",
     "test:server": "cargo test -p airday-server",
     "test:core:js": "bun test --cwd js/core",
+    "perf": "cargo run --release -p airday-core --example perf --",
     "fmt": "cargo fmt --all",
     "lint": "cargo clippy --workspace --all-targets -- -D warnings",
     "typecheck": "tsc --noEmit -p js/config && tsc --noEmit -p js/core && tsc --noEmit -p js/web"
