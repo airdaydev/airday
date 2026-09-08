@@ -1,6 +1,6 @@
 # Notes as LoroText: plan
 
-**Status: plan, not built.** Moves `item.notes` from a whole-string LWW
+**Status: plan; Phase 0 done 2026-09-08, Phases 1-4 not built.** Moves `item.notes` from a whole-string LWW
 register to a mergeable `LoroText` child container, and lays out the path
 from there to rich text with images. Companion to `sharing-plan.md` ("Text
 fields must be mergeable before sharing"), which this plan supersedes for the
@@ -9,7 +9,7 @@ storage question.
 Research date: 2026-09-04, amended 2026-09-08 after a source read of
 `loro` / `loro-internal` 1.13.9. Loro versions at that date: Rust crate
 `loro` 1.13.9 (2026-08-01), npm `loro-crdt` 1.15.1 (2026-08-29). Airday
-pins `loro = "1.10"` in `Cargo.toml`; `Cargo.lock` already resolves 1.13.9,
+pinned `loro = "1.10"` in `Cargo.toml` (now `"1.13"`, Phase 0); `Cargo.lock` already resolved 1.13.9,
 so the bump is a floor change only.
 
 ## Decisions in one screen
@@ -365,7 +365,7 @@ Estimate: 3 days including the server spec, tests, and the web upload path.
 
 | Phase | What | Days |
 |---|---|---|
-| 0 | Raise the `loro` floor to 1.13 (lock already there), build wasm, run tests | 0.25 |
+| 0 | Raise the `loro` floor to 1.13 (lock already there), build wasm, run tests. **Done 2026-09-08.** | 0.25 |
 | 1 | `text` + `notes` as mergeable `LoroText`, `update` diffing, content-clear (no key delete), classifier arm, schema v4 cutover, merge tests | 1 |
 | 2 | Delta bridge (`_utf16` inbound, shadow-string outbound), coalesced commits, dialog writes deltas, live remote edits under caret | 1.5 |
 | 3 | Rich text: style config, Quill 2 adaptor (or CodeMirror fallback), toolbar, paste whitelist, plain projection with `[image]` | 3 |
