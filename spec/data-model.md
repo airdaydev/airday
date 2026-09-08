@@ -2,8 +2,8 @@
 
 ## Loro doc layout
 
-One Loro doc per account. **Schema version 3** — see "Schema versioning &
-compatibility" below; v3 docs must never sync with v1/v2 clients.
+One Loro doc per account. **Schema version 4** — see "Schema versioning &
+compatibility" below; v4 docs must never sync with v1/v2/v3 clients.
 
 - `doc.get_map("items")` — `LoroMap<ItemId, LoroMap>`: item identity and
   content. Keyed by the item's stable UUID; each value is a child `LoroMap`
@@ -36,8 +36,8 @@ One child `LoroMap` under `items`, keyed by `ItemId`.
 | Field | Type | Notes |
 |---|---|---|
 | `id` | string | same as the map key; kept inside the map so a container handle resolves back to its id during diff translation |
-| `text` | string | the user's content. **Planned:** becomes a `LoroText` child container before sharing ships, see `sharing-plan.md` "Text fields must be mergeable before sharing"; as a string register, concurrent edits are whole-value LWW |
-| `notes` | string | optional free-form plain text; empty string when absent in simple clients. Same `LoroText` plan as `text` |
+| `text` | string | the user's content. Stays a string register on purpose: a title is rewritten whole, so concurrent rewrites resolve by LWW to one clean title rather than a character interleaving (`notes-plan.md` "Why `text` stays a register") |
+| `notes` | `LoroText` | optional free-form plain text as a **mergeable child text container** (`LoroMap::ensure_mergeable_text`, `notes-plan.md`). Absent until the first write; created lazily by whichever device writes first, and concurrent first writes on two devices merge into one container. Edits are applied as character diffs (`LoroText::update`), so concurrent edits from two devices merge character-wise. Clearing deletes the content and **keeps the key**: the key is never deleted, because a later `ensure` would resurface the hidden child's old content. Reads take the container's plain string; a stray string value at the key (a v3 leftover) is not read. |
 | `location` | string | **atomic placement register** — encoded `"<list_id>:<placement_id>"`, see below |
 | `lifecycle` | value | **atomic workflow register** — a plain `LoroValue` list `[state, at]`: the current workflow state (integer `0..=4`, see "Lifecycle") and the unix millis it was entered. Absent ≡ `[Backlog, created_at]`; new items omit it. |
 | `binned_at` | i64? | **bin mask** — unix millis when the item was binned. Present ≡ binned (masking the workflow state); absent ≡ not binned. Restore deletes the key, revealing the preserved workflow state. Orthogonal to `lifecycle`. |
@@ -488,3 +488,23 @@ v3 state:
 
 A v2 `done_at` also seeds the v3 `done_at` reflection stamp; `started_at`
 starts absent everywhere — it accrues only from v3 transitions onward.
+
+### Notes text container — the v3 → v4 break
+
+`notes` changes from a whole-string LWW register to a mergeable `LoroText`
+child of the item map (`spec/notes-plan.md`, Phase 1): **schema version
+bumps to 4**. `text` stays a string register. Same clean-break policy as
+before — wire protocol stays 1, `001_init.sql` is untouched, and the
+cutover is the one-time **export → wipe → import** at a clean checkpoint.
+A v4 build opening a v3 doc reads every item's notes as empty, and the
+first notes write to such an item fails (`ensure_mergeable_text` refuses a
+key that holds a plain value); do not mix, wipe.
+
+The JSON export shape is unchanged (`notes` is a string in both), so a v3
+export imports into v4 as-is; the importer writes non-empty notes into the
+text container.
+
+Loro realises a mergeable child as a root container with a derived name
+(`🤝:…>notes`) plus a small binary marker in the parent map slot. Diff
+translation therefore routes text diffs by event path
+(`[items, item map, text]`), not by target container.

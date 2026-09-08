@@ -1,6 +1,6 @@
 # Notes as LoroText: plan
 
-**Status: plan; Phase 0 done 2026-09-08, Phases 1-4 not built.** Moves `item.notes` from a whole-string LWW
+**Status: Phases 0 and 1 done 2026-09-08, Phases 2-4 not built.** Moves `item.notes` from a whole-string LWW
 register to a mergeable `LoroText` child container, and lays out the path
 from there to rich text with images. Companion to `sharing-plan.md` ("Text
 fields must be mergeable before sharing"), which this plan supersedes for the
@@ -16,7 +16,7 @@ at research time and 1.16.0 after the bump.
 
 | Question | Decision |
 |---|---|
-| Separate doc or same doc? | **Same doc.** `notes` becomes a `LoroText` child of the item map at `items/<id>/notes`. No new root container, no second doc. |
+| Separate doc or same doc? | **Same doc.** `notes` becomes a `LoroText` child of the item map at `items/<id>/notes`. No Airday-managed root container (Loro itself backs the child with a derived-name root, see the correction below), no second doc. |
 | Lazy creation | **Yes, via Loro mergeable containers** (`LoroMap::ensure_mergeable_text`, Rust 1.13.1+). Created on first write; concurrent first writes on two devices merge into one text. Items without notes carry nothing. |
 | Editor connector | **None fits as-is.** Every Loro editor binding needs a JS `LoroDoc`; Airday's doc lives in Rust wasm. We write a thin delta bridge across the wasm boundary instead. |
 | Rich text model | **Flat rich text in one `LoroText`** (Quill delta model: inline marks, line formats as attributes on `\n`). Not a ProseMirror node tree. |
@@ -46,11 +46,17 @@ at research time and 1.16.0 after the bump.
 A per-item root container (`doc.get_text("notes/<id>")`) is op-free and
 merges concurrent creation, and Airday already uses that pattern for
 `order/<list-id>`. It was the fallback if mergeable containers had not
-shipped. Rejected because root containers can never be removed from the
-doc, so hard-deleted items would leave a root per item forever, and the
-item's fields would live in two places for reads, hashes, export, and
-duplication. The mergeable child gives the same merge guarantee inside the
-item.
+shipped. Rejected because the item's fields would live in two places for
+reads, hashes, export, and duplication. The mergeable child gives the same
+merge guarantee inside the item.
+
+Correction from Phase 1 (2026-09-08): the earlier draft also argued that a
+root per item "can never be removed from the doc". That is equally true of
+the mergeable child, because Loro implements it *as* a root container with
+a derived name (`🤝:<hash>>notes`, `loro_common::MERGEABLE_NAMESPACE_PREFIX`)
+referenced by a binary marker in the map slot. Hard-deleting an item hides
+the text but its state stays in the doc either way. The one-place-for-reads
+argument stands on its own.
 
 ### Mergeable containers (the "lazy creation merge" feature)
 
@@ -201,12 +207,18 @@ The live-under-caret case is Phase 2.
 - Reads: `item_view` reads `LoroText::to_string()` for `notes`
   (`read_text_or_string` helper: accept a text container; a stray string
   value is a v3 leftover and, per the clean-break policy, is not read).
-- Diff classifier: in the `None` (nested) arm under `ROOT_ITEMS`, a
-  `LoroDiff::Text` whose path ends in `(item_map, Index::Key(key))` becomes
-  `CapturedDiff::ItemMap { container: <parent item map>, keys: {key} }`.
-  Today it falls through to `Opaque`, which forces a `FullResync` on every
-  remote keystroke. Also keep the marker write (a `Map` diff on the item
-  with key `notes`) mapping to the same key set, which it already does.
+- Diff classifier: a `LoroDiff::Text` whose event path has the shape
+  `[(items, _), (item_map, Key(id)), (text, Key(key))]` becomes
+  `CapturedDiff::ItemMap { container: item_map, keys: {key} }`. The
+  target container cannot be used for routing because a mergeable child
+  is a root container with a derived name (see the correction above), so
+  the classifier now takes the whole path (each entry pairs a container
+  with its index in its parent). Before Phase 1 it fell through to
+  `Opaque`, which forced a `FullResync` on every remote notes edit. The
+  marker write (a `Map` diff on the item with key `notes`) already mapped
+  to the same key set.
+- `import_json` wrote the `notes` register directly rather than through
+  `edit_item_notes`; it now creates the text container and inserts.
 - Events: `ItemNotesChanged { id, notes }` keeps carrying the full string
   (the store, search index, and CLI want plain text); `ItemTextChanged`
   is unchanged. Add `ItemNotesDelta { id, delta }` later in Phase 2; not needed for
@@ -217,8 +229,14 @@ The live-under-caret case is Phase 2.
 - Undo: core's doc-wide `UndoManager` will start recording each notes
   commit as a workspace undo step. Phase 1 leaves that as-is (it already
   records whole-string sets). Phase 2 revisits (see Undo below).
-- Schema: bump the constant to 4, add the JSON cutover note. The JSON
-  export shape is unchanged (strings), so v3 exports import into v4 as-is.
+- Schema: there is no version constant in code; the bump is the `doc.rs`
+  module comment plus the `data-model.md` "v3 → v4" paragraph. The JSON
+  export shape is unchanged (strings, `version: 1`), so v3 exports import
+  into v4 as-is. A v3 doc opened by v4 reads notes as empty; the first
+  notes write to such an item fails because `ensure_mergeable_text`
+  refuses a key holding a plain value.
+- An unchanged write (`update` to the current string) writes no ops and
+  emits no event.
 
 Tests (extend the existing multi-peer tests in `core/src/doc.rs`):
 
@@ -236,6 +254,25 @@ Tests (extend the existing multi-peer tests in `core/src/doc.rs`):
 6. Export v3 JSON, import into v4, hash equal.
 
 Estimate: 1 day including the cutover.
+
+### Phase 1 measurements (2026-09-08)
+
+`bun run perf scale` (release, `core/examples/perf.rs`), 10k items with two
+paragraphs of notes each (4.3 MiB of notes text):
+
+| Shape | Snapshot | Import | Boot walk (location only) | `to_string` every notes |
+|---|---|---|---|---|
+| v3 string register via `Doc` | 6.6 MiB | 40 ms (incl. index rebuild) | 20 ms | 34 ms (`all_items`) |
+| v4 `LoroText`, one commit per item | 6.6 MiB | 3.5 ms | 13 ms | 38 ms |
+| v4 `LoroText`, 5 commits per paragraph | 6.1 MiB | 2.8 ms | 14 ms | 39 ms |
+
+A text container per noted item costs nothing at boot and nothing in
+snapshot size. The typing-burst history only matters for uncompacted op
+replay (Phase 2's commit policy), not for snapshots.
+
+Done 2026-09-08. Tests: `notes_*`, `remote_notes_edit_translates_to_one_surgical_event`,
+`v3_string_register_notes_read_as_empty_and_hash_stable`,
+`v3_json_export_imports_into_v4_with_notes` in `core/src/doc.rs`.
 
 ## 3. Editor bindings: what exists and why none plug in
 
@@ -413,7 +450,7 @@ Estimate: 3 days including the server spec, tests, and the web upload path.
 | Phase | What | Days |
 |---|---|---|
 | 0 | Raise the `loro` floor (1.13, then 1.16.0), build wasm, run tests. **Done 2026-09-08.** | 0.25 |
-| 1 | `notes` as mergeable `LoroText` (`text` stays a register), `update` diffing, content-clear (no key delete), classifier arm, schema v4 cutover, merge tests | 1 |
+| 1 | `notes` as mergeable `LoroText` (`text` stays a register), `update` diffing, content-clear (no key delete), classifier arm, schema v4 cutover, merge tests. **Done 2026-09-08.** | 1 |
 | 2 | Delta bridge (`_utf16` inbound, shadow-string outbound), coalesced commits, dialog writes deltas, live remote edits under caret | 1.5 |
 | 3 | Rich text: style config, Quill 2 adaptor (or CodeMirror fallback), toolbar, paste whitelist, plain projection with `[image]` | 3 |
 | 4 | Attachments spec + server + client upload, image insert | 3 |

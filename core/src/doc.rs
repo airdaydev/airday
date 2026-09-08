@@ -1,7 +1,7 @@
 //! Loro CRDT layer: typed mutations, persistence, op-stream framing,
 //! and a deterministic logical-state fingerprint.
 //!
-//! Layout matches `spec/data-model.md` (schema v3):
+//! Layout matches `spec/data-model.md` (schema v4):
 //! - root container `items` (`LoroMap`) — keyed by the item's stable
 //!   UUID; each value is a child `LoroMap` with `id`, `text`,
 //!   `location`, `created_at`, optional `notes`, optional `lifecycle`
@@ -48,8 +48,8 @@ use std::sync::{Arc, Mutex};
 
 use loro::event::{Diff as LoroDiff, DiffEvent, ListDiffItem};
 use loro::{
-    Container, ContainerID, EventTriggerKind, ExportMode, LoroDoc, LoroMap, LoroMovableList,
-    LoroValue, Subscription, UndoManager, ValueOrContainer, VersionVector,
+    Container, ContainerID, EventTriggerKind, ExportMode, Index, LoroDoc, LoroMap, LoroMovableList,
+    LoroText, LoroValue, Subscription, UndoManager, UpdateOptions, ValueOrContainer, VersionVector,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -1093,13 +1093,34 @@ struct DiffCapture {
 
 fn classify_captured_diff(
     target: &ContainerID,
-    path_root: Option<&ContainerID>,
+    path: &[(ContainerID, Index)],
     diff: &LoroDiff,
 ) -> CapturedDiff {
     let root_name = |cid: &ContainerID| match cid {
         ContainerID::Root { name, .. } => Some(name.to_string()),
         ContainerID::Normal { .. } => None,
     };
+    // A text child of an item map (`notes`). Loro realises a mergeable
+    // child as a *root* container with a derived name, so the target
+    // never says which item it belongs to; the event path does. Each
+    // entry pairs a container with its index in its parent, so the
+    // shape is `[(items, _), (item map, Key(id)), (text, Key(key))]`.
+    // Translate to the item map dirty at that key; consumers re-read
+    // the whole string from the view.
+    if let LoroDiff::Text(_) = diff {
+        return match path {
+            [(root, _), (item_map, _), (_, Index::Key(key))]
+                if root_name(root).as_deref() == Some(ROOT_ITEMS) =>
+            {
+                CapturedDiff::ItemMap {
+                    container: item_map.clone(),
+                    keys: [key.to_string()].into_iter().collect(),
+                }
+            }
+            _ => CapturedDiff::Opaque,
+        };
+    }
+    let path_root = path.first().map(|(cid, _)| cid);
     match root_name(target) {
         Some(name) if name == ROOT_ITEMS => {
             let LoroDiff::Map(m) = diff else {
@@ -1189,10 +1210,9 @@ fn make_diff_subscriber(
             return;
         }
         for cd in &e.events {
-            let path_root = cd.path.first().map(|(cid, _)| cid);
             capture
                 .diffs
-                .push(classify_captured_diff(cd.target, path_root, &cd.diff));
+                .push(classify_captured_diff(cd.target, cd.path, &cd.diff));
         }
     })
 }
@@ -1608,9 +1628,21 @@ impl Doc {
     /// Set an item's free-form notes. Empty is allowed (clears the
     /// note); leading/trailing whitespace is preserved verbatim because
     /// notes are intentionally a freeform plain-text field.
+    ///
+    /// Notes live in a mergeable `LoroText` child of the item map
+    /// (`spec/notes-plan.md`), created on the first write. The new string
+    /// is applied as a character diff against the current text, so
+    /// concurrent edits from two devices merge instead of one overwriting
+    /// the other. Clearing deletes the text's content and keeps the map
+    /// key: deleting the key would hide the child, and a later
+    /// `ensure_mergeable_text` would resurface the old content.
     pub fn edit_item_notes(&self, item_id: &str, notes: &str) -> Result<(), DocError> {
         let map = self.find_item(item_id)?;
-        map.insert(KEY_NOTES, notes)?;
+        let text = map.ensure_mergeable_text(KEY_NOTES)?;
+        if text.to_string() == notes {
+            return Ok(());
+        }
+        update_text(&text, notes)?;
         self.inner.commit();
         self.push_event(AppEvent::ItemNotesChanged {
             id: item_id.to_string(),
@@ -3046,7 +3078,8 @@ impl Doc {
             }
             let notes = src_item.notes.trim();
             if !notes.is_empty() {
-                map.insert(KEY_NOTES, notes)?;
+                let text = map.ensure_mergeable_text(KEY_NOTES)?;
+                text.insert(0, notes)?;
             }
             if let Some(t) = done_stamp {
                 map.insert(KEY_DONE_AT, t)?;
@@ -4506,6 +4539,24 @@ fn read_string(map: &LoroMap, key: &str) -> Option<String> {
     value.into_string().ok().map(|s| s.to_string())
 }
 
+/// Read a text container's content. A plain string value at the key is a
+/// v3 leftover and, per the clean-break policy in `spec/data-model.md`,
+/// is not read: it yields `None` like an absent key.
+fn read_text(map: &LoroMap, key: &str) -> Option<String> {
+    match map.get(key)? {
+        ValueOrContainer::Container(Container::Text(t)) => Some(t.to_string()),
+        _ => None,
+    }
+}
+
+/// Make `text` equal `target` with a minimal character diff. The default
+/// options have no timeout, so the timeout error arm cannot fire; it is
+/// mapped to `Invalid` for completeness.
+fn update_text(text: &LoroText, target: &str) -> Result<(), DocError> {
+    text.update(target, UpdateOptions::default())
+        .map_err(|e| DocError::Invalid(e.to_string()))
+}
+
 fn read_i64(map: &LoroMap, key: &str) -> Option<i64> {
     let v = map.get(key)?;
     let value = v.as_value()?.clone();
@@ -4600,7 +4651,7 @@ fn item_view(map: &LoroMap) -> Option<ItemView> {
     Some(ItemView {
         id: read_string(map, KEY_ID)?,
         text: read_string(map, KEY_TEXT)?,
-        notes: read_string(map, KEY_NOTES).unwrap_or_default(),
+        notes: read_text(map, KEY_NOTES).unwrap_or_default(),
         list_id: location,
         state,
         lifecycle_at,
@@ -9123,5 +9174,250 @@ mod tests {
         let before = a.fingerprint();
         a.move_in_focus(&z, 0).unwrap();
         assert_ne!(a.fingerprint(), before, "focus order hashed");
+    }
+
+    // ---- notes as mergeable LoroText (spec/notes-plan.md Phase 1) ----
+
+    /// Push every uncaptured op both ways: `a`'s pending blob to `b`,
+    /// then `b`'s to `a`. Events on both sides are left in place.
+    fn exchange(a: &mut Doc, b: &mut Doc, dek: &Dek) {
+        if let Some(blob) = a.pending_export(dek).unwrap() {
+            b.apply_remote(dek, &blob).unwrap();
+        }
+        a.mark_persisted();
+        if let Some(blob) = b.pending_export(dek).unwrap() {
+            a.apply_remote(dek, &blob).unwrap();
+        }
+        b.mark_persisted();
+    }
+
+    fn notes_container_count(doc: &Doc, id: &str) -> usize {
+        let map = doc.find_item(id).unwrap();
+        let mut n = 0;
+        map.for_each(|k, v| {
+            if k == KEY_NOTES && matches!(v, ValueOrContainer::Container(_)) {
+                n += 1;
+            }
+        });
+        n
+    }
+
+    #[test]
+    fn notes_first_writes_on_two_peers_merge_into_one_text() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let id = a.add_item(LIST_INBOX, "item").unwrap();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        // Neither peer has a notes container yet; both create one
+        // offline. Mergeable ids make it the same container.
+        a.edit_item_notes(&id, "from a").unwrap();
+        b.edit_item_notes(&id, "from b").unwrap();
+        exchange(&mut a, &mut b, &dek);
+
+        let na = a.get_item(&id).unwrap().notes;
+        let nb = b.get_item(&id).unwrap().notes;
+        assert_eq!(na, nb, "peers converge");
+        assert!(na.contains("from a") && na.contains("from b"), "got {na:?}");
+        assert_eq!(notes_container_count(&a, &id), 1);
+        assert_eq!(notes_container_count(&b, &id), 1);
+        assert_eq!(a.fingerprint(), b.fingerprint());
+    }
+
+    #[test]
+    fn notes_edits_to_different_regions_both_survive() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let id = a.add_item(LIST_INBOX, "item").unwrap();
+        a.edit_item_notes(&id, "alpha\nbeta").unwrap();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        a.edit_item_notes(&id, "ALPHA\nbeta").unwrap();
+        b.edit_item_notes(&id, "alpha\nBETA").unwrap();
+        exchange(&mut a, &mut b, &dek);
+
+        assert_eq!(a.get_item(&id).unwrap().notes, "ALPHA\nBETA");
+        assert_eq!(b.get_item(&id).unwrap().notes, "ALPHA\nBETA");
+    }
+
+    #[test]
+    fn notes_same_region_edits_merge_character_wise() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let id = a.add_item(LIST_INBOX, "item").unwrap();
+        a.edit_item_notes(&id, "hello").unwrap();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        a.edit_item_notes(&id, "hello world").unwrap();
+        b.edit_item_notes(&id, "hello there").unwrap();
+        exchange(&mut a, &mut b, &dek);
+
+        let na = a.get_item(&id).unwrap().notes;
+        assert_eq!(na, b.get_item(&id).unwrap().notes);
+        assert!(na.starts_with("hello"), "got {na:?}");
+        assert!(
+            na.contains(" world") && na.contains(" there"),
+            "nothing dropped: {na:?}"
+        );
+    }
+
+    #[test]
+    fn remote_notes_edit_translates_to_one_surgical_event() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let id = a.add_item(LIST_INBOX, "item").unwrap();
+        let other = a.add_item(LIST_INBOX, "other").unwrap();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        // First write: marker op on the item map plus the text insert.
+        a.edit_item_notes(&id, "first").unwrap();
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_persisted();
+        b.apply_remote(&dek, &blob).unwrap();
+        let evs = b.drain_events();
+        assert_eq!(
+            evs,
+            vec![AppEvent::ItemNotesChanged {
+                id: id.clone(),
+                notes: "first".into(),
+            }],
+            "first write: {evs:?}"
+        );
+
+        // Second write: only the text container changes. This is the
+        // `LoroDiff::Text` classifier arm; without it the frame is
+        // opaque and forces a FullResync.
+        a.edit_item_notes(&id, "first, then more").unwrap();
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_persisted();
+        b.apply_remote(&dek, &blob).unwrap();
+        let evs = b.drain_events();
+        assert_eq!(
+            evs,
+            vec![AppEvent::ItemNotesChanged {
+                id: id.clone(),
+                notes: "first, then more".into(),
+            }],
+            "text-only write: {evs:?}"
+        );
+        assert_eq!(b.get_item(&other).unwrap().notes, "");
+        assert_eq!(a.fingerprint(), b.fingerprint());
+    }
+
+    #[test]
+    fn notes_clear_keeps_key_and_concurrent_append_survives() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let id = a.add_item(LIST_INBOX, "item").unwrap();
+        a.edit_item_notes(&id, "hello").unwrap();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        a.edit_item_notes(&id, "").unwrap();
+        assert_eq!(
+            notes_container_count(&a, &id),
+            1,
+            "clear deletes content, never the key"
+        );
+        assert_eq!(a.get_item(&id).unwrap().notes, "");
+        b.edit_item_notes(&id, "hello world").unwrap();
+        exchange(&mut a, &mut b, &dek);
+
+        assert_eq!(a.get_item(&id).unwrap().notes, " world");
+        assert_eq!(b.get_item(&id).unwrap().notes, " world");
+    }
+
+    #[test]
+    fn notes_clear_then_type_yields_only_the_typed_text() {
+        // The resurface bug a key-delete design would have: `hello`
+        // cleared, then `h` typed, must read `h` on every peer, not
+        // `hhello`.
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let id = a.add_item(LIST_INBOX, "item").unwrap();
+        a.edit_item_notes(&id, "hello").unwrap();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        a.edit_item_notes(&id, "").unwrap();
+        a.edit_item_notes(&id, "h").unwrap();
+        exchange(&mut a, &mut b, &dek);
+
+        assert_eq!(a.get_item(&id).unwrap().notes, "h");
+        assert_eq!(b.get_item(&id).unwrap().notes, "h");
+        assert_eq!(a.fingerprint(), b.fingerprint());
+    }
+
+    #[test]
+    fn notes_unchanged_write_is_a_no_op() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_INBOX, "item").unwrap();
+        doc.edit_item_notes(&id, "same").unwrap();
+        let _ = doc.drain_events();
+        let vv = doc.inner.oplog_vv();
+
+        doc.edit_item_notes(&id, "same").unwrap();
+        assert!(doc.drain_events().is_empty());
+        assert_eq!(doc.inner.oplog_vv(), vv, "no ops written");
+    }
+
+    #[test]
+    fn notes_undo_restores_previous_text() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_INBOX, "item").unwrap();
+        doc.edit_item_notes(&id, "one").unwrap();
+        doc.edit_item_notes(&id, "one two").unwrap();
+        let _ = doc.drain_events();
+
+        assert!(doc.undo().unwrap());
+        assert_eq!(doc.get_item(&id).unwrap().notes, "one");
+        let evs = doc.drain_events();
+        assert_eq!(
+            evs,
+            vec![AppEvent::ItemNotesChanged {
+                id: id.clone(),
+                notes: "one".into(),
+            }]
+        );
+        assert!(doc.redo().unwrap());
+        assert_eq!(doc.get_item(&id).unwrap().notes, "one two");
+    }
+
+    #[test]
+    fn v3_string_register_notes_read_as_empty_and_hash_stable() {
+        // Clean-break policy: a stray v3 string register at `notes` is
+        // not read. The fingerprint hashes the view, so it equals an
+        // item with no notes.
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_INBOX, "item").unwrap();
+        let before = doc.fingerprint();
+        doc.find_item(&id)
+            .unwrap()
+            .insert(KEY_NOTES, "v3 leftover")
+            .unwrap();
+        doc.inner.commit();
+        assert_eq!(doc.get_item(&id).unwrap().notes, "");
+        assert_eq!(doc.fingerprint(), before);
+    }
+
+    #[test]
+    fn v3_json_export_imports_into_v4_with_notes() {
+        // The JSON shape did not change across v3 -> v4 (notes is a
+        // string in both), so a v3 export imports as-is.
+        let src = Doc::new().unwrap();
+        let a = src.add_item(LIST_INBOX, "alpha").unwrap();
+        src.edit_item_notes(&a, "  keep my\nnotes  ").unwrap();
+        let json = src.export_json_string();
+
+        let dst = Doc::new().unwrap();
+        dst.import_json_str(&json).unwrap();
+        let items: Vec<ItemView> = dst.iter_items().collect();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].notes, "keep my\nnotes");
+        assert_eq!(notes_container_count(&dst, &items[0].id), 1);
+        // Round trip again: hashes of the two imported docs agree on
+        // notes content (ids are regenerated, so compare views).
+        let again = Doc::new().unwrap();
+        again.import_json_str(&dst.export_json_string()).unwrap();
+        let v: Vec<ItemView> = again.iter_items().collect();
+        assert_eq!(v[0].notes, items[0].notes);
     }
 }
