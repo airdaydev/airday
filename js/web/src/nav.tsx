@@ -392,6 +392,49 @@ export function Nav(props: {
   const selectedNavIds = (id: string): string[] =>
     navSelection.isSelected(id) ? navSelection.getSelectedKeys().map(String) : [id];
 
+  // Keep the active view's nav row in view. The view can change from
+  // anywhere (find palette, URL, keyboard, list creation, a click), so
+  // react to the view itself rather than to any one entry point; a
+  // clicked row is already visible and `block: "nearest"` makes that a
+  // no-op. Every entry (Focus, Upcoming, lists, Done, Bin) marks itself
+  // with `data-active`, so that's the lookup rather than a per-kind id.
+  // The Dnd here isn't a scroller (no fillHeight), so every list row is
+  // mounted and `.nav-scroll` is the only scroll container. Deferred a
+  // frame (with a couple of retries) so a list created and opened in the
+  // same tick has its row in the DOM before we look for it.
+  let navScrollEl!: HTMLDivElement;
+  const revealActiveNav = () => {
+    // Read here so the effect below tracks the view.
+    void props.view.kind;
+    if (props.view.kind === "list") void props.view.id;
+    let attempts = 0;
+    const tryScroll = () => {
+      // Collapsed sidebar (`.app.nav-hidden`) has no layout to scroll;
+      // the ResizeObserver below re-runs this when it comes back.
+      if (!navScrollEl || navScrollEl.clientHeight === 0) return;
+      const el = navScrollEl.querySelector<HTMLElement>(".nav-item[data-active]");
+      if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      else if (++attempts < 3) requestAnimationFrame(tryScroll);
+    };
+    requestAnimationFrame(tryScroll);
+  };
+  createEffect(() => {
+    // The list rows only exist while the group is expanded, so expanding
+    // it should also bring the active row into view.
+    personalCollapsed();
+    revealActiveNav();
+  });
+  onMount(() => {
+    let wasHidden = navScrollEl.clientHeight === 0;
+    const ro = new ResizeObserver(() => {
+      const hidden = navScrollEl.clientHeight === 0;
+      if (wasHidden && !hidden) revealActiveNav();
+      wasHidden = hidden;
+    });
+    ro.observe(navScrollEl);
+    onCleanup(() => ro.disconnect());
+  });
+
   const onReorder = (op: DndOp<NavList>) => {
     if (op.type !== "move") return;
     const ids = props.lists.map((l) => l.id);
@@ -420,7 +463,7 @@ export function Nav(props: {
   };
   return (
     <nav class="nav" onKeyDown={onNavKeyDown}>
-      <div class="nav-scroll" tabIndex={-1}>
+      <div class="nav-scroll" tabIndex={-1} ref={navScrollEl}>
       <div class="nav-group">
         {/* Focus: a reserved lens (spec/focus.md), not a `ListMeta` row, so
             it's a static entry with a fixed icon — like Done / Bin. Sits at

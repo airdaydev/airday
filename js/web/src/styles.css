@@ -610,6 +610,8 @@ body {
   cursor: pointer;
   font: inherit;
   color: inherit;
+  /* Breathing room when the active row is scrolled into view. */
+  scroll-margin-block: 8px;
 }
 
 .nav-item-icon {
