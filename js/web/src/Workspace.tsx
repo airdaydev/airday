@@ -2593,7 +2593,7 @@ export function Workspace(props: {
                   }
                   itemHeight={rowHeight(itemsIsMobile())}
                   expandable
-                  clearOnClickOutside
+                  clearOnBlankClick
                   fillHeight
                   autofocus
                   reorder={view().kind === "list" || view().kind === "focus"}

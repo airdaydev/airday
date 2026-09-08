@@ -74,7 +74,11 @@ export interface DndProps<T> {
   /** When false, plain Arrow keys do nothing. Modifier-key combos (Shift,
    *  Cmd/Ctrl, Alt) keep working for extend/move/jump. Default true. */
   arrowNavigate?: boolean;
-  /** When true, a click anywhere outside the Dnd element clears selection. */
+  /** When true, a click on the listbox that lands on no row clears the
+   *  selection; clicks elsewhere only unfocus the list. */
+  clearOnBlankClick?: boolean;
+  /** When true, a click anywhere outside the Dnd element clears selection
+   *  (implies `clearOnBlankClick`). */
   clearOnClickOutside?: boolean;
   /** When true, host fills its parent's height. */
   fillHeight?: boolean;
@@ -148,6 +152,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     reorder: props.reorder !== false,
     multi: props.multi !== false,
     arrowNavigate: props.arrowNavigate !== false,
+    clearOnBlankClick: props.clearOnBlankClick ?? false,
     clearOnClickOutside: props.clearOnClickOutside ?? false,
     fillHeight: props.fillHeight ?? false,
   });

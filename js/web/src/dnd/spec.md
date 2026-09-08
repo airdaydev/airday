@@ -17,6 +17,7 @@ Name | Type | Default
 | drag-stack-count | number | 3
 | expandable | boolean | false
 | multi | boolean | true
+| clear-on-blank-click | boolean | false
 | clear-on-click-outside | boolean | false
 | reorder | boolean | true
 
@@ -316,6 +317,11 @@ When `expandable` is set, double-clicking an item toggles a single-item expanded
 A click anywhere outside the expanded item collapses it. When the user double-clicks an item *below* the expanded one, the first click triggers a click-outside collapse — items below shift up, and the second click of the intended dblclick lands on a different element.
 
 To recover the user's intent, every `click` snapshots the prior click's target and timestamp. In `dblclick`, if the snapshot is within the dblclick window (500ms — comfortably above the 0.15s shift animation), it is used as the target instead of the `dblclick` event's own target (which is typically the common ancestor of the two diverged clicks, or the second-clicked sibling).
+
+### Clearing selection by click
+`clear-on-blank-click`: a click on the listbox that hits no row clears the selection. Clicks anywhere else leave it alone — the listbox just loses focus, and the host styles the selection as dormant via `:focus-within` (Finder's model: clicking another window doesn't deselect). Escape still clears. Use this for the main item list, where a side panel acts on the selection and must not dissolve it underfoot.
+
+`clear-on-click-outside`: superset — a click anywhere outside the host element clears too. Use for content-height listboxes whose blank space lies outside the listbox (the nav), where a blank-click rule alone would leave no pointer way to deselect.
 
 ### Click-outside hit-testing
 Both `clear-on-click-outside` and the expanded-item collapse check use cursor coordinates against the relevant element's bounding rect, not DOM containment. A portaled dismissable layer (e.g. a context menu) commonly sets `pointer-events:none` on `<body>` while open, which routes the click event to `<html>` — DOM containment then reports the click as outside even when the cursor was on top of us, spuriously clearing selection or collapsing.

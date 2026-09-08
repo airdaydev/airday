@@ -29,6 +29,16 @@ export interface DndControllerConfig {
    *  this for listboxes (e.g. the sidebar) where row "selection" via plain
    *  arrows has no visible state and would just be confusing. */
   arrowNavigate: boolean;
+  /** A click on the listbox that lands on no row clears the selection.
+   *  Anywhere else — the app chrome, a side panel acting on the selection
+   *  — leaves it alone: the listbox merely loses focus, and the host's
+   *  focus-within styling shows the selection as dormant. Escape still
+   *  clears explicitly. */
+  clearOnBlankClick: boolean;
+  /** Superset of `clearOnBlankClick`: a click anywhere outside the host
+   *  element clears too. For listboxes whose blank space lies outside the
+   *  listbox (content-height, e.g. the nav) or whose selection has no
+   *  dormant state worth keeping. */
   clearOnClickOutside: boolean;
   fillHeight: boolean;
   /** Px shaved off the bottom of the drop placeholder so it matches gapped
@@ -151,7 +161,7 @@ export class DndController {
 
   /** Set when a drag ends so the synthetic `click` that follows mouseup
    *  is ignored. Without this, the post-drag click runs `selection.clear()`
-   *  (when clearOnClickOutside is on and the click lands on the listbox)
+   *  (when clearOnBlankClick is on and the click lands on the listbox)
    *  or `selectOnly(key)` (when it lands on a row), in either case
    *  destroying the multi-selection that was just dragged. */
   private suppressNextClick = false;
@@ -802,7 +812,10 @@ export class DndController {
     this.lastClickTime = Date.now();
 
     if (key === null) {
-      if (this.cfg.clearOnClickOutside && this.selection.hasSelection()) {
+      if (
+        (this.cfg.clearOnBlankClick || this.cfg.clearOnClickOutside) &&
+        this.selection.hasSelection()
+      ) {
         this.selection.clear();
       }
       return;

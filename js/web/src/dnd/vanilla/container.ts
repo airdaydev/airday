@@ -77,6 +77,9 @@ export class PrimaveraDnd extends HTMLElement {
   private get multi(): boolean {
     return this.getAttribute("multi") !== "false";
   }
+  private get clearOnBlankClick(): boolean {
+    return this.hasAttribute("clear-on-blank-click");
+  }
   private get clearOnClickOutside(): boolean {
     return this.hasAttribute("clear-on-click-outside");
   }
@@ -147,6 +150,7 @@ export class PrimaveraDnd extends HTMLElement {
       reorder: this.reorder,
       multi: this.multi,
       arrowNavigate: true,
+      clearOnBlankClick: this.clearOnBlankClick,
       clearOnClickOutside: this.clearOnClickOutside,
       fillHeight: this.fillHeight,
     };
