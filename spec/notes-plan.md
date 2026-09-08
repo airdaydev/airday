@@ -9,8 +9,8 @@ storage question.
 Research date: 2026-09-04, amended 2026-09-08 after a source read of
 `loro` / `loro-internal` 1.13.9. Loro versions at that date: Rust crate
 `loro` 1.13.9 (2026-08-01), npm `loro-crdt` 1.15.1 (2026-08-29). Airday
-pinned `loro = "1.10"` in `Cargo.toml` (now `"1.13"`, Phase 0); `Cargo.lock` already resolved 1.13.9,
-so the bump is a floor change only.
+pinned `loro = "1.10"` in `Cargo.toml` (now `"1.16"`, Phase 0); `Cargo.lock` resolved 1.13.9
+at research time and 1.16.0 after the bump.
 
 ## Decisions in one screen
 
@@ -116,14 +116,17 @@ instead of two"). Dropped 2026-09-08:
 
 ### Loro version bump
 
-Root `Cargo.toml`: `loro = "1.13"`. The lockfile is already at 1.13.9, so
-nothing recompiles differently; this only stops a future `cargo update`
-from resolving below `ensure_mergeable_text`. Verify `bun run test` and
-`bun run build:wasm`. Note the Rust crate lags the npm package: the
+Root `Cargo.toml`: `loro = "1.16"` (Phase 0 first raised the floor to 1.13
+against the existing 1.13.9 lock, then bumped to 1.16.0 on 2026-09-08;
+wasm build and the full workspace test suite pass on 1.16.0). Verify
+`bun run test` and `bun run build:wasm` after any further bump. Note the Rust crate lags the npm package: the
 1.14 / 1.15 fixes (atomic `import_batch`, O(n^2) styled-text read fix,
 redundant mark dedupe) are not on crates.io yet. The styled-read fix matters
 for rich text with many marks; notes are short, so this is a watch item,
-not a blocker.
+not a blocker. Update 2026-09-08: the Rust crate jumped to 1.16.0 on
+2026-09-06 (no 1.14 / 1.15 on crates.io) and still exposes every API this
+plan uses; the floor is now 1.16. Whether the styled-read fix is included
+is unverified and only matters once Phase 3 adds marks.
 
 ### Index units
 
@@ -342,6 +345,26 @@ text undo while the editor is open. This is the same scoping problem
 tracked upstream as loro-dev/loro#981 (per-container undo); the origin
 prefix is the workaround Loro itself suggests.
 
+### Native clients (iOS, Android)
+
+Researched 2026-09-08: no iOS or Android editor binding for `LoroText`
+exists, official or community, and Lexical iOS has no collaboration
+support at all, so native clients bind to the same delta bridge over
+`airday-ffi` (uniffi) that the web uses over wasm. On iOS that is a
+`UITextView` (TextKit 2, wrapped for SwiftUI) with `NSTextStorageDelegate`
+producing UTF-16 deltas and `itemNotesDelta` applied to the text storage;
+marks map to font traits and attributes, line formats to
+`NSParagraphStyle` + `NSTextList`, and images to `NSTextAttachment`,
+whose placeholder is the same `U+FFFC`. Android is the same shape with
+`EditText` spans and `TextWatcher`. SwiftUI `TextEditor` is adequate only
+for the plain-text phases (whole-string `update`, as Automerge's
+MeetingNotes does). Cross-client equivalence comes from a shared contract,
+`spec/notes-format.md` (mark keys, expand table, line attributes, image
+attribute shape, plain projection) plus a delta fixture set every adaptor
+must pass, not from a shared editor. Native undo routes to the
+notes-scoped core `UndoManager`. Estimate: about 2 days per platform on
+top of Phase 3.
+
 ### What carries over from cooee
 
 Cooee (`danielgormly/cooee`, not on disk any more; `../cooee` is gone) is
@@ -389,7 +412,7 @@ Estimate: 3 days including the server spec, tests, and the web upload path.
 
 | Phase | What | Days |
 |---|---|---|
-| 0 | Raise the `loro` floor to 1.13 (lock already there), build wasm, run tests. **Done 2026-09-08.** | 0.25 |
+| 0 | Raise the `loro` floor (1.13, then 1.16.0), build wasm, run tests. **Done 2026-09-08.** | 0.25 |
 | 1 | `notes` as mergeable `LoroText` (`text` stays a register), `update` diffing, content-clear (no key delete), classifier arm, schema v4 cutover, merge tests | 1 |
 | 2 | Delta bridge (`_utf16` inbound, shadow-string outbound), coalesced commits, dialog writes deltas, live remote edits under caret | 1.5 |
 | 3 | Rich text: style config, Quill 2 adaptor (or CodeMirror fallback), toolbar, paste whitelist, plain projection with `[image]` | 3 |
