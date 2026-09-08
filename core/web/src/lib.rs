@@ -11,10 +11,10 @@ use airday_core::{
     Doc as CoreDoc, DocId as CoreDocId, EngineOptions as CoreEngineOptions, Event as CoreEvent,
     ImportSummary as CoreImportSummary, InFlightPush as CoreInFlightPush,
     ItemLifecycle as CoreItemLifecycle, Kek as CoreKek, LocalSeq as CoreLocalSeq,
-    LocalStorage as CoreLocalStorage, PushId as CorePushId, RemoteWalRow as CoreRemoteWalRow,
-    ServerSeq as CoreServerSeq, StorageError as CoreStorageError, SyncEngine as CoreSyncEngine,
-    WrappedDek as CoreWrappedDek, derive_password_master, derive_recovery_master,
-    generate_recovery_code, kek_from_master, parse_recovery_code,
+    LocalStorage as CoreLocalStorage, NotesDeltaOp, PushId as CorePushId,
+    RemoteWalRow as CoreRemoteWalRow, ServerSeq as CoreServerSeq, StorageError as CoreStorageError,
+    SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek, derive_password_master,
+    derive_recovery_master, generate_recovery_code, kek_from_master, parse_recovery_code,
 };
 use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
 
@@ -23,6 +23,11 @@ use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfPa
 #[wasm_bindgen(start)]
 pub fn _start() {
     console_error_panic_hook::set_once();
+}
+
+fn parse_notes_delta(delta_json: &str) -> Result<Vec<NotesDeltaOp>, JsError> {
+    serde_json::from_str::<Vec<NotesDeltaOp>>(delta_json)
+        .map_err(|e| JsError::new(&format!("notes delta: {e}")))
 }
 
 fn js_err<E: std::fmt::Display>(e: E) -> JsError {
@@ -184,6 +189,31 @@ impl Doc {
     #[wasm_bindgen(js_name = editItemNotes)]
     pub fn edit_item_notes(&self, item_id: &str, notes: &str) -> Result<(), JsError> {
         self.inner.edit_item_notes(item_id, notes).map_err(js_err)
+    }
+
+    /// Start streaming an item's notes as `itemNotesDelta` events; returns
+    /// the current plain text for the editor to load. See
+    /// `Doc::subscribe_notes`.
+    #[wasm_bindgen(js_name = subscribeNotes)]
+    pub fn subscribe_notes(&self, item_id: &str) -> Result<String, JsError> {
+        self.inner.subscribe_notes(item_id).map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = unsubscribeNotes)]
+    pub fn unsubscribe_notes(&self, item_id: &str) {
+        self.inner.unsubscribe_notes(item_id);
+    }
+
+    /// Apply an editor delta to an item's notes. `delta_json` is a JSON
+    /// array of `{retain}` / `{insert}` / `{delete}` steps in UTF-16
+    /// units. One commit with origin `notes:<id>` (excluded from
+    /// workspace undo); rejected whole if it does not fit the text.
+    #[wasm_bindgen(js_name = applyNotesDelta)]
+    pub fn apply_notes_delta(&self, item_id: &str, delta_json: &str) -> Result<(), JsError> {
+        let delta = parse_notes_delta(delta_json)?;
+        self.inner
+            .apply_notes_delta(item_id, &delta)
+            .map_err(js_err)
     }
 
     /// Set (`Some`) or clear (`None`) an item's date-only deadline. The
@@ -1468,6 +1498,34 @@ impl SyncEngine {
             .map_err(js_err)
     }
 
+    /// Start streaming an item's notes as `itemNotesDelta` events; returns
+    /// the current plain text for the editor to load. See
+    /// `Doc::subscribe_notes`.
+    #[wasm_bindgen(js_name = subscribeNotes)]
+    pub fn subscribe_notes(&self, item_id: &str) -> Result<String, JsError> {
+        self.inner.doc().subscribe_notes(item_id).map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = unsubscribeNotes)]
+    pub fn unsubscribe_notes(&self, item_id: &str) {
+        self.inner.doc().unsubscribe_notes(item_id);
+    }
+
+    /// Apply an editor delta to an item's notes. `delta_json` is a JSON
+    /// array of `{retain}` / `{insert}` / `{delete}` steps in UTF-16
+    /// units. One commit with origin `notes:<id>` (excluded from
+    /// workspace undo); rejected whole if it does not fit the text.
+    /// Does not capture or push: the host coalesces a typing burst into
+    /// one flush (`spec/notes-plan.md` "Commit policy").
+    #[wasm_bindgen(js_name = applyNotesDelta)]
+    pub fn apply_notes_delta(&self, item_id: &str, delta_json: &str) -> Result<(), JsError> {
+        let delta = parse_notes_delta(delta_json)?;
+        self.inner
+            .doc()
+            .apply_notes_delta(item_id, &delta)
+            .map_err(js_err)
+    }
+
     /// Set (`Some`) or clear (`None`) an item's date-only deadline. The
     /// value must be a `YYYY-MM-DD` calendar date or the call rejects.
     #[wasm_bindgen(js_name = setItemDeadline)]
@@ -1898,6 +1956,7 @@ impl From<CoreEvent> for EngineEvent {
 /// - `itemMoved` — id, openIndex?
 /// - `itemTextChanged` — id, text
 /// - `itemNotesChanged` — id, notes
+/// - `itemNotesDelta` — id, delta (JSON array of `{retain}` / `{insert}` / `{delete}`, UTF-16 units; only for items with a `subscribeNotes` subscription)
 /// - `itemDeadlineChanged` — id, deadline? (undefined = no deadline)
 /// - `itemLifecycleChanged` — id, state, lifecycleAt, startedAt?, doneAt?, binnedAt?, openIndex?
 /// - `itemListChanged` — id, listId, openIndex?
@@ -1917,6 +1976,8 @@ pub struct AppEventJs {
     list_id: Option<String>,
     text: Option<String>,
     notes: Option<String>,
+    /// `itemNotesDelta` only: the delta as JSON text.
+    delta: Option<String>,
     name: Option<String>,
     /// List display icon (`listIconChanged`): `Some(grapheme)` when set,
     /// `None` when the icon was removed or on events that don't carry one.
@@ -1982,6 +2043,10 @@ impl AppEventJs {
     #[wasm_bindgen(getter)]
     pub fn notes(&self) -> Option<String> {
         self.notes.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn delta(&self) -> Option<String> {
+        self.delta.clone()
     }
     #[wasm_bindgen(getter)]
     pub fn name(&self) -> Option<String> {
@@ -2053,6 +2118,7 @@ impl From<CoreAppEvent> for AppEventJs {
             list_id: None,
             text: None,
             notes: None,
+            delta: None,
             name: None,
             icon: None,
             default_view: None,
@@ -2128,6 +2194,12 @@ impl From<CoreAppEvent> for AppEventJs {
                 kind: "itemNotesChanged",
                 id,
                 notes: Some(notes),
+                ..blank
+            },
+            CoreAppEvent::ItemNotesDelta { id, delta } => AppEventJs {
+                kind: "itemNotesDelta",
+                id,
+                delta: Some(serde_json::to_string(&delta).unwrap_or_else(|_| "[]".into())),
                 ..blank
             },
             CoreAppEvent::ItemDeadlineChanged { id, deadline } => AppEventJs {

@@ -1,6 +1,6 @@
 # Notes as LoroText: plan
 
-**Status: Phases 0 and 1 done 2026-09-08, Phases 2-4 not built.** Moves `item.notes` from a whole-string LWW
+**Status: Phases 0, 1 and 2 done 2026-09-08, Phases 3-4 not built.** Moves `item.notes` from a whole-string LWW
 register to a mergeable `LoroText` child container, and lays out the path
 from there to rich text with images. Companion to `sharing-plan.md` ("Text
 fields must be mergeable before sharing"), which this plan supersedes for the
@@ -153,8 +153,9 @@ of bounds. Integers cross the wasm boundary untouched (only strings are
 re-encoded, to UTF-8), so a UTF-16 offset lands in Rust still reading as
 the same number. The bridge converts in one place, on the Rust side:
 
-- Inbound, Phase 2 (no marks): do not use `apply_delta`. Walk the delta
-  with a UTF-16 cursor and call `insert_utf16` / `delete_utf16` directly.
+- Inbound, Phase 2 (no marks): do not use `apply_delta`. Validate the
+  whole delta against the current text first (built: `validate_utf16_delta`),
+  then walk it with a UTF-16 cursor and call `insert_utf16` / `delete_utf16` directly.
   Loro validates every boundary (`UTF16InUnicodeCodePoint` on a split
   surrogate pair) and resolves the index through the rope's cached
   counts. `convert_pos` on an attached container flattens the text to a
@@ -293,30 +294,60 @@ runtimes on every keystroke. Rejected.
 What we build instead: a **delta bridge** on the wasm API.
 
 ```
-// wasm (core/web/src/lib.rs)
-notesDelta(itemId): string            // JSON Vec<TextDelta>, UTF-16 units
-applyNotesDelta(itemId, deltaJson)    // UTF-16 in, converted, one commit, origin "notes:<itemId>"
+// core (Doc) and wasm (core/web/src/lib.rs), built 2026-09-08
+subscribeNotes(itemId): string        // current plain text; starts the delta stream for this item
+unsubscribeNotes(itemId)              // editor closed
+applyNotesDelta(itemId, deltaJson)    // UTF-16 in, validated whole, converted, one commit, origin "notes:<itemId>"
 // event
-itemNotesDelta { id, delta }          // remote (and other-tab) changes as a UTF-16 delta
+itemNotesDelta { id, delta }          // remote / other-tab / undo changes as a UTF-16 delta, subscribed items only
 ```
 
-Rust side: `ensure_mergeable_text`, walk the delta with a UTF-16 cursor
-calling `insert_utf16` / `delete_utf16`, commit with origin
-`notes:<itemId>`. Event side: subscribe to `Diff::Text` under the item's
-`notes` key, convert scalars to UTF-16 against the per-item shadow string
-(see Index units), emit. The web adaptor is the `loro-codemirror` pattern:
-local editor change with source `user` goes to `applyNotesDelta`;
-`itemNotesDelta` arriving goes to the editor with source `api`, guarded
-against echo by origin.
+Delta shape is Quill's, plain text only for now: a JSON array of
+`{"retain": n}` / `{"insert": "s"}` / `{"delete": n}`
+(`airday_core::NotesDeltaOp`, `serde(untagged)`).
 
-Commit policy: one commit per editor change is one encrypted op blob per
-keystroke, which is the exact input the measured boot-replay cost grows
-on (`tui-plan.md`; uncompacted offline ops replay superlinearly).
-`applyNotesDelta` applies immediately but the commit is coalesced on a
-short idle timer (proposal 300 ms, flushed on blur / close / visibility
-change), so a typing burst becomes one op. Compaction for the
-offline-by-default case (fold with retained outbox rows) becomes a
-prerequisite rather than a nice-to-have once notes are deltas.
+Rust side: `ensure_mergeable_text`, validate the whole delta against the
+current text (bounds, and no position inside a surrogate pair; a bad
+delta is rejected with `Invalid` and nothing is written), then walk it
+with a UTF-16 cursor calling `insert_utf16` / `delete_utf16`, commit with
+origin `notes:<itemId>`. Emits the whole-string `ItemNotesChanged` (store,
+search) and never echoes an `ItemNotesDelta` for a local apply. Event
+side: the diff classifier's text arm now carries the Loro delta
+(`CapturedDiff::ItemText`); at emission, a subscribed item's delta is
+converted scalars-to-UTF-16 against its shadow string (see Index units),
+the shadow advances, and `ItemNotesDelta` follows the `ItemNotesChanged`.
+If a delta does not fit the shadow, or the change was wholesale (a
+container re-set, a view-diff path), a full replace delta is emitted
+instead. `FullResync` refreshes every shadow; the editor re-subscribes
+on it. Subscription is explicit (`subscribe_notes` returns the text and
+seeds the shadow), so unsubscribed items cost nothing.
+
+Web adaptor (`TaskDialog.tsx`, `notesDelta.ts`): the editor keeps
+`synced` (the core's text) beside the DOM; every `input` event diffs
+them (common prefix / suffix in UTF-16 units, never splitting a
+surrogate pair) and sends the delta. An inbound delta is applied to
+`synced`, the DOM is re-rendered through the linkifier, and the caret is
+moved through the delta (`transformOffset`). IME: nothing is sent
+mid-composition; a remote delta that lands during one is applied to
+`synced` and the composed text is re-placed on top at `compositionend`
+(its position shifted through the inbound delta, its deletion kept only
+if the remote edit did not touch that range). Closing, target switch,
+blur, `visibilitychange` (hidden) and `pagehide` flush.
+
+Commit policy, as built: `applyNotesDelta` commits on every editor
+change, but that is not one op blob per keystroke. Loro merges
+consecutive commits from one peer into a single `Change` when nothing
+remote interleaves and the timestamps are within its merge interval
+(origin is not part of the change, so the `notes:` tag does not split
+them; verified 2026-09-08: 20 origin-tagged commits, `len_changes() ==
+1`). What decides the blob count is the capture (`captureLocalOps`, one
+WAL row and one push per `flush`), so the coalescing lives in the store:
+`applyNotesDelta` skips the store's `mutate` / `flush` path (no workspace
+undo step, no capture) and arms a 300 ms idle timer; `flushNotes` runs
+the capture now on blur / close / target switch / page hide. A typing
+burst is therefore one op blob holding one merged change. Compaction for
+the offline-by-default case (fold with retained outbox rows) remains a
+prerequisite for long offline editing sessions.
 
 Undo consequence: with notes commits excluded from the workspace
 `UndoManager` by origin prefix (see Undo under Rich text; the prefix hook
@@ -327,6 +358,16 @@ Accepted.
 Phase 2 deliverable: this bridge plus the current plain contenteditable
 dialog switched from full-string writes to deltas, so a live remote edit
 under the caret no longer replaces the whole field. Estimate: 1.5 days.
+**Done 2026-09-08.** Tests: `apply_notes_delta_*`, `notes_delta_*`,
+`remote_notes_edit_streams_a_utf16_delta_to_subscribers`,
+`remote_delta_converts_against_the_locally_advanced_shadow`,
+`undo_of_whole_string_notes_write_streams_a_delta`,
+`utf16_conversion_and_compose_helpers` in `core/src/doc.rs`;
+`js/web/test/notesDelta.test.ts` for the editor diff / caret transform.
+`edit_item_notes` (whole string, default origin, one undo step) stays for
+the CLI, import, and the new-item capture path. Not verified in a
+browser (no automation here): the IME re-placement path and caret
+restoration are covered by reading and the unit tests only.
 
 ## 4. Rich text (Phase 3)
 
@@ -451,7 +492,7 @@ Estimate: 3 days including the server spec, tests, and the web upload path.
 |---|---|---|
 | 0 | Raise the `loro` floor (1.13, then 1.16.0), build wasm, run tests. **Done 2026-09-08.** | 0.25 |
 | 1 | `notes` as mergeable `LoroText` (`text` stays a register), `update` diffing, content-clear (no key delete), classifier arm, schema v4 cutover, merge tests. **Done 2026-09-08.** | 1 |
-| 2 | Delta bridge (`_utf16` inbound, shadow-string outbound), coalesced commits, dialog writes deltas, live remote edits under caret | 1.5 |
+| 2 | Delta bridge (`_utf16` inbound, shadow-string outbound), coalesced capture, dialog writes deltas, live remote edits under caret. **Done 2026-09-08.** | 1.5 |
 | 3 | Rich text: style config, Quill 2 adaptor (or CodeMirror fallback), toolbar, paste whitelist, plain projection with `[image]` | 3 |
 | 4 | Attachments spec + server + client upload, image insert | 3 |
 

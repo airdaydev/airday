@@ -10,7 +10,7 @@ pub use crypto::*;
 pub use doc::{
     DefaultView, Doc, DocError, ExportItem, ExportLifecycle, ExportList, ExportSettings,
     INBOX_NAME, ImportSummary, ItemLifecycle, ItemView, JsonExport, LIST_INBOX, LaneSet, ListView,
-    SettingsView, WorkflowState,
+    NOTES_ORIGIN_PREFIX, NotesDeltaOp, SettingsView, WorkflowState,
 };
 pub use events::AppEvent;
 pub use storage::{

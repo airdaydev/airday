@@ -16,6 +16,7 @@
 
 import type { AppEventJs, SyncEngine } from "@airday/core/wasm";
 import { ItemLifecycle } from "@airday/core/wasm";
+import type { NotesDeltaOp } from "../notesDelta.ts";
 import { batch, createSignal, type Accessor } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import { createSearchEngine, type SearchEngine } from "../search.ts";
@@ -228,8 +229,25 @@ export interface DocApp {
   addItemsAt(listId: string, texts: string[], indexInList: number): string[];
   editItemText(id: string, text: string): void;
   /** Set the free-form notes string. Empty clears it; whitespace is
-   *  preserved verbatim. */
+   *  preserved verbatim. One undoable step; used for whole-value writes
+   *  (a new item's notes). An open editor uses the delta path below. */
   editItemNotes(id: string, notes: string): void;
+  /** Notes delta bridge (spec/notes-plan.md Phase 2). `subscribeNotes`
+   *  returns the current text and starts streaming remote / other-tab /
+   *  undo changes to `onNotesDelta` listeners as UTF-16 deltas; call it
+   *  again after a `null` (resync) notification to reload. Local edits go
+   *  through `applyNotesDelta`, which commits immediately (excluded from
+   *  workspace undo) but defers the durable capture + push to a short
+   *  idle timer so a typing burst is one op blob; `flushNotes` runs that
+   *  capture now (blur, close, page hide). */
+  subscribeNotes(id: string): string;
+  unsubscribeNotes(id: string): void;
+  applyNotesDelta(id: string, ops: readonly NotesDeltaOp[]): void;
+  flushNotes(): void;
+  /** Listen for inbound notes deltas. `ops` is `null` after a
+   *  `fullResync`: the subscriber must reload the text. Returns the
+   *  unsubscribe function. */
+  onNotesDelta(cb: (id: string, ops: readonly NotesDeltaOp[] | null) => void): () => void;
   /** Set (`YYYY-MM-DD`) or clear (`null`) an item's date-only deadline.
    *  The value is a floating local calendar date; a malformed string is
    *  rejected by the core. */
@@ -471,6 +489,15 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     );
   };
 
+  // Notes delta bridge state: editor listeners, and the idle timer that
+  // coalesces a typing burst into one capture + push.
+  const notesListeners = new Set<
+    (id: string, ops: readonly NotesDeltaOp[] | null) => void
+  >();
+  const NOTES_FLUSH_IDLE_MS = 300;
+  let notesFlushTimer: ReturnType<typeof setTimeout> | undefined;
+  let notesFlushPending = false;
+
   const dispatch = (ev: AppEventJs): void => {
     switch (ev.kind) {
       case "fullResync":
@@ -536,6 +563,16 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         if (state.itemsById[ev.id]) {
           setState("itemsById", ev.id, "notes", ev.notes ?? "");
         }
+        break;
+      }
+      case "itemNotesDelta": {
+        let ops: NotesDeltaOp[] = [];
+        try {
+          ops = JSON.parse(ev.delta ?? "[]") as NotesDeltaOp[];
+        } catch {
+          break;
+        }
+        for (const cb of notesListeners) cb(ev.id, ops);
         break;
       }
       case "itemLifecycleChanged": {
@@ -726,6 +763,9 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         // search engine do a wholesale rebuild from the fresh state
         // rather than try to track which events fell into the bucket.
         search.rebuild(next);
+        // Any per-item delta in the bucket is lost with it; subscribed
+        // editors reload from the fresh state.
+        for (const cb of notesListeners) cb("", null);
       } else {
         for (const ev of events) {
           dispatch(ev);
@@ -765,6 +805,14 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     // Local mutations enqueue AppEvents synchronously; pull them so
     // the next Solid tick sees the store update.
     drainEvents();
+  };
+
+  const flushNotesNow = (): void => {
+    clearTimeout(notesFlushTimer);
+    notesFlushTimer = undefined;
+    if (!notesFlushPending) return;
+    notesFlushPending = false;
+    flush();
   };
 
   const recordAction = (steps: number): void => {
@@ -841,6 +889,33 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     editItemNotes(id, notes) {
       mutate(() => engine.editItemNotes(id, notes));
+    },
+    subscribeNotes(id) {
+      return engine.subscribeNotes(id);
+    },
+    unsubscribeNotes(id) {
+      flushNotesNow();
+      engine.unsubscribeNotes(id);
+    },
+    applyNotesDelta(id, ops) {
+      if (ops.length === 0) return;
+      // Commits into the doc now (the store and search index see the
+      // new string on this drain) without recording a workspace undo
+      // step; the durable capture + push waits for the idle timer.
+      engine.applyNotesDelta(id, JSON.stringify(ops));
+      drainEvents();
+      notesFlushPending = true;
+      clearTimeout(notesFlushTimer);
+      notesFlushTimer = setTimeout(flushNotesNow, NOTES_FLUSH_IDLE_MS);
+    },
+    flushNotes() {
+      flushNotesNow();
+    },
+    onNotesDelta(cb) {
+      notesListeners.add(cb);
+      return () => {
+        notesListeners.delete(cb);
+      };
     },
     setItemDeadline(id, deadline) {
       mutate(() => engine.setItemDeadline(id, deadline ?? undefined));

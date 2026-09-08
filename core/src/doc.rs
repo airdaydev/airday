@@ -48,8 +48,9 @@ use std::sync::{Arc, Mutex};
 
 use loro::event::{Diff as LoroDiff, DiffEvent, ListDiffItem};
 use loro::{
-    Container, ContainerID, EventTriggerKind, ExportMode, Index, LoroDoc, LoroMap, LoroMovableList,
-    LoroText, LoroValue, Subscription, UndoManager, UpdateOptions, ValueOrContainer, VersionVector,
+    CommitOptions, Container, ContainerID, EventTriggerKind, ExportMode, Index, LoroDoc, LoroMap,
+    LoroMovableList, LoroText, LoroValue, Subscription, TextDelta, UndoManager, UpdateOptions,
+    ValueOrContainer, VersionVector,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -81,6 +82,11 @@ const FOCUS_CONTAINER: &str = "focus";
 const KEY_ID: &str = "id";
 const KEY_TEXT: &str = "text";
 const KEY_NOTES: &str = "notes";
+/// Commit origin prefix for notes delta writes (`spec/notes-plan.md`
+/// Phase 2). The workspace `UndoManager` excludes it, so typing in an
+/// open notes editor never lands on the workspace undo stack; the
+/// editor's own history owns notes undo while it is open.
+pub const NOTES_ORIGIN_PREFIX: &str = "notes:";
 /// Atomic location register: `"<list_id>:<placement_id>"`. Written as
 /// one scalar so list membership and placement can never be torn apart
 /// by concurrent edits. See `Location`.
@@ -145,6 +151,20 @@ const BULK_LIFECYCLE_EVENT_THRESHOLD: usize = 64;
 /// diff translation for the whole-doc resync fallback — one O(doc) pass
 /// beats per-item projection syncs for bulk imports or undo steps.
 const DIFF_TRANSLATE_MAX_DIRTY: usize = 64;
+
+/// One step of a plain-text delta over an item's notes, in the Quill
+/// delta shape (`spec/notes-plan.md` "Editor bindings"). Positions and
+/// counts are **UTF-16 code units**, the unit browser editors count in;
+/// the core converts to Loro's Unicode-scalar indices internally so no
+/// client ever handles the unit question. Serialises as
+/// `{"retain": n}` / `{"insert": "s"}` / `{"delete": n}`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum NotesDeltaOp {
+    Retain { retain: usize },
+    Insert { insert: String },
+    Delete { delete: usize },
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum DocError {
@@ -1050,6 +1070,15 @@ enum CapturedDiff {
         container: ContainerID,
         keys: Vec<String>,
     },
+    /// A text child of an item map changed (`notes`). Carries the Loro
+    /// delta (Unicode-scalar units) so a subscribed editor can receive
+    /// it as an `ItemNotesDelta`; the key is also treated as dirty on
+    /// the item map so the whole-string event still fires.
+    ItemText {
+        container: ContainerID,
+        key: String,
+        delta: Vec<TextDelta>,
+    },
     /// One `order/<list-id>` container changed (insert/delete/move).
     Order {
         list_id: String,
@@ -1107,14 +1136,15 @@ fn classify_captured_diff(
     // shape is `[(items, _), (item map, Key(id)), (text, Key(key))]`.
     // Translate to the item map dirty at that key; consumers re-read
     // the whole string from the view.
-    if let LoroDiff::Text(_) = diff {
+    if let LoroDiff::Text(delta) = diff {
         return match path {
             [(root, _), (item_map, _), (_, Index::Key(key))]
                 if root_name(root).as_deref() == Some(ROOT_ITEMS) =>
             {
-                CapturedDiff::ItemMap {
+                CapturedDiff::ItemText {
                     container: item_map.clone(),
-                    keys: [key.to_string()].into_iter().collect(),
+                    key: key.to_string(),
+                    delta: delta.clone(),
                 }
             }
             _ => CapturedDiff::Opaque,
@@ -1238,6 +1268,12 @@ pub struct Doc {
     /// gate prevents ordinary local mutations from accumulating diffs;
     /// callers enable it only around the operation they will translate.
     diff_capture: Arc<Mutex<DiffCapture>>,
+    /// Pre-change text of every item with a subscribed notes editor
+    /// (`subscribe_notes`). Loro's text diffs count Unicode scalars and
+    /// a delete carries only a count, so converting a remote delta to
+    /// UTF-16 needs the text as it was before the change; this is it.
+    /// Updated on every local delta and every translated remote delta.
+    notes_shadows: Mutex<HashMap<String, String>>,
     /// Root diff subscription feeding `diff_capture`. Dropping it
     /// unsubscribes, so it lives exactly as long as the doc.
     _diff_sub: Subscription,
@@ -1249,6 +1285,7 @@ pub struct Doc {
 fn make_undo_manager(inner: &LoroDoc) -> UndoManager {
     let mut um = UndoManager::new(inner);
     um.add_exclude_origin_prefix("remote");
+    um.add_exclude_origin_prefix(NOTES_ORIGIN_PREFIX);
     um
 }
 
@@ -1288,6 +1325,7 @@ impl Doc {
             undo,
             item_index,
             diff_capture,
+            notes_shadows: Mutex::new(HashMap::new()),
             _diff_sub,
         })
     }
@@ -1319,6 +1357,7 @@ impl Doc {
             undo,
             item_index,
             diff_capture,
+            notes_shadows: Mutex::new(HashMap::new()),
             _diff_sub,
         }
     }
@@ -1644,11 +1683,143 @@ impl Doc {
         }
         update_text(&text, notes)?;
         self.inner.commit();
+        self.refresh_notes_shadow(item_id, notes);
         self.push_event(AppEvent::ItemNotesChanged {
             id: item_id.to_string(),
             notes: notes.to_string(),
         });
         Ok(())
+    }
+
+    /// Start streaming an item's notes as deltas. Returns the current
+    /// plain text, which the caller's editor loads; from here on every
+    /// remote (or other-tab, or undo) change to this item's notes is
+    /// emitted as an `ItemNotesDelta` in UTF-16 units alongside the
+    /// whole-string `ItemNotesChanged`. Call `unsubscribe_notes` when the
+    /// editor closes. Subscribing again re-syncs (returns the text and
+    /// resets the shadow), which is the recovery step after `FullResync`.
+    pub fn subscribe_notes(&self, item_id: &str) -> Result<String, DocError> {
+        let map = self.find_item(item_id)?;
+        let notes = read_text(&map, KEY_NOTES).unwrap_or_default();
+        self.notes_shadows
+            .lock()
+            .expect("notes shadows mutex poisoned")
+            .insert(item_id.to_string(), notes.clone());
+        Ok(notes)
+    }
+
+    /// Stop streaming an item's notes. Unknown ids are ignored.
+    pub fn unsubscribe_notes(&self, item_id: &str) {
+        self.notes_shadows
+            .lock()
+            .expect("notes shadows mutex poisoned")
+            .remove(item_id);
+    }
+
+    /// Apply an editor delta (UTF-16 units) to an item's notes. One
+    /// commit, origin `notes:<item id>`, excluded from workspace undo.
+    /// The whole delta is validated against the current text before
+    /// anything is written: an out-of-range retain / delete, or a
+    /// position that would split a surrogate pair, rejects with
+    /// `Invalid` and leaves the doc untouched. Emits `ItemNotesChanged`
+    /// with the resulting plain text; no `ItemNotesDelta` (the caller
+    /// already has the delta).
+    pub fn apply_notes_delta(&self, item_id: &str, delta: &[NotesDeltaOp]) -> Result<(), DocError> {
+        let map = self.find_item(item_id)?;
+        let text = map.ensure_mergeable_text(KEY_NOTES)?;
+        let current = text.to_string();
+        validate_utf16_delta(&current, delta)?;
+        let mut pos = 0usize;
+        for op in delta {
+            match op {
+                NotesDeltaOp::Retain { retain } => pos += retain,
+                NotesDeltaOp::Delete { delete } => text.delete_utf16(pos, *delete)?,
+                NotesDeltaOp::Insert { insert } => {
+                    text.insert_utf16(pos, insert)?;
+                    pos += insert.encode_utf16().count();
+                }
+            }
+        }
+        self.inner
+            .commit_with(CommitOptions::new().origin(&format!("{NOTES_ORIGIN_PREFIX}{item_id}")));
+        let notes = text.to_string();
+        self.refresh_notes_shadow(item_id, &notes);
+        self.push_event(AppEvent::ItemNotesChanged {
+            id: item_id.to_string(),
+            notes,
+        });
+        Ok(())
+    }
+
+    /// View-diff paths (`emit_item_diffs` / `emit_state_diff`) know only
+    /// the whole strings; give subscribed editors a replace delta for
+    /// each `ItemNotesChanged` they produced.
+    fn emit_notes_deltas_for(&self, emitted: &[AppEvent]) {
+        for ev in emitted {
+            if let AppEvent::ItemNotesChanged { id, notes } = ev {
+                self.emit_notes_delta(id, &[], notes);
+            }
+        }
+    }
+
+    /// Point a subscribed item's shadow at `notes`; no-op when the item
+    /// is not subscribed.
+    fn refresh_notes_shadow(&self, item_id: &str, notes: &str) {
+        let mut shadows = self
+            .notes_shadows
+            .lock()
+            .expect("notes shadows mutex poisoned");
+        if let Some(shadow) = shadows.get_mut(item_id) {
+            *shadow = notes.to_string();
+        }
+    }
+
+    /// Emit `ItemNotesDelta` for a subscribed item after a translated
+    /// change. `deltas` are the captured Loro text diffs for this frame
+    /// in order (scalar units); an empty slice means the change was
+    /// wholesale (a container re-set), so the delta is a full replace.
+    /// If a delta does not fit the shadow, the shadow was out of step
+    /// and a full replace is emitted instead; either way the shadow
+    /// ends equal to `post`.
+    fn emit_notes_delta(&self, item_id: &str, deltas: &[Vec<TextDelta>], post: &str) {
+        let mut shadows = self
+            .notes_shadows
+            .lock()
+            .expect("notes shadows mutex poisoned");
+        let Some(shadow) = shadows.get_mut(item_id) else {
+            return;
+        };
+        let mut out: Vec<NotesDeltaOp> = Vec::new();
+        let mut cur = shadow.clone();
+        let mut ok = !deltas.is_empty();
+        if ok {
+            for d in deltas {
+                match utf16_delta_from_scalar(&cur, d) {
+                    Some((ops, next)) => {
+                        out = compose_utf16_deltas(&out, &ops);
+                        cur = next;
+                    }
+                    None => {
+                        ok = false;
+                        break;
+                    }
+                }
+            }
+            if ok && cur != post {
+                ok = false;
+            }
+        }
+        if !ok {
+            out = replace_delta(shadow, post);
+        }
+        *shadow = post.to_string();
+        drop(shadows);
+        if !out.is_empty() {
+            self.push_event(AppEvent::ItemNotesDelta {
+                id: item_id.to_string(),
+                delta: out,
+            });
+        }
     }
 
     /// Set or clear an item's date-only deadline. `Some(date)` validates
@@ -3512,6 +3683,9 @@ impl Doc {
         // the actively-moved candidates for minimal event emission.
         let mut active: HashMap<String, HashSet<String>> = HashMap::new();
         let mut entry_churn = 0usize;
+        // Text diffs per item container, in frame order, for the
+        // subscribed-editor delta stream.
+        let mut text_deltas: HashMap<ContainerID, Vec<Vec<TextDelta>>> = HashMap::new();
 
         {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
@@ -3527,6 +3701,14 @@ impl Doc {
                     }
                     CapturedDiff::ItemMap { container, keys } => {
                         map_dirty.entry(container).or_default().extend(keys);
+                    }
+                    CapturedDiff::ItemText {
+                        container,
+                        key,
+                        delta,
+                    } => {
+                        map_dirty.entry(container.clone()).or_default().insert(key);
+                        text_deltas.entry(container).or_default().push(delta);
                     }
                     CapturedDiff::Order { list_id, ops } => {
                         let shadow = shadows.entry(list_id.clone()).or_insert_with(|| {
@@ -3584,13 +3766,17 @@ impl Doc {
         // full-state events anyway; deleted containers are fine iff the
         // frame also removed them.
         let mut dirty_keys_by_id = HashMap::<String, HashSet<String>>::new();
+        let mut text_deltas_by_id = HashMap::<String, Vec<Vec<TextDelta>>>::new();
         for (cid, keys) in map_dirty {
-            let map = self.inner.get_map(cid);
+            let map = self.inner.get_map(cid.clone());
             let Some(id) = read_string(&map, KEY_ID) else {
                 continue;
             };
             if removals.contains(&id) || upserts.contains(&id) {
                 continue;
+            }
+            if let Some(deltas) = text_deltas.remove(&cid) {
+                text_deltas_by_id.insert(id.clone(), deltas);
             }
             dirty_keys_by_id.entry(id).or_default().extend(keys);
         }
@@ -3747,6 +3933,8 @@ impl Doc {
                         id: id.clone(),
                         notes: view.notes.clone(),
                     });
+                    let deltas = text_deltas_by_id.get(id).map(Vec::as_slice).unwrap_or(&[]);
+                    self.emit_notes_delta(id, deltas, &view.notes);
                 }
                 if has(KEY_DEADLINE) {
                     self.push_event(AppEvent::ItemDeadlineChanged {
@@ -4009,6 +4197,21 @@ impl Doc {
     /// current snapshot once; they are never flooded with N synthetic adds.
     fn emit_diff_fallback(&self) {
         self.rebuild_index();
+        // Subscribed editors re-subscribe on `FullResync` (which resets
+        // their shadow); refresh here too so a consumer that only
+        // re-reads the string still converts later deltas correctly.
+        {
+            let items = self.items();
+            let mut shadows = self
+                .notes_shadows
+                .lock()
+                .expect("notes shadows mutex poisoned");
+            for (id, shadow) in shadows.iter_mut() {
+                if let Some(map) = item_map_of(&items, id) {
+                    *shadow = read_text(&map, KEY_NOTES).unwrap_or_default();
+                }
+            }
+        }
         let mut events = self.events.lock().expect("events mutex poisoned");
         events.clear();
         events.push_back(AppEvent::FullResync);
@@ -4169,6 +4372,7 @@ impl Doc {
             item_index,
             undo,
             diff_capture,
+            notes_shadows: Mutex::new(HashMap::new()),
             _diff_sub,
         };
         doc.rebuild_index();
@@ -4416,6 +4620,7 @@ impl Doc {
         let post_items: Vec<ItemView> = self.iter_items().collect();
         let mut emitted = Vec::new();
         diff_items(pre_items, &post_items, &mut emitted);
+        self.emit_notes_deltas_for(&emitted);
         if !emitted.is_empty() {
             let mut q = self.events.lock().expect("events mutex poisoned");
             for ev in emitted {
@@ -4462,6 +4667,7 @@ impl Doc {
         diff_settings(pre_settings, &post_settings, &mut emitted);
         diff_lists(pre_lists, &post_lists, &mut emitted);
         diff_items(pre_items, &post_items, &mut emitted);
+        self.emit_notes_deltas_for(&emitted);
         if !emitted.is_empty() {
             let mut q = self.events.lock().expect("events mutex poisoned");
             for ev in emitted {
@@ -4555,6 +4761,237 @@ fn read_text(map: &LoroMap, key: &str) -> Option<String> {
 fn update_text(text: &LoroText, target: &str) -> Result<(), DocError> {
     text.update(target, UpdateOptions::default())
         .map_err(|e| DocError::Invalid(e.to_string()))
+}
+
+/// Check a UTF-16 delta against the text it will be applied to: every
+/// retain / delete stays within the text and every position it lands on
+/// is a scalar boundary (never inside a surrogate pair). Inserts are
+/// only counted. Nothing is written here, so a bad delta is rejected
+/// whole rather than half-applied.
+fn validate_utf16_delta(current: &str, delta: &[NotesDeltaOp]) -> Result<(), DocError> {
+    // UTF-16 offsets that begin a scalar, plus the end offset.
+    let mut boundaries = HashSet::new();
+    let mut total = 0usize;
+    for c in current.chars() {
+        boundaries.insert(total);
+        total += c.len_utf16();
+    }
+    boundaries.insert(total);
+    let bad = |what: &str| DocError::Invalid(format!("notes delta: {what}"));
+    let mut pos = 0usize;
+    for op in delta {
+        match op {
+            NotesDeltaOp::Retain { retain } => {
+                pos = pos.checked_add(*retain).ok_or_else(|| bad("overflow"))?;
+                if pos > total {
+                    return Err(bad("retain past end"));
+                }
+            }
+            NotesDeltaOp::Delete { delete } => {
+                let end = pos.checked_add(*delete).ok_or_else(|| bad("overflow"))?;
+                if end > total {
+                    return Err(bad("delete past end"));
+                }
+                if !boundaries.contains(&pos) || !boundaries.contains(&end) {
+                    return Err(bad("delete splits a surrogate pair"));
+                }
+                // The text shrinks, but so does every later offset; keep
+                // validating against the original coordinates by
+                // shifting the boundary set is overkill for short notes:
+                // rebuild the remaining boundaries instead.
+                let removed = end - pos;
+                boundaries = boundaries
+                    .into_iter()
+                    .filter(|b| *b < pos || *b >= end)
+                    .map(|b| if b >= end { b - removed } else { b })
+                    .collect();
+                total -= removed;
+            }
+            NotesDeltaOp::Insert { insert } => {
+                if !boundaries.contains(&pos) {
+                    return Err(bad("insert splits a surrogate pair"));
+                }
+                let len = insert.encode_utf16().count();
+                boundaries = boundaries
+                    .into_iter()
+                    .map(|b| if b >= pos { b + len } else { b })
+                    .collect();
+                let mut off = pos;
+                for c in insert.chars() {
+                    boundaries.insert(off);
+                    off += c.len_utf16();
+                }
+                total += len;
+                pos += len;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Convert a Loro text delta (Unicode-scalar units) into UTF-16 units
+/// against `pre`, the text before the change. Returns the converted
+/// delta and the text after the change, or `None` when the delta does
+/// not fit `pre` (the shadow was out of step). Attributes are dropped:
+/// Phase 2 is plain text.
+fn utf16_delta_from_scalar(pre: &str, delta: &[TextDelta]) -> Option<(Vec<NotesDeltaOp>, String)> {
+    let chars: Vec<char> = pre.chars().collect();
+    let mut cursor = 0usize;
+    let mut out = Vec::with_capacity(delta.len());
+    let mut post = String::with_capacity(pre.len());
+    for op in delta {
+        match op {
+            TextDelta::Retain { retain, .. } => {
+                let end = cursor.checked_add(*retain)?;
+                let slice = chars.get(cursor..end)?;
+                let n: usize = slice.iter().map(|c| c.len_utf16()).sum();
+                post.extend(slice);
+                out.push(NotesDeltaOp::Retain { retain: n });
+                cursor = end;
+            }
+            TextDelta::Delete { delete } => {
+                let end = cursor.checked_add(*delete)?;
+                let slice = chars.get(cursor..end)?;
+                let n: usize = slice.iter().map(|c| c.len_utf16()).sum();
+                out.push(NotesDeltaOp::Delete { delete: n });
+                cursor = end;
+            }
+            TextDelta::Insert { insert, .. } => {
+                post.push_str(insert);
+                out.push(NotesDeltaOp::Insert {
+                    insert: insert.clone(),
+                });
+            }
+        }
+    }
+    post.extend(chars.get(cursor..)?);
+    Some((out, post))
+}
+
+/// Full-replace delta from `pre` to `post` (UTF-16 units): delete
+/// everything, insert the new text. Empty when they are equal.
+fn replace_delta(pre: &str, post: &str) -> Vec<NotesDeltaOp> {
+    if pre == post {
+        return Vec::new();
+    }
+    let mut out = Vec::with_capacity(2);
+    let len = pre.encode_utf16().count();
+    if len > 0 {
+        out.push(NotesDeltaOp::Delete { delete: len });
+    }
+    if !post.is_empty() {
+        out.push(NotesDeltaOp::Insert {
+            insert: post.to_string(),
+        });
+    }
+    out
+}
+
+/// Compose two UTF-16 deltas so that `compose(a, b)` applied to a text
+/// equals applying `a` then `b`. Standard Quill compose over plain
+/// text (no attributes). Trailing retains are trimmed.
+fn compose_utf16_deltas(a: &[NotesDeltaOp], b: &[NotesDeltaOp]) -> Vec<NotesDeltaOp> {
+    if a.is_empty() {
+        return trim_delta(b.to_vec());
+    }
+    if b.is_empty() {
+        return trim_delta(a.to_vec());
+    }
+    // Expand `a` into a per-unit stream is wasteful; instead iterate
+    // both with remaining counts.
+    #[derive(Clone)]
+    enum Cur {
+        Retain(usize),
+        Insert(Vec<u16>),
+        Delete(usize),
+    }
+    let to_cur = |op: &NotesDeltaOp| match op {
+        NotesDeltaOp::Retain { retain } => Cur::Retain(*retain),
+        NotesDeltaOp::Insert { insert } => Cur::Insert(insert.encode_utf16().collect()),
+        NotesDeltaOp::Delete { delete } => Cur::Delete(*delete),
+    };
+    let mut ai = a.iter().map(to_cur).peekable();
+    let mut bi = b.iter().map(to_cur).peekable();
+    let mut out: Vec<Cur> = Vec::new();
+    let push = |out: &mut Vec<Cur>, c: Cur| match (out.last_mut(), c) {
+        (Some(Cur::Retain(x)), Cur::Retain(y)) => *x += y,
+        (Some(Cur::Delete(x)), Cur::Delete(y)) => *x += y,
+        (Some(Cur::Insert(x)), Cur::Insert(y)) => x.extend(y),
+        (_, c) => out.push(c),
+    };
+    let mut a_cur: Option<Cur> = ai.next();
+    let mut b_cur: Option<Cur> = bi.next();
+    loop {
+        match (a_cur.take(), b_cur.take()) {
+            (None, None) => break,
+            (Some(x), None) => {
+                push(&mut out, x);
+                a_cur = ai.next();
+            }
+            (None, Some(y)) => {
+                push(&mut out, y);
+                b_cur = bi.next();
+            }
+            (Some(Cur::Delete(n)), y) => {
+                // Deletes in `a` pass through untouched.
+                push(&mut out, Cur::Delete(n));
+                a_cur = ai.next();
+                b_cur = y;
+            }
+            (x, Some(Cur::Insert(s))) => {
+                // Inserts in `b` pass through untouched.
+                push(&mut out, Cur::Insert(s));
+                b_cur = bi.next();
+                a_cur = x;
+            }
+            (Some(Cur::Retain(n)), Some(Cur::Retain(m))) => {
+                let k = n.min(m);
+                push(&mut out, Cur::Retain(k));
+                a_cur = (n > k).then_some(Cur::Retain(n - k)).or_else(|| ai.next());
+                b_cur = (m > k).then_some(Cur::Retain(m - k)).or_else(|| bi.next());
+            }
+            (Some(Cur::Retain(n)), Some(Cur::Delete(m))) => {
+                let k = n.min(m);
+                push(&mut out, Cur::Delete(k));
+                a_cur = (n > k).then_some(Cur::Retain(n - k)).or_else(|| ai.next());
+                b_cur = (m > k).then_some(Cur::Delete(m - k)).or_else(|| bi.next());
+            }
+            (Some(Cur::Insert(s)), Some(Cur::Retain(m))) => {
+                let k = s.len().min(m);
+                push(&mut out, Cur::Insert(s[..k].to_vec()));
+                a_cur = (s.len() > k)
+                    .then(|| Cur::Insert(s[k..].to_vec()))
+                    .or_else(|| ai.next());
+                b_cur = (m > k).then_some(Cur::Retain(m - k)).or_else(|| bi.next());
+            }
+            (Some(Cur::Insert(s)), Some(Cur::Delete(m))) => {
+                // `b` deletes what `a` inserted: they cancel.
+                let k = s.len().min(m);
+                a_cur = (s.len() > k)
+                    .then(|| Cur::Insert(s[k..].to_vec()))
+                    .or_else(|| ai.next());
+                b_cur = (m > k).then_some(Cur::Delete(m - k)).or_else(|| bi.next());
+            }
+        }
+    }
+    let ops = out
+        .into_iter()
+        .map(|c| match c {
+            Cur::Retain(n) => NotesDeltaOp::Retain { retain: n },
+            Cur::Delete(n) => NotesDeltaOp::Delete { delete: n },
+            Cur::Insert(u) => NotesDeltaOp::Insert {
+                insert: String::from_utf16_lossy(&u),
+            },
+        })
+        .collect();
+    trim_delta(ops)
+}
+
+fn trim_delta(mut ops: Vec<NotesDeltaOp>) -> Vec<NotesDeltaOp> {
+    while matches!(ops.last(), Some(NotesDeltaOp::Retain { .. })) {
+        ops.pop();
+    }
+    ops
 }
 
 fn read_i64(map: &LoroMap, key: &str) -> Option<i64> {
@@ -8109,6 +8546,7 @@ mod tests {
             events: Mutex::new(VecDeque::new()),
             undo,
             diff_capture,
+            notes_shadows: Mutex::new(HashMap::new()),
             _diff_sub,
         };
         restored.rebuild_index();
@@ -9419,5 +9857,262 @@ mod tests {
         again.import_json_str(&dst.export_json_string()).unwrap();
         let v: Vec<ItemView> = again.iter_items().collect();
         assert_eq!(v[0].notes, items[0].notes);
+    }
+
+    // ---- notes delta bridge (spec/notes-plan.md Phase 2) ----
+
+    fn d_retain(n: usize) -> NotesDeltaOp {
+        NotesDeltaOp::Retain { retain: n }
+    }
+    fn d_insert(s: &str) -> NotesDeltaOp {
+        NotesDeltaOp::Insert {
+            insert: s.to_string(),
+        }
+    }
+    fn d_delete(n: usize) -> NotesDeltaOp {
+        NotesDeltaOp::Delete { delete: n }
+    }
+
+    fn notes_deltas(evs: &[AppEvent]) -> Vec<(String, Vec<NotesDeltaOp>)> {
+        evs.iter()
+            .filter_map(|e| match e {
+                AppEvent::ItemNotesDelta { id, delta } => Some((id.clone(), delta.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn notes_delta_ops_serialise_in_quill_shape() {
+        let ops = vec![d_retain(2), d_insert("hi"), d_delete(1)];
+        let json = serde_json::to_string(&ops).unwrap();
+        assert_eq!(json, r#"[{"retain":2},{"insert":"hi"},{"delete":1}]"#);
+        let back: Vec<NotesDeltaOp> = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, ops);
+    }
+
+    #[test]
+    fn apply_notes_delta_edits_in_utf16_units() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_INBOX, "item").unwrap();
+        doc.apply_notes_delta(&id, &[d_insert("a😀b")]).unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().notes, "a😀b");
+        // 😀 is one scalar, two UTF-16 units: an editor offset of 3 is
+        // after it.
+        doc.apply_notes_delta(&id, &[d_retain(3), d_insert("X")])
+            .unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().notes, "a😀Xb");
+        doc.apply_notes_delta(&id, &[d_retain(1), d_delete(2)])
+            .unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().notes, "aXb");
+        let evs = doc.drain_events();
+        assert!(
+            evs.iter()
+                .all(|e| !matches!(e, AppEvent::ItemNotesDelta { .. })),
+            "local applies never echo a delta: {evs:?}"
+        );
+        assert_eq!(
+            evs.iter()
+                .filter(|e| matches!(e, AppEvent::ItemNotesChanged { .. }))
+                .count(),
+            3,
+            "{evs:?}"
+        );
+    }
+
+    #[test]
+    fn apply_notes_delta_rejects_bad_deltas_whole() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_INBOX, "item").unwrap();
+        doc.apply_notes_delta(&id, &[d_insert("a😀b")]).unwrap();
+        let vv = doc.inner.oplog_vv();
+        // Split the surrogate pair.
+        let err = doc
+            .apply_notes_delta(&id, &[d_retain(2), d_insert("X")])
+            .unwrap_err();
+        assert!(matches!(err, DocError::Invalid(_)), "{err:?}");
+        // Retain past the end, after a valid first step.
+        let err = doc
+            .apply_notes_delta(&id, &[d_insert("ok"), d_retain(9), d_insert("X")])
+            .unwrap_err();
+        assert!(matches!(err, DocError::Invalid(_)), "{err:?}");
+        let err = doc
+            .apply_notes_delta(&id, &[d_retain(1), d_delete(1)])
+            .unwrap_err();
+        assert!(matches!(err, DocError::Invalid(_)), "{err:?}");
+        assert_eq!(doc.get_item(&id).unwrap().notes, "a😀b");
+        assert_eq!(doc.inner.oplog_vv(), vv, "nothing written");
+    }
+
+    #[test]
+    fn notes_delta_commits_are_excluded_from_workspace_undo() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_INBOX, "item").unwrap();
+        doc.apply_notes_delta(&id, &[d_insert("typed")]).unwrap();
+        let _ = doc.drain_events();
+        // The only undoable step is the add; the notes commit is skipped.
+        assert!(doc.undo().unwrap());
+        assert!(doc.get_item(&id).is_none());
+        assert!(!doc.can_undo());
+    }
+
+    #[test]
+    fn remote_notes_edit_streams_a_utf16_delta_to_subscribers() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let id = a.add_item(LIST_INBOX, "item").unwrap();
+        let other = a.add_item(LIST_INBOX, "other").unwrap();
+        a.edit_item_notes(&id, "a😀b").unwrap();
+        a.edit_item_notes(&other, "x").unwrap();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        assert_eq!(b.subscribe_notes(&id).unwrap(), "a😀b");
+        a.apply_notes_delta(&id, &[d_retain(4), d_insert("!")])
+            .unwrap();
+        a.edit_item_notes(&other, "xy").unwrap();
+        exchange(&mut a, &mut b, &dek);
+
+        let evs = b.drain_events();
+        assert!(!evs.contains(&AppEvent::FullResync), "{evs:?}");
+        assert_eq!(
+            notes_deltas(&evs),
+            vec![(id.clone(), vec![d_retain(4), d_insert("!")])],
+            "subscribed item streams, unsubscribed does not: {evs:?}"
+        );
+        assert!(evs.contains(&AppEvent::ItemNotesChanged {
+            id: other.clone(),
+            notes: "xy".into()
+        }));
+        assert_eq!(b.get_item(&id).unwrap().notes, "a😀b!");
+
+        // Unsubscribe: no more deltas, whole-string events continue.
+        b.unsubscribe_notes(&id);
+        a.apply_notes_delta(&id, &[d_delete(1)]).unwrap();
+        exchange(&mut a, &mut b, &dek);
+        let evs = b.drain_events();
+        assert!(notes_deltas(&evs).is_empty(), "{evs:?}");
+        assert!(evs.contains(&AppEvent::ItemNotesChanged {
+            id: id.clone(),
+            notes: "😀b!".into()
+        }));
+    }
+
+    #[test]
+    fn remote_delta_converts_against_the_locally_advanced_shadow() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let id = a.add_item(LIST_INBOX, "item").unwrap();
+        a.edit_item_notes(&id, "hello").unwrap();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        // a's editor is open; a types at the end while b prepends
+        // offline. The shadow on a must already include a's own edit
+        // when b's insert is converted.
+        a.subscribe_notes(&id).unwrap();
+        a.apply_notes_delta(&id, &[d_retain(5), d_insert(" a")])
+            .unwrap();
+        b.apply_notes_delta(&id, &[d_insert("😀 ")]).unwrap();
+        let _ = a.drain_events();
+        exchange(&mut a, &mut b, &dek);
+
+        assert_eq!(a.get_item(&id).unwrap().notes, "😀 hello a");
+        let evs = a.drain_events();
+        assert_eq!(
+            notes_deltas(&evs),
+            vec![(id.clone(), vec![d_insert("😀 ")])],
+            "{evs:?}"
+        );
+        // A follow-up remote edit after the emoji still converts in
+        // UTF-16 (😀 = 2 units): b appends after "hello".
+        b.apply_notes_delta(&id, &[d_retain(8), d_insert("!")])
+            .unwrap();
+        exchange(&mut a, &mut b, &dek);
+        assert_eq!(a.get_item(&id).unwrap().notes, "😀 hello! a");
+        let evs = a.drain_events();
+        assert_eq!(
+            notes_deltas(&evs),
+            vec![(id.clone(), vec![d_retain(8), d_insert("!")])],
+            "{evs:?}"
+        );
+    }
+
+    #[test]
+    fn undo_of_whole_string_notes_write_streams_a_delta() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_INBOX, "item").unwrap();
+        doc.edit_item_notes(&id, "one").unwrap();
+        doc.edit_item_notes(&id, "one two").unwrap();
+        doc.subscribe_notes(&id).unwrap();
+        let _ = doc.drain_events();
+        assert!(doc.undo().unwrap());
+        let evs = doc.drain_events();
+        assert_eq!(doc.get_item(&id).unwrap().notes, "one");
+        assert_eq!(
+            notes_deltas(&evs),
+            vec![(id.clone(), vec![d_retain(3), d_delete(4)])],
+            "{evs:?}"
+        );
+    }
+
+    #[test]
+    fn utf16_conversion_and_compose_helpers() {
+        // Scalar delta over "a😀b": retain 2 scalars (a, 😀) = 3 units.
+        let scalar = vec![
+            TextDelta::Retain {
+                retain: 2,
+                attributes: None,
+            },
+            TextDelta::Insert {
+                insert: "X".into(),
+                attributes: None,
+            },
+            TextDelta::Delete { delete: 1 },
+        ];
+        let (ops, post) = utf16_delta_from_scalar("a😀b", &scalar).unwrap();
+        assert_eq!(ops, vec![d_retain(3), d_insert("X"), d_delete(1)]);
+        assert_eq!(post, "a😀X");
+        // Out of step: retain past the shadow.
+        assert!(utf16_delta_from_scalar("ab", &scalar).is_none());
+
+        assert_eq!(replace_delta("a😀", "z"), vec![d_delete(3), d_insert("z")]);
+        assert!(replace_delta("same", "same").is_empty());
+        assert_eq!(replace_delta("", "new"), vec![d_insert("new")]);
+
+        // compose: insert "ab" at 0, then delete 1 at 0 -> insert "b".
+        let c = compose_utf16_deltas(&[d_insert("ab")], &[d_delete(1)]);
+        assert_eq!(c, vec![d_insert("b")]);
+        // retain 2 + insert "X", then retain 1 + delete 1 (deletes the
+        // original 2nd char) -> retain 1, delete 1, insert "X".
+        let c = compose_utf16_deltas(&[d_retain(2), d_insert("X")], &[d_retain(1), d_delete(1)]);
+        assert_eq!(c, vec![d_retain(1), d_delete(1), d_insert("X")]);
+        // Applying compose(a, b) equals applying a then b.
+        let apply = |text: &str, ops: &[NotesDeltaOp]| -> String {
+            let units: Vec<u16> = text.encode_utf16().collect();
+            let mut out: Vec<u16> = Vec::new();
+            let mut pos = 0;
+            for op in ops {
+                match op {
+                    NotesDeltaOp::Retain { retain } => {
+                        out.extend(&units[pos..pos + retain]);
+                        pos += retain;
+                    }
+                    NotesDeltaOp::Delete { delete } => pos += delete,
+                    NotesDeltaOp::Insert { insert } => out.extend(insert.encode_utf16()),
+                }
+            }
+            out.extend(&units[pos..]);
+            String::from_utf16(&out).unwrap()
+        };
+        let a_ops = vec![d_retain(2), d_insert("XY"), d_delete(1)];
+        let b_ops = vec![
+            d_retain(1),
+            d_delete(2),
+            d_insert("q"),
+            d_retain(1),
+            d_insert("!"),
+        ];
+        let via_two = apply(&apply("hello", &a_ops), &b_ops);
+        let via_one = apply("hello", &compose_utf16_deltas(&a_ops, &b_ops));
+        assert_eq!(via_one, via_two);
     }
 }

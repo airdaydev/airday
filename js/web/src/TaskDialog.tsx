@@ -2,10 +2,12 @@
 // mobile, or an inline pane when the desktop side panel is showing) driven
 // purely by an item id, so the same component can later back a native
 // detached window. Notes live here only — the inline row editor is
-// text-only "quick entry". Edits are buffered locally and flushed to the
-// engine on close and before stepping to a neighbour (last-write-on-close
-// wins; live peer edits while open are intentionally ignored, matching the
-// old inline notes editor).
+// text-only "quick entry". The title is buffered locally and flushed to
+// the engine on close and before stepping to a neighbour (last write on
+// close wins). Notes stream as deltas both ways (spec/notes-plan.md Phase
+// 2): every input event sends the editor's change to the core, and a live
+// peer edit arrives as a delta that is applied under the caret instead of
+// replacing the field.
 
 import { Dialog } from "@kobalte/core/dialog";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
@@ -36,9 +38,16 @@ import {
   collapsedCaretOffset,
   openLinkOnClick,
   placeCaretAtEnd,
+  placeCaretAtOffset,
   placeCaretAtStart,
   setLinkifiedText,
 } from "./linkify.ts";
+import {
+  applyDelta,
+  diffToDelta,
+  transformOffset,
+  type NotesDeltaOp,
+} from "./notesDelta.ts";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
 import { itemUrl } from "./url.ts";
 import { trackOverlay } from "./overlay.ts";
@@ -260,6 +269,173 @@ export function TaskDialog(props: {
   // written from the load effect, never read reactively.
   let loadedId: string | null = null;
 
+  // Notes delta bridge. `synced` is the notes text the core holds for the
+  // subscribed item (what the editor last sent or received); `notes()`
+  // tracks the editor DOM. Their diff is the pending local delta.
+  let subscribedId: string | null = null;
+  let synced = "";
+  // IME state: nothing crosses the boundary mid-composition (a lone
+  // surrogate would be re-encoded on the way in). `compositionBase` is
+  // the synced text when the composition began; inbound deltas that
+  // land during it are applied to `synced` and remembered so the
+  // composed text can be re-placed on top of them at the end.
+  let composing = false;
+  let compositionBase = "";
+  let inboundDuringComposition: NotesDeltaOp[] | null = null;
+
+  const unsubscribeNotes = () => {
+    if (!subscribedId) return;
+    props.app.unsubscribeNotes(subscribedId);
+    subscribedId = null;
+  };
+  // Subscribe the editor to `id`; returns the core's current notes text.
+  // A missing item (deleted under us) falls back to the store's copy and
+  // leaves the editor unsubscribed, so its writes go the whole-string way.
+  const subscribeNotes = (id: string, fallback: string): string => {
+    unsubscribeNotes();
+    try {
+      synced = props.app.subscribeNotes(id);
+      subscribedId = id;
+    } catch {
+      synced = fallback;
+    }
+    composing = false;
+    inboundDuringComposition = null;
+    return synced;
+  };
+  // Send the editor's pending local edit as a delta. Skipped mid-IME.
+  const commitLocalEdit = () => {
+    if (!subscribedId || composing) return;
+    const next = notes();
+    const ops = diffToDelta(synced, next);
+    if (!ops) return;
+    try {
+      props.app.applyNotesDelta(subscribedId, ops);
+      synced = next;
+    } catch (e) {
+      console.error("applyNotesDelta failed:", e);
+      resyncNotesFromCore();
+    }
+  };
+  // Reload the editor from the core (after a full resync, or a delta
+  // that did not fit), keeping the caret where it was if it is in the
+  // notes.
+  const resyncNotesFromCore = () => {
+    if (!subscribedId) return;
+    const id = subscribedId;
+    const caret = notesRef ? collapsedCaretOffset(notesRef) : null;
+    const text = subscribeNotes(id, props.app.state.itemsById[id]?.notes ?? "");
+    setNotes(text);
+    loadEditor(notesRef, text);
+    if (caret !== null && notesRef && document.activeElement === notesRef) {
+      placeCaretAtOffset(notesRef, Math.min(caret, text.length));
+    }
+  };
+  // Apply an inbound delta to the buffer and the DOM, moving the caret
+  // with it. The DOM is re-rendered wholesale (notes are short and the
+  // linkifier owns the markup); the caret survives via its offset.
+  const applyInboundToEditor = (ops: readonly NotesDeltaOp[]) => {
+    const caret = notesRef ? collapsedCaretOffset(notesRef) : null;
+    const next = applyDelta(synced, ops);
+    synced = next;
+    setNotes(next);
+    loadEditor(notesRef, next);
+    if (caret !== null && notesRef && document.activeElement === notesRef) {
+      placeCaretAtOffset(notesRef, transformOffset(caret, ops));
+    }
+  };
+  const offNotesDelta = props.app.onNotesDelta((id, ops) => {
+    if (!subscribedId) return;
+    if (ops === null) {
+      resyncNotesFromCore();
+      return;
+    }
+    if (id !== subscribedId) return;
+    if (composing) {
+      // Keep `synced` truthful; the DOM catches up at compositionend.
+      synced = applyDelta(synced, ops);
+      inboundDuringComposition = inboundDuringComposition
+        ? [...inboundDuringComposition, ...ops]
+        : [...ops];
+      return;
+    }
+    // Fold any unsent local edit in first so the inbound delta lands on
+    // the text the core converted it against.
+    commitLocalEdit();
+    applyInboundToEditor(ops);
+  });
+  onCleanup(offNotesDelta);
+  const onNotesCompositionStart = () => {
+    if (!subscribedId) return;
+    commitLocalEdit();
+    composing = true;
+    compositionBase = synced;
+    inboundDuringComposition = null;
+  };
+  const onNotesCompositionEnd = () => {
+    if (!composing) return;
+    composing = false;
+    setNotes(editorText(notesRef));
+    const inbound = inboundDuringComposition;
+    inboundDuringComposition = null;
+    if (!inbound || !subscribedId) {
+      commitLocalEdit();
+      return;
+    }
+    // Remote text arrived mid-composition. Re-place the composed edit on
+    // top of the new text: shift its position through the inbound
+    // delta, and keep its deletion only if nothing remote touched that
+    // range (otherwise the remote text wins and the composed text is
+    // inserted beside it).
+    const local = diffToDelta(compositionBase, notes());
+    if (!local) {
+      applyInboundToEditor([]);
+      return;
+    }
+    let retain = 0;
+    let del = 0;
+    let insert = "";
+    for (const op of local) {
+      if ("retain" in op) retain = op.retain;
+      else if ("delete" in op) del = op.delete;
+      else insert = op.insert;
+    }
+    const start = transformOffset(retain, inbound);
+    const end = transformOffset(retain + del, inbound);
+    const safeDelete = end - start === del ? del : 0;
+    const ops: NotesDeltaOp[] = [];
+    if (start > 0) ops.push({ retain: start });
+    if (safeDelete > 0) ops.push({ delete: safeDelete });
+    if (insert) ops.push({ insert });
+    try {
+      if (ops.length > 0) props.app.applyNotesDelta(subscribedId, ops);
+      synced = applyDelta(synced, ops);
+      setNotes(synced);
+      loadEditor(notesRef, synced);
+      if (notesRef && document.activeElement === notesRef) {
+        placeCaretAtOffset(notesRef, start + insert.length);
+      }
+    } catch (e) {
+      console.error("applyNotesDelta failed:", e);
+      resyncNotesFromCore();
+    }
+  };
+  // Durable capture + push of a typing burst happens on an idle timer;
+  // leaving the editor, hiding the page, or unloading runs it now.
+  const flushNotesNow = () => {
+    commitLocalEdit();
+    props.app.flushNotes();
+  };
+  const onVisibility = () => {
+    if (document.visibilityState === "hidden") flushNotesNow();
+  };
+  document.addEventListener("visibilitychange", onVisibility);
+  window.addEventListener("pagehide", flushNotesNow);
+  onCleanup(() => {
+    document.removeEventListener("visibilitychange", onVisibility);
+    window.removeEventListener("pagehide", flushNotesNow);
+  });
+
   // Read the plain text out of a contenteditable editor, stripping the stray
   // <br> browsers leave behind when the last character is deleted so the
   // :empty placeholder returns.
@@ -306,6 +482,7 @@ export function TaskDialog(props: {
     sel.addRange(range);
     ensureTrailingBreak(el);
     setNotes(editorText(el));
+    commitLocalEdit();
     return true;
   };
 
@@ -322,7 +499,19 @@ export function TaskDialog(props: {
     const t = text().trim();
     if (t && t !== it.text) props.app.editItemText(id, t);
     const n = notes();
-    if (n !== it.notes) props.app.editItemNotes(id, n);
+    if (subscribedId === id) {
+      // Streaming: the core already holds every sent edit. Send what is
+      // still pending, fall back to a whole-string write for anything a
+      // composition left unsent, then make the burst durable.
+      commitLocalEdit();
+      if (n !== synced) {
+        props.app.editItemNotes(id, n);
+        synced = n;
+      }
+      props.app.flushNotes();
+    } else if (n !== it.notes) {
+      props.app.editItemNotes(id, n);
+    }
   };
 
   // Settle whatever the buffers currently hold: commit a pending capture,
@@ -345,13 +534,16 @@ export function TaskDialog(props: {
     const key = id ?? (nw ? "new" : null);
     if (key === loadedId) return;
     untrack(settle);
+    unsubscribeNotes();
     loadedId = key;
     // Closed: the editors unmount; forgetting the target means reopening
     // the same item re-pushes its content into fresh editors.
     if (key === null) return;
     const it = id ? props.app.state.itemsById[id] : undefined;
     const t = it?.text ?? "";
-    const n = it?.notes ?? "";
+    // The core's text is the truth for an open item (the store's copy
+    // is the same string one drain behind); a capture has none yet.
+    const n = id ? subscribeNotes(id, it?.notes ?? "") : "";
     setText(t);
     setNotes(n);
     setNewDeadline(null);
@@ -369,7 +561,10 @@ export function TaskDialog(props: {
 
   // Unmounting mid-edit (the shell swapping, the workspace tearing down)
   // must not drop buffered edits.
-  onCleanup(settle);
+  onCleanup(() => {
+    settle();
+    unsubscribeNotes();
+  });
 
   // Commit new-item mode: create the item in its target lane's workflow
   // state iff the title is non-empty, then close. A capture without an
@@ -686,7 +881,13 @@ export function TaskDialog(props: {
             role="textbox"
             aria-multiline="true"
             data-placeholder={m().workspace.notes}
-            onInput={() => setNotes(editorText(notesRef))}
+            onInput={() => {
+              setNotes(editorText(notesRef));
+              commitLocalEdit();
+            }}
+            onBlur={flushNotesNow}
+            on:compositionstart={onNotesCompositionStart}
+            on:compositionend={onNotesCompositionEnd}
             onKeyDown={onNotesKeyDown}
             on:beforeinput={onNotesBeforeInput}
             onPaste={pasteAsPlainText}

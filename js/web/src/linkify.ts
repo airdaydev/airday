@@ -64,6 +64,39 @@ export function collapsedCaretOffset(el: HTMLElement): number | null {
   return pre.toString().length;
 }
 
+// Focus `el` and collapse the caret at character `offset` of its plain
+// text (clamped to the content length). Walks the text nodes, so it
+// works across the anchors `setLinkifiedText` inserts.
+export function placeCaretAtOffset(el: HTMLElement, offset: number): void {
+  el.focus();
+  const sel = window.getSelection();
+  if (!sel) return;
+  const range = document.createRange();
+  let remaining = Math.max(0, offset);
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let node: Node | null = walker.nextNode();
+  let last: Text | null = null;
+  while (node) {
+    const t = node as Text;
+    const len = t.data.length;
+    if (remaining <= len) {
+      range.setStart(t, remaining);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return;
+    }
+    remaining -= len;
+    last = t;
+    node = walker.nextNode();
+  }
+  if (last) range.setStart(last, last.data.length);
+  else range.selectNodeContents(el);
+  range.collapse(last ? true : false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 // Focus `el` and collapse the caret to the end of its content.
 export function placeCaretAtEnd(el: HTMLElement): void {
   el.focus();

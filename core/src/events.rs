@@ -13,7 +13,7 @@
 //! Initial attachment materializes current state explicitly. After that,
 //! consumers receive live deltas or an occasional `FullResync` request.
 
-use crate::doc::{DefaultView, WorkflowState};
+use crate::doc::{DefaultView, NotesDeltaOp, WorkflowState};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppEvent {
@@ -78,6 +78,15 @@ pub enum AppEvent {
     ItemNotesChanged {
         id: String,
         notes: String,
+    },
+    /// An item's notes changed by a remote, other-tab, or undo write
+    /// while a notes editor is subscribed (`Doc::subscribe_notes`).
+    /// Emitted after the matching `ItemNotesChanged`; the delta is in
+    /// UTF-16 units against the text the subscriber last saw. Local
+    /// `apply_notes_delta` writes never echo back as this event.
+    ItemNotesDelta {
+        id: String,
+        delta: Vec<NotesDeltaOp>,
     },
     /// Item's date-only deadline changed. The payload is the raw
     /// `YYYY-MM-DD` value after the write — `None` when cleared. The
