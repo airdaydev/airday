@@ -1960,7 +1960,6 @@ export function Workspace(props: {
         {
           label: msgs.common.delete,
           shortcut: "⌫",
-          destructive: true,
           run: () => binOrDeleteIds(ids),
         },
       ];
@@ -2014,7 +2013,6 @@ export function Workspace(props: {
     out.push({
       label: msgs.workspace.moveToBin,
       shortcut: "⌫",
-      destructive: true,
       run: () => binOrDeleteIds(ids),
     });
     return out;

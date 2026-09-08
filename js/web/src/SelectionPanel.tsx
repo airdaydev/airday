@@ -20,7 +20,6 @@ export interface SelectionAction {
   /** Keyboard equivalent, shown as a `<kbd>` hint (matches the row
    *  context menu's glyphs). */
   shortcut?: string;
-  destructive?: boolean;
   run: () => void;
 }
 
@@ -42,7 +41,6 @@ export function SelectionPanel(props: {
             <button
               type="button"
               class="selection-panel-action"
-              classList={{ destructive: a.destructive === true }}
               on:mousedown={keepListFocus}
               on:click={(e) => {
                 e.stopPropagation();
@@ -60,7 +58,7 @@ export function SelectionPanel(props: {
       <hr class="selection-panel-rule" />
       <button
         type="button"
-        class="selection-panel-action selection-panel-clear"
+        class="selection-panel-action"
         on:mousedown={keepListFocus}
         on:click={(e) => {
           e.stopPropagation();

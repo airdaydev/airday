@@ -307,7 +307,6 @@ body {
 .selection-panel-actions {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
 .selection-panel-action {
@@ -316,7 +315,7 @@ body {
   justify-content: space-between;
   gap: 24px;
   width: 100%;
-  padding: 6px 4px;
+  padding: 6px;
   border: 0;
   border-radius: 4px;
   background: transparent;
@@ -333,20 +332,12 @@ body {
   outline: none;
 }
 
-.selection-panel-action.destructive {
-  color: var(--error-text);
-}
-
 /* Hairline between the mutations and Clear selection. */
 .selection-panel-rule {
   width: 100%;
   margin: 8px 0;
   border: 0;
   border-top: 0.5px solid var(--border-surface);
-}
-
-.selection-panel-clear {
-  color: var(--text-muted);
 }
 
 /* The task surface as an inline pane: fills the panel column and scrolls
