@@ -1,7 +1,7 @@
 # Calendar: plan
 
-**Status: Phase 0 (core, wasm, CLI) built 2026-09-09; Phase 1 (web) not
-started. Decided 2026-09-09, trimmed the same day.** Adds
+**Status: built 2026-09-09 (Phase 0 core / wasm / CLI and Phase 1 web).
+Decided 2026-09-09, trimmed the same day.** Adds
 a second date to items, `when`, alongside the existing `deadline`, and grows
 the Upcoming view into a day-granular agenda over both dates. The first cut
 is the basics only: the field, the agenda, and a When control with an
@@ -263,9 +263,12 @@ here.
    wasm bindings, `when` / `deadline` / `agenda` verbs (`agenda` takes
    `--today` so scripts and tests pin the date). `data-model.md` and
    `cli.md` amended. Unit and system tests.
-1. **Web field and agenda.** Store field and mutation, `WhenBadge`, When
-   control with the Kobalte time field and `hourCycle`, `groupByDay`, agenda
-   tone rules, i18n. Amend `urls.md` for the reserved tokens.
+1. **Web field and agenda.** Built. Store field and mutation, `WhenBadge`,
+   `WhenField` with the Kobalte time field and `hourCycle`, `groupByDay`
+   (`dayGroups.ts`, replacing `deadlineGroups.ts`), agenda tone rules and
+   leading time label, When submenu on row context menus and the palette,
+   duplicate / paste carry `when`, i18n. `urls.md` amended for the reserved
+   tokens.
 
 Month grid and reschedule are deferred, not phased; see "Deferred, with their
 extension points".

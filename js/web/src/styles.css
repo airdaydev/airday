@@ -459,6 +459,15 @@ body {
   flex-shrink: 0;
 }
 
+/* Leading wall-clock time on a timed agenda row, fixed-width so titles
+   line up down the day. */
+.upcoming-row-time {
+  flex-shrink: 0;
+  min-width: 4.5em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
 @media (max-width: 768px) and (pointer: coarse) {
   /* Bump the inherited base size on phones; chrome elements with
      explicit px sizes (section labels, chips) keep theirs. ≥16px also
@@ -2606,6 +2615,71 @@ input.task-check:hover {
   border-top: 1px solid var(--border-row);
 }
 
+/* Optional time under the calendar (`when` mode): Kobalte's segmented
+   TimeField — one focusable span per hour / minute / day-period segment,
+   arrow-spin and typed digits, no native picker. Blank segments render
+   their placeholder (`data-placeholder`), which is how all-day reads. */
+.deadline-dialog-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-row);
+  font-size: 12px;
+}
+
+.time-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.time-field-label {
+  color: var(--text-muted);
+}
+
+.time-field-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.time-field-input:focus-within {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
+}
+
+.time-field-segment {
+  padding: 1px 2px;
+  border-radius: 3px;
+  outline: none;
+  caret-color: transparent;
+}
+
+.time-field-segment[data-type="literal"] {
+  padding: 0;
+  color: var(--text-muted);
+}
+
+.time-field-segment[data-placeholder] {
+  color: var(--text-badge-faint);
+}
+
+.time-field-segment:focus {
+  background: var(--link);
+  color: #fff;
+}
+
+.time-field-hint {
+  color: var(--text-faint);
+}
+
 .deadline-dialog-remove {
   font: inherit;
   font-size: 12px;
@@ -3380,6 +3454,24 @@ input.task-check:hover {
 }
 
 .deadline-badge[data-tone="muted"] {
+  color: var(--text-badge-faint);
+}
+
+/* Planned-date pill (`WhenBadge`): same geometry and icon slot as the
+   deadline pill. Today is the warning pairing; slipped is deliberately
+   quiet — a `when` never goes red. */
+.when-badge[data-tone="today"] {
+  color: var(--due-today-text);
+  background: var(--due-today-bg);
+}
+
+.when-badge[data-tone="slipped"] {
+  color: var(--text-muted);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.when-badge[data-tone="muted"] {
   color: var(--text-badge-faint);
 }
 

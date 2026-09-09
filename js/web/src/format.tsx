@@ -28,13 +28,17 @@ function readTimeFormat(): TimeFormatPreference {
   return "auto";
 }
 
+// Same tolerance as the reader: no `document` (tests, workers) means the
+// signal still flips, the cookie just isn't persisted.
 function writeTimeFormat(pref: TimeFormatPreference) {
   const attrs = (maxAge: number) => `path=/;max-age=${maxAge};SameSite=Lax`;
-  if (pref === "auto") {
-    document.cookie = `${TIME_FORMAT_COOKIE}=;${attrs(0)}`;
-  } else {
-    document.cookie = `${TIME_FORMAT_COOKIE}=${pref === "12h" ? "12" : "24"};${attrs(TIME_FORMAT_MAX_AGE)}`;
-  }
+  try {
+    if (pref === "auto") {
+      document.cookie = `${TIME_FORMAT_COOKIE}=;${attrs(0)}`;
+    } else {
+      document.cookie = `${TIME_FORMAT_COOKIE}=${pref === "12h" ? "12" : "24"};${attrs(TIME_FORMAT_MAX_AGE)}`;
+    }
+  } catch {}
 }
 
 const [timeFormatPref, setTimeFormatSignal] = createSignal<TimeFormatPreference>(
@@ -213,6 +217,122 @@ export function formatDeadlineBadge(
     return { label: weekday, urgency: "future" };
   }
   return { label: compactDate(target, ref, locale), urgency: "future" };
+}
+
+// ---------- planned dates (`when`) ----------
+//
+// A `when` is a floating `YYYY-MM-DD` (all-day) or `YYYY-MM-DDTHH:MM`
+// (timed) register (`spec/calendar-plan.md`). Same local-parts rule as
+// deadlines: never `new Date(when)`.
+
+/** Hour / minute pair as Kobalte's `TimeField` holds it: either or both
+ *  may be undefined while the user is mid-edit. */
+export interface TimeParts {
+  hour?: number;
+  minute?: number;
+}
+
+/** The `YYYY-MM-DD` day key of a `when` (its first ten characters). */
+export function whenDay(when: string): string {
+  return when.slice(0, 10);
+}
+
+/** The time part of a timed `when`, or null for an all-day one. */
+export function whenTime(when: string): TimeParts | null {
+  const m = /^\d{4}-\d{2}-\d{2}T(\d{2}):(\d{2})$/.exec(when);
+  if (!m) return null;
+  return { hour: Number(m[1]), minute: Number(m[2]) };
+}
+
+/** Both segments filled: the field state maps to a timed register. */
+export function isCompleteTime(t: TimeParts): t is Required<TimeParts> {
+  return t.hour != null && t.minute != null;
+}
+
+/** Neither segment filled: the field state maps to an all-day register. */
+export function isEmptyTime(t: TimeParts): boolean {
+  return t.hour == null && t.minute == null;
+}
+
+/** Build a `when` from a day stamp and an optional complete time. A
+ *  partial or null time yields the all-day form. */
+export function whenFromParts(day: string, time: TimeParts | null | undefined): string {
+  if (time && isCompleteTime(time)) {
+    return `${day}T${String(time.hour).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}`;
+  }
+  return day;
+}
+
+/** The hour cycle the time field should render in: the explicit 12h /
+ *  24h preference, or for "auto" whatever `Intl` resolves for the
+ *  locale. Always passed to `TimeField` so the field and every formatted
+ *  time in the app agree by construction. */
+export function hourCycle(locale: string): 12 | 24 {
+  switch (timeFormatPref()) {
+    case "12h":
+      return 12;
+    case "24h":
+      return 24;
+    default: {
+      const hc = new Intl.DateTimeFormat(locale, { hour: "numeric" }).resolvedOptions().hourCycle;
+      return hc === "h11" || hc === "h12" ? 12 : 24;
+    }
+  }
+}
+
+/** Local wall-clock time of a timed `when`, in the preferred cycle; empty
+ *  for an all-day value. */
+export function formatWhenTime(when: string, locale: string): string {
+  const t = whenTime(when);
+  const d = parseLocalDateParts(whenDay(when));
+  if (!t || !d) return "";
+  return timeFormatter(locale).format(
+    new Date(d.getFullYear(), d.getMonth(), d.getDate(), t.hour, t.minute),
+  );
+}
+
+export type WhenUrgency = "slipped" | "today" | "future";
+
+export interface WhenBadgeInfo {
+  label: string;
+  urgency: WhenUrgency;
+}
+
+// Compact label + urgency for a planned date relative to `today`. Before
+// today → the compact date itself in the slipped tone (a `when` is never
+// "overdue": it slipped, and the useful fact is which day). Today /
+// tomorrow / weekday / compact date otherwise, as deadlines do. A timed
+// value appends its wall-clock time.
+export function formatWhenBadge(
+  when: string,
+  today: string,
+  labels: { today: string; tomorrow: string },
+  locale: string,
+): WhenBadgeInfo | null {
+  const target = parseLocalDateParts(whenDay(when));
+  const ref = parseLocalDateParts(today);
+  if (!target || !ref) return null;
+  const days = calendarDayDiff(target, ref);
+  let label: string;
+  let urgency: WhenUrgency;
+  if (days < 0) {
+    label = compactDate(target, ref, locale);
+    urgency = "slipped";
+  } else if (days === 0) {
+    label = labels.today;
+    urgency = "today";
+  } else if (days === 1) {
+    label = labels.tomorrow;
+    urgency = "future";
+  } else if (days < 7) {
+    label = new Intl.DateTimeFormat(locale, { weekday: "short" }).format(target);
+    urgency = "future";
+  } else {
+    label = compactDate(target, ref, locale);
+    urgency = "future";
+  }
+  const time = formatWhenTime(when, locale);
+  return { label: time ? `${label} ${time}` : label, urgency };
 }
 
 // Done-view stamp: same calendar day as `now` → time of day; otherwise

@@ -6,6 +6,7 @@ import noteSvg from "./icons/note.svg?raw";
 import { DndSelection } from "./dnd/solid";
 import { trackOverlay } from "./overlay.ts";
 import { DeadlineBadge } from "./DeadlineBadge.tsx";
+import { WhenBadge } from "./WhenBadge.tsx";
 import {
   addDaysToStamp,
   formatDateTime,
@@ -13,6 +14,8 @@ import {
   formatRelative,
   nowMs,
   todayStamp,
+  whenFromParts,
+  whenTime,
 } from "./format.tsx";
 import { laneLabel, useAppI18n } from "./i18n.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
@@ -78,6 +81,9 @@ export function Row(props: {
   /** Open the shared calendar modal to set a deadline on the target set.
    *  `initial` seeds the calendar (this row's current deadline, or null). */
   onSetDeadline?: (ids: readonly string[], initial: string | null) => void;
+  /** Open the shared calendar modal (with its time field) to set a
+   *  planned date on the target set. `initial` seeds it. */
+  onSetWhen?: (ids: readonly string[], initial: string | null) => void;
   /** Jump to the item's other appearance and select it there: from the
    *  Focus lens to its home list, or from a list / board to the Focus
    *  lens. Only offered for items that appear in both (`spec/focus.md`). */
@@ -178,7 +184,8 @@ export function Row(props: {
       ((!leadingStamp() && Boolean(rowStamp())) ||
         (!props.expanded() &&
           ((canPinToFocus() && focused()) ||
-            (isOpen(props.item()) && Boolean(props.item().deadline))))));
+            (isOpen(props.item()) &&
+              (Boolean(props.item().when) || Boolean(props.item().deadline)))))));
   let textRef!: HTMLSpanElement;
   // Set by the Enter keydown handler before it dispatches the synthetic
   // Escape that drives collapse. The collapse effect reads (and resets)
@@ -353,6 +360,23 @@ export function Row(props: {
   };
   const onSetDate = () => {
     props.onSetDeadline?.(targetIds(), props.item().deadline ?? null);
+  };
+  // Planned-date actions, same target-set rule. Today / Tomorrow keep
+  // this row's time part, if any, so a timed item moves days intact.
+  const keepTime = (day: string) => whenFromParts(day, whenTime(props.item().when ?? ""));
+  const onWhenToday = () => {
+    const stamp = keepTime(todayStamp(nowMs()));
+    for (const id of targetIds()) props.app.setItemWhen(id, stamp);
+  };
+  const onWhenTomorrow = () => {
+    const stamp = keepTime(addDaysToStamp(todayStamp(nowMs()), 1));
+    for (const id of targetIds()) props.app.setItemWhen(id, stamp);
+  };
+  const onWhenRemove = () => {
+    for (const id of targetIds()) props.app.setItemWhen(id, null);
+  };
+  const onSetWhenDate = () => {
+    props.onSetWhen?.(targetIds(), props.item().when ?? null);
   };
   // Move the target set to the top / bottom of the item's list Open order,
   // preserving the targets' relative order. `moveItem`'s index is applied
@@ -603,7 +627,7 @@ export function Row(props: {
           when={
             props.deadlineInFooter &&
             !props.expanded() &&
-            ((isOpen(props.item()) && props.item().deadline) ||
+            ((isOpen(props.item()) && (props.item().when || props.item().deadline)) ||
               (canPinToFocus() && focused()) ||
               hasNotes() ||
               rowStamp())
@@ -620,6 +644,9 @@ export function Row(props: {
                 aria-label={m().focus.badge}
                 innerHTML={drawingPinFilledSvg}
               />
+            </Show>
+            <Show when={isOpen(props.item()) && props.item().when}>
+              {(w) => <WhenBadge when={w()} />}
             </Show>
             <Show when={isOpen(props.item()) && props.item().deadline}>
               {(d) => <DeadlineBadge deadline={d()} />}
@@ -661,6 +688,16 @@ export function Row(props: {
                 aria-label={m().focus.badge}
                 innerHTML={drawingPinFilledSvg}
               />
+            </Show>
+            <Show
+              when={
+                !props.deadlineInFooter &&
+                !props.expanded() &&
+                isOpen(props.item()) &&
+                props.item().when
+              }
+            >
+              {(w) => <WhenBadge when={w()} />}
             </Show>
             <Show
               when={
@@ -754,8 +791,51 @@ export function Row(props: {
               <span>{m().focus.showInFocus}</span>
             </ContextMenu.Item>
           </Show>
-          {/* Deadline only matters while the item is open (the badge hides
-              for done/binned rows too, see above). */}
+          {/* Dates only matter while the item is open (the badges hide
+              for done/binned rows too, see above). When leads Deadline,
+              as the badges do. */}
+          <Show when={isOpen(props.item())}>
+            <ContextMenu.Sub gutter={4}>
+              <ContextMenu.SubTrigger class="context-menu-item">
+                <span>{m().when.label}</span>
+                <span class="menu-sub-arrow" aria-hidden="true">
+                  ›
+                </span>
+              </ContextMenu.SubTrigger>
+              <ContextMenu.Portal>
+                <ContextMenu.SubContent class="context-menu-content">
+                  <Show when={props.item().when}>
+                    <ContextMenu.Item
+                      class="context-menu-item"
+                      onSelect={onWhenRemove}
+                    >
+                      <span>{m().when.remove}</span>
+                    </ContextMenu.Item>
+                  </Show>
+                  <Show when={props.onSetWhen}>
+                    <ContextMenu.Item
+                      class="context-menu-item"
+                      onSelect={onSetWhenDate}
+                    >
+                      <span>{m().when.setDate}</span>
+                    </ContextMenu.Item>
+                  </Show>
+                  <ContextMenu.Item
+                    class="context-menu-item"
+                    onSelect={onWhenToday}
+                  >
+                    <span>{m().when.today}</span>
+                  </ContextMenu.Item>
+                  <ContextMenu.Item
+                    class="context-menu-item"
+                    onSelect={onWhenTomorrow}
+                  >
+                    <span>{m().when.tomorrow}</span>
+                  </ContextMenu.Item>
+                </ContextMenu.SubContent>
+              </ContextMenu.Portal>
+            </ContextMenu.Sub>
+          </Show>
           <Show when={isOpen(props.item())}>
             <ContextMenu.Sub gutter={4}>
               <ContextMenu.SubTrigger class="context-menu-item">

@@ -24,6 +24,7 @@ import {
 } from "solid-js";
 import { Portal } from "solid-js/web";
 import { DeadlineField } from "./DeadlineField.tsx";
+import { WhenField } from "./WhenField.tsx";
 import { ListPicker, type ListOption } from "./ListPicker.tsx";
 import caretSortSvg from "./icons/caret-sort.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
@@ -254,10 +255,13 @@ export function TaskDialog(props: {
   // New-item mode's deadline buffer: nothing exists to write to until the
   // capture commits, so picks are held here and applied after creation.
   const [newDeadline, setNewDeadline] = createSignal<string | null>(null);
+  // New-item mode's planned-date buffer, same deal.
+  const [newWhen, setNewWhen] = createSignal<string | null>(null);
   // New-item mode's pin-to-Focus buffer, same deal as `newDeadline`.
   const [newFocus, setNewFocus] = createSignal(false);
   // Deadline calendar popover open state, shared by both DeadlineField modes.
   const [deadlineCalOpen, setDeadlineCalOpen] = createSignal(false);
+  const [whenCalOpen, setWhenCalOpen] = createSignal(false);
   // The title and notes editors are contenteditable (not textareas) so that
   // http(s) URLs render as clickable anchors, matching the row quick-entry
   // editor. Their content is set imperatively from the buffers on load — it
@@ -557,6 +561,7 @@ export function TaskDialog(props: {
     setText(t);
     setNotes(n);
     setNewDeadline(null);
+    setNewWhen(null);
     setNewFocus(false);
     // The editors mount when the surface opens; defer so their refs exist,
     // then push — but only if this target is still the one showing.
@@ -594,6 +599,8 @@ export function TaskDialog(props: {
         if (n.trim()) props.app.editItemNotes(id, n);
         const d = newDeadline();
         if (d) props.app.setItemDeadline(id, d);
+        const w = newWhen();
+        if (w) props.app.setItemWhen(id, w);
         // A Done capture can't hold a Focus ref (auto-remove-on-Done,
         // spec/focus.md), so the pin buffer only applies to open captures.
         if (newFocus() && !nw.done) props.app.addToFocus(id);
@@ -866,6 +873,13 @@ export function TaskDialog(props: {
               }}
               onChange={setNewItemState}
             />
+            <WhenField
+              when={newWhen}
+              muted={() => newItemTarget()?.done ?? false}
+              onChange={setNewWhen}
+              open={whenCalOpen}
+              setOpen={setWhenCalOpen}
+            />
             <DeadlineField
               deadline={newDeadline}
               muted={() => newItemTarget()?.done ?? false}
@@ -1028,6 +1042,13 @@ export function TaskDialog(props: {
                 onChange={(state) => props.app.setLifecycle(it().id, state)}
               />
             </Show>
+            <WhenField
+              when={() => it().when ?? null}
+              muted={() => isDone(it()) || isBinned(it())}
+              onChange={(value) => props.app.setItemWhen(it().id, value)}
+              open={whenCalOpen}
+              setOpen={setWhenCalOpen}
+            />
             <DeadlineField
               deadline={() => it().deadline ?? null}
               muted={() => isDone(it()) || isBinned(it())}

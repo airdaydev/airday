@@ -1,22 +1,23 @@
-// The Upcoming view: the main-surface home for deadlines and the seed of
-// a calendar surface. Every Open item with a deadline, bucketed by day
-// (`deadlineGroups.ts`), Today always anchored so the surface reads as
-// "the days ahead" even when nothing is due. Overdue items live in Today
-// rather than a section of their own — a slipped deadline is still owed
-// now — and are the only rows that badge a date, in the overdue tone, since
-// the day header already carries everyone else's. Rows tick off in place
-// and open the task surface (dialog or side panel) on click.
+// The Upcoming view: the agenda. Every Open item with a planned date or a
+// deadline, bucketed by day (`dayGroups.ts`), Today always anchored so the
+// surface reads as "the days ahead" even when nothing is due. Past dates
+// of either kind live in Today rather than a section of their own, and
+// are the only placing dates that badge (the day header carries everyone
+// else's). The other field, when present, badges beside it so a row reads
+// "Sat 13 · due 31 Oct". Timed rows lead with their time. Rows tick off in
+// place and open the task surface (dialog or side panel) on click.
 //
 // Deliberately not a `Dnd` listbox: day sections are the point, and the
-// flat virtualised list can't host group headers. Selection, keyboard
-// nav and drag-to-reschedule are the calendar's future, not this seed.
+// flat virtualised list can't host group headers. Drag-to-reschedule is
+// deferred (`spec/calendar-plan.md`).
 
 import { createMemo, For, Show } from "solid-js";
+import { groupByDay, type DayGroup, type DayRow } from "./dayGroups.ts";
 import { DeadlineBadge } from "./DeadlineBadge.tsx";
-import { groupByDeadline, type DeadlineGroup } from "./deadlineGroups.ts";
-import { nowMs, todayStamp } from "./format.tsx";
+import { formatWhenTime, nowMs, todayStamp, whenDay } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { isDone, type DocApp } from "./sync/store.ts";
+import { WhenBadge } from "./WhenBadge.tsx";
 
 export function Upcoming(props: {
   app: DocApp;
@@ -26,8 +27,8 @@ export function Upcoming(props: {
 }) {
   const { m, locale } = useAppI18n();
 
-  const groups = createMemo<DeadlineGroup[]>(() =>
-    groupByDeadline(
+  const groups = createMemo<DayGroup[]>(() =>
+    groupByDay(
       Object.values(props.app.state.itemsById),
       todayStamp(nowMs()),
       {
@@ -42,7 +43,7 @@ export function Upcoming(props: {
   // Every day heads with the same long-form date ("Sat 24 Sept"); Today
   // is the only one annotated, so the eye lands on it without the other
   // days changing shape as they approach.
-  const dayHeading = (g: DeadlineGroup): string => {
+  const dayHeading = (g: DayGroup): string => {
     const [y, mo, d] = g.key.split("-").map(Number);
     if (!y || !mo || !d) return g.label;
     const date = new Intl.DateTimeFormat(locale(), {
@@ -53,6 +54,15 @@ export function Upcoming(props: {
     return g.urgency === "today" ? `${date} (${m().deadline.today})` : date;
   };
 
+  // The placing field badges only when its own day is behind the header
+  // (Today's fold); the other field always badges.
+  const showPlacingWhen = (r: DayRow, key: string) =>
+    r.placedBy === "when" && whenDay(r.item.when!) < key;
+  const showPlacingDeadline = (r: DayRow, key: string) =>
+    r.placedBy === "deadline" && r.item.deadline! < key;
+  const timeLabel = (r: DayRow) =>
+    r.placedBy === "when" ? formatWhenTime(r.item.when!, locale()) : "";
+
   return (
     <div class="upcoming" tabIndex={-1}>
       <For each={groups()}>
@@ -62,45 +72,58 @@ export function Upcoming(props: {
               <h2 class="upcoming-day-label">{dayHeading(g)}</h2>
             </header>
             <Show
-              when={g.items.length > 0}
+              when={g.rows.length > 0}
               fallback={
                 <div class="upcoming-empty-day">
                   {m().upcoming.emptyToday}
                 </div>
               }
             >
-              <For each={g.items}>
-                {(it) => (
+              <For each={g.rows}>
+                {(r) => (
                   <div
                     class="upcoming-row"
                     role="button"
                     tabIndex={-1}
+                    data-tone={r.tone}
                     onClick={(e) => {
                       const t = e.target as HTMLElement | null;
                       if (t?.closest("input")) return;
-                      props.onOpen(it.id);
+                      props.onOpen(r.item.id);
                     }}
                   >
                     <input
                       type="checkbox"
                       class="task-check"
-                      checked={isDone(it)}
+                      checked={isDone(r.item)}
                       aria-label={m().workspace.markDone}
                       onChange={(e) =>
-                        props.app.setDone(it.id, e.currentTarget.checked)
+                        props.app.setDone(r.item.id, e.currentTarget.checked)
                       }
                     />
-                    <span class="upcoming-row-text">{it.text}</span>
+                    <Show when={timeLabel(r)}>
+                      {(t) => <span class="upcoming-row-time">{t()}</span>}
+                    </Show>
+                    <span class="upcoming-row-text">{r.item.text}</span>
                     <span class="upcoming-row-meta">
-                      <Show when={it.deadline! < g.key}>
-                        <DeadlineBadge deadline={it.deadline!} pastAsDate />
+                      <Show when={showPlacingWhen(r, g.key)}>
+                        <WhenBadge when={r.item.when!} />
+                      </Show>
+                      <Show when={r.placedBy === "deadline" && r.item.when}>
+                        {(w) => <WhenBadge when={w()} />}
+                      </Show>
+                      <Show when={showPlacingDeadline(r, g.key)}>
+                        <DeadlineBadge deadline={r.item.deadline!} pastAsDate />
+                      </Show>
+                      <Show when={r.placedBy === "when" && r.item.deadline}>
+                        {(d) => <DeadlineBadge deadline={d()} />}
                       </Show>
                       <span
                         class="badge row-list"
-                        title={props.listLabel(it.listId)}
+                        title={props.listLabel(r.item.listId)}
                       >
                         <span class="row-list-name">
-                          {props.listLabel(it.listId)}
+                          {props.listLabel(r.item.listId)}
                         </span>
                       </span>
                     </span>

@@ -310,6 +310,14 @@ export function Workspace(props: {
   const openDeadlineCalendar = (ids: readonly string[], initial: string | null) => {
     if (ids.length > 0) setDeadlineTarget({ ids, initial });
   };
+  // Same again for the planned date (`when`), which carries the time field.
+  const [whenTarget, setWhenTarget] = createSignal<{
+    ids: readonly string[];
+    initial: string | null;
+  } | null>(null);
+  const openWhenCalendar = (ids: readonly string[], initial: string | null) => {
+    if (ids.length > 0) setWhenTarget({ ids, initial });
+  };
   // New-item capture target for the detail dialog (board "+" buttons), or
   // null when not capturing. Mutually exclusive with `openItemId`.
   const [newItemTarget, setNewItemTarget] = createSignal<{
@@ -1191,15 +1199,16 @@ export function Workspace(props: {
   // bottom-most source row — same shape as paste — rather than each
   // clone sitting under its own original. Shared by Cmd+D and the row
   // context menu's Duplicate action so both behave identically.
-  // A clone is a full copy, not just the title: carry the notes and
-  // deadline across. Both are no-ops when the source has neither, so the
-  // batch stays a single undo step either way.
+  // A clone is a full copy, not just the title: carry the notes and both
+  // dates across. Each is a no-op when the source lacks it, so the batch
+  // stays a single undo step either way.
   const copyItemDetails = (
     id: string,
-    src: { notes: string; deadline: string | undefined },
+    src: { notes: string; deadline: string | undefined; when: string | undefined },
   ): void => {
     if (src.notes) app.editItemNotes(id, src.notes);
     if (src.deadline) app.setItemDeadline(id, src.deadline);
+    if (src.when) app.setItemWhen(id, src.when);
   };
 
   const duplicateBlock = (sourceIds: readonly string[]): void => {
@@ -1218,6 +1227,7 @@ export function Workspace(props: {
         text: string;
         notes: string;
         deadline: string | undefined;
+        when: string | undefined;
         state: WorkflowState;
         listId: string;
       }[] = [];
@@ -1232,6 +1242,7 @@ export function Workspace(props: {
           text: it.text,
           notes: it.notes,
           deadline: it.deadline,
+          when: it.when,
           state: it.state,
           listId,
         });
@@ -1278,6 +1289,7 @@ export function Workspace(props: {
       text: string;
       notes: string;
       deadline: string | undefined;
+      when: string | undefined;
       state: WorkflowState;
     }[] = [];
     visible.forEach((id, idx) => {
@@ -1289,6 +1301,7 @@ export function Workspace(props: {
         text: it.text,
         notes: it.notes,
         deadline: it.deadline,
+        when: it.when,
         state: it.state,
       });
     });
@@ -2007,7 +2020,11 @@ export function Workspace(props: {
     // entry hide for done rows too).
     if (openIds.length > 0) {
       out.push({
-        label: msgs.deadline.setDate,
+        label: `${msgs.when.label}: ${msgs.when.setDate}`,
+        run: () => openWhenCalendar(openIds, null),
+      });
+      out.push({
+        label: `${msgs.deadline.label}: ${msgs.deadline.setDate}`,
         run: () => openDeadlineCalendar(openIds, null),
       });
     }
@@ -2262,6 +2279,26 @@ export function Workspace(props: {
         onRemove={() => {
           const t = deadlineTarget();
           if (t) for (const id of t.ids) app.setItemDeadline(id, null);
+        }}
+      />
+      <DeadlineCalendarDialog
+        kind="when"
+        open={() => whenTarget() !== null}
+        setOpen={(o) => {
+          if (!o) setWhenTarget(null);
+        }}
+        value={() => whenTarget()?.initial ?? null}
+        onPick={(value) => {
+          const t = whenTarget();
+          if (!t) return;
+          for (const id of t.ids) app.setItemWhen(id, value);
+          // Keep the seed current so a follow-up time edit builds on the
+          // date just picked rather than the stale opening value.
+          setWhenTarget({ ids: t.ids, initial: value });
+        }}
+        onRemove={() => {
+          const t = whenTarget();
+          if (t) for (const id of t.ids) app.setItemWhen(id, null);
         }}
       />
       <ShortcutsDialog
@@ -2651,6 +2688,7 @@ export function Workspace(props: {
                           setOpenItemId(id);
                         }}
                         onSetDeadline={openDeadlineCalendar}
+                        onSetWhen={openWhenCalendar}
                         onReveal={revealItemIn}
                         onMoveToList={openMovePalette}
                         openOnTap={itemsIsMobile}
@@ -2672,6 +2710,7 @@ export function Workspace(props: {
                 setOpenItemId(id);
               }}
               onSetDeadline={openDeadlineCalendar}
+              onSetWhen={openWhenCalendar}
               onReveal={revealItemIn}
               onMoveToList={openMovePalette}
               openOnTap={itemsIsMobile}

@@ -240,6 +240,28 @@ export type Messages = {
     /** Accessible label for the calendar's next-month button. */
     nextMonth: string;
   };
+  when: {
+    /** Section label / accessible name for the planned-date control. */
+    label: string;
+    /** Task-dialog badge label when no planned date is set. */
+    unset: string;
+    /** Tooltip / tone name for a planned date that is now in the past. */
+    slipped: string;
+    /** Badge + quick-action label for today's date. */
+    today: string;
+    /** Badge + quick-action label for tomorrow's date. */
+    tomorrow: string;
+    /** Quick action / context-menu action that removes the planned date. */
+    remove: string;
+    /** Context-menu action that opens the calendar to pick a date. */
+    setDate: string;
+    /** Title of the calendar modal. */
+    dialogTitle: string;
+    /** Label of the optional time field under the calendar. */
+    time: string;
+    /** Hint beside the time field: leaving it blank means all-day. */
+    allDay: string;
+  };
   upcoming: {
     /** Upcoming view's Today group when nothing is due today. */
     emptyToday: string;
@@ -497,6 +519,18 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       prevMonth: "Mes anterior",
       nextMonth: "Mes siguiente",
     },
+    when: {
+      label: "Cuándo",
+      unset: "Cuándo",
+      slipped: "Atrasado",
+      today: "Hoy",
+      tomorrow: "Mañana",
+      remove: "Quitar fecha",
+      setDate: "Elegir fecha…",
+      dialogTitle: "Establecer fecha",
+      time: "Hora",
+      allDay: "Vacío = todo el día",
+    },
     upcoming: {
       emptyToday: "Nada para hoy",
     },
@@ -734,6 +768,18 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       dialogTitle: "Set deadline",
       prevMonth: "Previous month",
       nextMonth: "Next month",
+    },
+    when: {
+      label: "When",
+      unset: "When",
+      slipped: "Slipped",
+      today: "Today",
+      tomorrow: "Tomorrow",
+      remove: "Remove date",
+      setDate: "Set date…",
+      dialogTitle: "Set date",
+      time: "Time",
+      allDay: "Blank = all day",
     },
     upcoming: {
       emptyToday: "Nothing due today",

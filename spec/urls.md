@@ -15,6 +15,9 @@ id     = [0-9a-f]{32}          -- uuid-v7 hex, same as ItemId / ListMeta.id
 ```
 
 `#list_inbox` is accepted as an alias and canonicalised to `#inbox`.
+Reserved, not yet parsed (`calendar-plan.md`): `calendar` for a month-grid
+lens, and an underscore day anchor on the agenda and grid
+(`upcoming_2026-07-13`, `calendar_2026-07`).
 Anything else is ignored: the client keeps whatever it was showing.
 There is no `#home`: a bare URL (no fragment) restores the last view
 from local prefs, as before URLs existed.

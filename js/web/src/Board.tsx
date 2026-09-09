@@ -78,6 +78,7 @@ export function Board(props: {
   listId: string;
   onOpen: (id: string, focus?: "notes") => void;
   onSetDeadline: (ids: readonly string[], initial: string | null) => void;
+  onSetWhen: (ids: readonly string[], initial: string | null) => void;
   /** Row context-menu jump to the item's other appearance (the Focus
    *  lens). Forwarded to each card. */
   onReveal?: (id: string, where: "list" | "focus") => void;
@@ -593,6 +594,7 @@ export function Board(props: {
             autofocus={i() === 0}
             onOpen={props.onOpen}
             onSetDeadline={props.onSetDeadline}
+            onSetWhen={props.onSetWhen}
             onReveal={props.onReveal}
             onMoveToList={props.onMoveToList}
             openOnTap={props.openOnTap}
@@ -619,6 +621,7 @@ export function Board(props: {
           registerHandle={registerHandle}
           onOpen={props.onOpen}
           onSetDeadline={props.onSetDeadline}
+          onSetWhen={props.onSetWhen}
           onReveal={props.onReveal}
           onMoveToList={props.onMoveToList}
           openOnTap={props.openOnTap}
@@ -643,6 +646,7 @@ function BoardColumn(props: {
   onAddItem: () => void;
   onOpen: (id: string, focus?: "notes") => void;
   onSetDeadline: (ids: readonly string[], initial: string | null) => void;
+  onSetWhen: (ids: readonly string[], initial: string | null) => void;
   onReveal?: (id: string, where: "list" | "focus") => void;
   onMoveToList?: (ids: readonly string[]) => void;
   openOnTap: () => boolean;
@@ -729,6 +733,7 @@ function BoardColumn(props: {
               copyBlock={props.copyBlock}
               onOpen={props.onOpen}
               onSetDeadline={props.onSetDeadline}
+              onSetWhen={props.onSetWhen}
               onReveal={props.onReveal}
               onMoveToList={props.onMoveToList}
               openOnTap={props.openOnTap}

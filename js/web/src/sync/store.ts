@@ -54,6 +54,10 @@ export interface ItemView {
    *  local calendar date — never parse it with `new Date("YYYY-MM-DD")`,
    *  which reads as UTC midnight). Absent means no deadline. */
   deadline?: string;
+  /** Optional planned date: raw `YYYY-MM-DD` (all-day) or
+   *  `YYYY-MM-DDTHH:MM` (timed), floating (`spec/calendar-plan.md`).
+   *  Same never-`new Date()` rule as `deadline`. Absent means unset. */
+  when?: string;
   createdAt: number;
   /** Reflection stamp: first entry into In Progress, if any. */
   startedAt?: number;
@@ -252,6 +256,10 @@ export interface DocApp {
    *  The value is a floating local calendar date; a malformed string is
    *  rejected by the core. */
   setItemDeadline(id: string, deadline: string | null): void;
+  /** Set (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`) or clear (`null`) an
+   *  item's planned date. Floating; malformed values are rejected by the
+   *  core. */
+  setItemWhen(id: string, when: string | null): void;
   /** Done toggle: `true` is the Done transition; `false` is un-done — a
    *  plain write to Backlog, applied only to currently-Done items. */
   setDone(id: string, done: boolean): void;
@@ -517,6 +525,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           state: parseWorkflowState(ev.state),
           lifecycleAt: Number(ev.lifecycleAt ?? ev.createdAt ?? 0),
           deadline: ev.deadline ?? undefined,
+          when: ev.when ?? undefined,
           createdAt: Number(ev.createdAt ?? 0),
           startedAt: ev.startedAt != null ? Number(ev.startedAt) : undefined,
           doneAt: ev.doneAt != null ? Number(ev.doneAt) : undefined,
@@ -628,6 +637,12 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       case "itemDeadlineChanged": {
         if (state.itemsById[ev.id]) {
           setState("itemsById", ev.id, "deadline", ev.deadline ?? undefined);
+        }
+        break;
+      }
+      case "itemWhenChanged": {
+        if (state.itemsById[ev.id]) {
+          setState("itemsById", ev.id, "when", ev.when ?? undefined);
         }
         break;
       }
@@ -919,6 +934,9 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     setItemDeadline(id, deadline) {
       mutate(() => engine.setItemDeadline(id, deadline ?? undefined));
+    },
+    setItemWhen(id, when) {
+      mutate(() => engine.setItemWhen(id, when ?? undefined));
     },
     setDone(id, done) {
       mutate(() => engine.setItemDone(id, done));
