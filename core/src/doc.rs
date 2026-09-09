@@ -106,6 +106,12 @@ const KEY_STARTED_AT: &str = "started_at";
 /// register; malformed values never reach the doc (validated in
 /// `set_item_deadline`).
 const KEY_DEADLINE: &str = "deadline";
+/// Optional planned date: a floating local `YYYY-MM-DD` (all-day) or
+/// `YYYY-MM-DDTHH:MM` (timed) wall-clock intent. Absent ≡ unset; the
+/// mutation deletes the key when cleared. Shape-discriminated, one
+/// register, so date and time can never tear under concurrent edit.
+/// Validated in `set_item_when`; see `spec/calendar-plan.md`.
+const KEY_WHEN: &str = "when";
 const KEY_NAME: &str = "name";
 /// Optional per-list display icon. Stored as the literal emoji grapheme
 /// the user picked (e.g. `"📥"`); absent/empty means "no icon, render the
@@ -330,6 +336,10 @@ pub struct ItemView {
     /// `YYYY-MM-DD` format. `None` ≡ no deadline. The core stores and
     /// echoes the raw string; it never parses it into a timestamp.
     pub deadline: Option<String>,
+    /// Optional planned date — `YYYY-MM-DD` (all-day) or
+    /// `YYYY-MM-DDTHH:MM` (timed), floating. `None` ≡ unset. Raw string,
+    /// never parsed into a timestamp; sorts by plain string compare.
+    pub when: Option<String>,
     pub created_at: i64,
     /// Reflection stamp: first entry into In Progress (write-once).
     pub started_at: Option<i64>,
@@ -618,6 +628,10 @@ pub struct ExportItem {
     /// pre-deadline dumps byte-identical.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub deadline: Option<String>,
+    /// Planned date (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`). Skipped when
+    /// unset so older dumps stay byte-identical.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub when: Option<String>,
     pub created_at: i64,
     /// Reflection stamp (first entry into In Progress). Skipped when
     /// unset; v2 exports never carry it.
@@ -1643,6 +1657,7 @@ impl Doc {
                 done_at: None,
                 binned_at: None,
                 deadline: None,
+                when: None,
                 open_index,
             });
         }
@@ -1844,6 +1859,32 @@ impl Doc {
         self.push_event(AppEvent::ItemDeadlineChanged {
             id: item_id.to_string(),
             deadline: normalized,
+        });
+        Ok(())
+    }
+
+    /// Set or clear an item's planned date. `Some(value)` validates a
+    /// floating `YYYY-MM-DD` (all-day) or `YYYY-MM-DDTHH:MM` (timed)
+    /// value and writes the `when` register; `None` deletes the key. One
+    /// Loro commit. Malformed values — seconds, offsets, a bracketed
+    /// zone suffix — are rejected with `Invalid` and never touch the doc.
+    /// Mirrors `set_item_deadline`.
+    pub fn set_item_when(&self, item_id: &str, when: Option<&str>) -> Result<(), DocError> {
+        let normalized = match when {
+            Some(raw) => Some(parse_when(raw)?),
+            None => None,
+        };
+        let map = self.find_item(item_id)?;
+        match &normalized {
+            Some(value) => map.insert(KEY_WHEN, value.as_str())?,
+            None => {
+                let _ = map.delete(KEY_WHEN);
+            }
+        }
+        self.inner.commit();
+        self.push_event(AppEvent::ItemWhenChanged {
+            id: item_id.to_string(),
+            when: normalized,
         });
         Ok(())
     }
@@ -3057,6 +3098,7 @@ impl Doc {
                 }),
                 live: false,
                 deadline: item.deadline,
+                when: item.when,
                 created_at: item.created_at,
                 started_at: item.started_at,
                 done_at: item.done_at,
@@ -3246,6 +3288,9 @@ impl Doc {
                 .and_then(|d| parse_deadline(d).ok())
             {
                 map.insert(KEY_DEADLINE, date.as_str())?;
+            }
+            if let Some(value) = src_item.when.as_deref().and_then(|w| parse_when(w).ok()) {
+                map.insert(KEY_WHEN, value.as_str())?;
             }
             let notes = src_item.notes.trim();
             if !notes.is_empty() {
@@ -3942,6 +3987,12 @@ impl Doc {
                         deadline: view.deadline.clone(),
                     });
                 }
+                if has(KEY_WHEN) {
+                    self.push_event(AppEvent::ItemWhenChanged {
+                        id: id.clone(),
+                        when: view.when.clone(),
+                    });
+                }
                 // An open→open workflow flip (the register alone, e.g.
                 // Backlog → In Progress) changes the item's lane but not
                 // its order, so the per-list walk emits nothing for it —
@@ -4000,6 +4051,7 @@ impl Doc {
                     done_at: view.done_at,
                     binned_at: view.binned_at,
                     deadline: view.deadline,
+                    when: view.when,
                     open_index: None,
                 });
                 continue;
@@ -4062,6 +4114,7 @@ impl Doc {
                             done_at: view.done_at,
                             binned_at: view.binned_at,
                             deadline: view.deadline,
+                            when: view.when,
                             open_index: Some(i),
                         },
                     );
@@ -4326,6 +4379,7 @@ impl Doc {
                 done_at: item.done_at,
                 binned_at: item.binned_at,
                 deadline: item.deadline,
+                when: item.when,
                 open_index,
             });
         }
@@ -4422,6 +4476,7 @@ impl Doc {
             hasher.update([i.state as u8]);
             hasher.update(i.lifecycle_at.to_be_bytes());
             hash_opt_str(&mut hasher, i.deadline.as_deref());
+            hash_opt_str(&mut hasher, i.when.as_deref());
             hasher.update(i.created_at.to_be_bytes());
             hash_opt_i64(&mut hasher, i.started_at);
             hash_opt_i64(&mut hasher, i.done_at);
@@ -5079,6 +5134,44 @@ fn parse_deadline(raw: &str) -> Result<String, DocError> {
     Ok(s.to_string())
 }
 
+/// Validate a planned date and return it normalized (trimmed). Accepts
+/// exactly `YYYY-MM-DD` (all-day, 10 chars) or `YYYY-MM-DDTHH:MM` (timed,
+/// 16 chars, hour `00..=23`, minute `00..=59`). The date part goes
+/// through `parse_deadline`'s calendar check. Seconds, offsets, and the
+/// reserved RFC 9557 `[Zone]` suffix are rejected until fixed-instant
+/// support lands (`spec/calendar-plan.md`). Floating; no timezone.
+fn parse_when(raw: &str) -> Result<String, DocError> {
+    let s = raw.trim();
+    let invalid = || {
+        DocError::Invalid(format!(
+            "when must be YYYY-MM-DD or YYYY-MM-DDTHH:MM: {raw:?}"
+        ))
+    };
+    match s.len() {
+        10 => parse_deadline(s).map_err(|_| invalid()),
+        16 => {
+            let bytes = s.as_bytes();
+            if bytes[10] != b'T' || bytes[13] != b':' {
+                return Err(invalid());
+            }
+            parse_deadline(&s[..10]).map_err(|_| invalid())?;
+            let two = |from: usize| -> Option<u32> {
+                let part = &s[from..from + 2];
+                if part.bytes().all(|b| b.is_ascii_digit()) {
+                    part.parse::<u32>().ok()
+                } else {
+                    None
+                }
+            };
+            match (two(11), two(14)) {
+                (Some(h), Some(m)) if h <= 23 && m <= 59 => Ok(s.to_string()),
+                _ => Err(invalid()),
+            }
+        }
+        _ => Err(invalid()),
+    }
+}
+
 fn item_view(map: &LoroMap) -> Option<ItemView> {
     let location = read_string(map, KEY_LOCATION)
         .and_then(|s| Location::parse(&s))
@@ -5093,6 +5186,7 @@ fn item_view(map: &LoroMap) -> Option<ItemView> {
         state,
         lifecycle_at,
         deadline: read_string(map, KEY_DEADLINE).filter(|s| !s.is_empty()),
+        when: read_string(map, KEY_WHEN).filter(|s| !s.is_empty()),
         created_at: read_i64(map, KEY_CREATED_AT)?,
         started_at: read_i64(map, KEY_STARTED_AT),
         done_at: read_i64(map, KEY_DONE_AT),
@@ -5331,6 +5425,7 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     done_at: post_it.done_at,
                     binned_at: post_it.binned_at,
                     deadline: post_it.deadline.clone(),
+                    when: post_it.when.clone(),
                     open_index,
                 });
             }
@@ -5351,6 +5446,12 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     out.push(AppEvent::ItemDeadlineChanged {
                         id: post_it.id.clone(),
                         deadline: post_it.deadline.clone(),
+                    });
+                }
+                if pre_it.when != post_it.when {
+                    out.push(AppEvent::ItemWhenChanged {
+                        id: post_it.id.clone(),
+                        when: post_it.when.clone(),
                     });
                 }
                 if pre_it.state != post_it.state
@@ -8122,6 +8223,7 @@ mod tests {
             lifecycle: None,
             live: false,
             deadline: None,
+            when: None,
             created_at: 1,
             started_at: None,
             done_at: None,
@@ -8341,6 +8443,166 @@ mod tests {
     }
 
     #[test]
+    fn set_and_clear_item_when() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_INBOX, "plan me").unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().when, None);
+        let _ = doc.drain_events();
+
+        // All-day.
+        doc.set_item_when(&id, Some("2026-07-13")).unwrap();
+        assert_eq!(
+            doc.get_item(&id).unwrap().when.as_deref(),
+            Some("2026-07-13")
+        );
+        assert_eq!(
+            doc.drain_events(),
+            vec![AppEvent::ItemWhenChanged {
+                id: id.clone(),
+                when: Some("2026-07-13".into()),
+            }]
+        );
+
+        // Timed, whitespace trimmed, minutes and hour bounds inclusive.
+        doc.set_item_when(&id, Some("  2026-07-13T23:59 ")).unwrap();
+        assert_eq!(
+            doc.get_item(&id).unwrap().when.as_deref(),
+            Some("2026-07-13T23:59")
+        );
+        doc.set_item_when(&id, Some("2026-07-13T00:00")).unwrap();
+        assert_eq!(
+            doc.get_item(&id).unwrap().when.as_deref(),
+            Some("2026-07-13T00:00")
+        );
+        let _ = doc.drain_events();
+
+        // Clearing deletes the key; deadline is independent and untouched.
+        doc.set_item_deadline(&id, Some("2026-10-31")).unwrap();
+        let _ = doc.drain_events();
+        doc.set_item_when(&id, None).unwrap();
+        let view = doc.get_item(&id).unwrap();
+        assert_eq!(view.when, None);
+        assert_eq!(view.deadline.as_deref(), Some("2026-10-31"));
+        assert_eq!(
+            doc.drain_events(),
+            vec![AppEvent::ItemWhenChanged {
+                id: id.clone(),
+                when: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn set_item_when_rejects_malformed_values() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_INBOX, "task").unwrap();
+        let _ = doc.drain_events();
+
+        for bad in [
+            "2026-07-13T14:00:00",                   // seconds
+            "2026-07-13T14:00Z",                     // UTC marker
+            "2026-07-13T14:00+10:00",                // offset
+            "2026-07-13T14:00[Australia/Melbourne]", // reserved zone suffix
+            "2026-07-13T24:00",                      // hour out of range
+            "2026-07-13T14:60",                      // minute out of range
+            "2026-07-13T9:00",                       // single-digit hour
+            "2026-07-13t14:00",                      // lowercase separator
+            "2026-07-13 14:00",                      // space separator
+            "2026-07-13T14.00",                      // wrong time separator
+            "2026-07-13T",                           // dangling separator
+            "2027-02-29T10:00",                      // invalid date, valid time
+            "2026-13-01",                            // invalid all-day
+            "1752566400000",                         // unix millis
+            "",
+        ] {
+            let err = doc.set_item_when(&id, Some(bad)).unwrap_err();
+            assert!(
+                matches!(err, DocError::Invalid(_)),
+                "expected Invalid for {bad:?}, got {err:?}"
+            );
+        }
+        assert_eq!(doc.get_item(&id).unwrap().when, None);
+        assert!(doc.drain_events().is_empty());
+
+        // Leap day accepted with a time, too.
+        doc.set_item_when(&id, Some("2028-02-29T08:30")).unwrap();
+        assert_eq!(
+            doc.get_item(&id).unwrap().when.as_deref(),
+            Some("2028-02-29T08:30")
+        );
+    }
+
+    #[test]
+    fn export_import_preserves_when_and_skips_it_when_unset() {
+        let src = Doc::new().unwrap();
+        let a = src.add_item(LIST_INBOX, "timed").unwrap();
+        let b = src.add_item(LIST_INBOX, "all day").unwrap();
+        let _c = src.add_item(LIST_INBOX, "unset").unwrap();
+        src.set_item_when(&a, Some("2026-09-12T14:00")).unwrap();
+        src.set_item_when(&b, Some("2026-09-12")).unwrap();
+
+        let export = src.export_json();
+        let json = serde_json::to_string(&export).unwrap();
+        // Exactly the two set values appear; the unset item carries no key.
+        assert_eq!(json.matches("\"when\"").count(), 2);
+
+        let dst = Doc::new().unwrap();
+        dst.import_json(&export).unwrap();
+        let imported: Vec<ItemView> = dst.iter_items().collect();
+        let find = |t: &str| imported.iter().find(|i| i.text == t).unwrap();
+        assert_eq!(find("timed").when.as_deref(), Some("2026-09-12T14:00"));
+        assert_eq!(find("all day").when.as_deref(), Some("2026-09-12"));
+        assert_eq!(find("unset").when, None);
+
+        // A malformed value in a hand-edited dump is dropped, not fatal.
+        let mut edited = export.clone();
+        edited.items[0].when = Some("2026-09-12T14:00:00".into());
+        let dst2 = Doc::new().unwrap();
+        dst2.import_json(&edited).unwrap();
+        assert!(
+            dst2.iter_items()
+                .all(|i| i.when.is_none() || i.text == "all day")
+        );
+    }
+
+    #[test]
+    fn when_converges_between_peers() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let id = a.add_item(LIST_INBOX, "sync me").unwrap();
+        let seed = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_persisted();
+        let mut b = Doc::empty();
+        b.apply_remote(&dek, &seed).unwrap();
+        let _ = a.drain_events();
+        let _ = b.drain_events();
+
+        a.set_item_when(&id, Some("2026-11-05T09:30")).unwrap();
+        let frame = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &frame).unwrap();
+
+        assert_eq!(
+            b.get_item(&id).unwrap().when.as_deref(),
+            Some("2026-11-05T09:30")
+        );
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        assert!(b.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::ItemWhenChanged { id: eid, when: Some(w) } if eid == &id && w == "2026-11-05T09:30"
+        )));
+
+        a.set_item_when(&id, None).unwrap();
+        let frame = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &frame).unwrap();
+        assert_eq!(b.get_item(&id).unwrap().when, None);
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        assert!(b.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::ItemWhenChanged { id: eid, when: None } if eid == &id
+        )));
+    }
+
+    #[test]
     fn import_json_preserves_per_list_order() {
         let src = Doc::new().unwrap();
         let l = src.add_list("Ordered").unwrap();
@@ -8426,6 +8688,7 @@ mod tests {
                 lifecycle: None,
                 live: false,
                 deadline: None,
+                when: None,
                 created_at: 1_700_000_000_000,
                 started_at: None,
                 done_at: None,

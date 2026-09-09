@@ -1,5 +1,5 @@
 //! Item commands: add / ls / backlog / todo / start / review / done /
-//! bin (verb) / restore / mv / edit.
+//! bin (verb) / restore / mv / edit / when / deadline.
 //!
 //! Every action goes through `Session` (open → mutate → flush). The
 //! session reads from and writes to the local Loro doc; it only talks
@@ -107,6 +107,12 @@ struct ItemJson<'a> {
     started_at: Option<i64>,
     done_at: Option<i64>,
     binned_at: Option<i64>,
+    /// Date-only deadline (`YYYY-MM-DD`), when set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    deadline: Option<&'a str>,
+    /// Planned date (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`), when set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    when: Option<&'a str>,
 }
 
 fn item_json(item: &ItemView) -> ItemJson<'_> {
@@ -120,7 +126,24 @@ fn item_json(item: &ItemView) -> ItemJson<'_> {
         started_at: item.started_at,
         done_at: item.done_at,
         binned_at: item.binned_at,
+        deadline: item.deadline.as_deref(),
+        when: item.when.as_deref(),
     }
+}
+
+/// Trailing date tags for a text row: ` @<when>` then ` !<deadline>`,
+/// each only when set. Shared by `ls` and `agenda`.
+pub fn date_tags(item: &ItemView) -> String {
+    let mut s = String::new();
+    if let Some(w) = &item.when {
+        s.push_str(" @");
+        s.push_str(w);
+    }
+    if let Some(d) = &item.deadline {
+        s.push_str(" !");
+        s.push_str(d);
+    }
+    s
 }
 
 /// One-character box mark for the workflow register's state.
@@ -148,7 +171,12 @@ fn print_items(items: &[ItemView]) {
         } else {
             String::new()
         };
-        println!("{}  [{mark}] {}{suffix}", item.id, item.text);
+        println!(
+            "{}  [{mark}] {}{}{suffix}",
+            item.id,
+            item.text,
+            date_tags(item)
+        );
     }
 }
 
@@ -240,6 +268,42 @@ pub async fn mv(args: MvArgs, sync: bool) -> anyhow::Result<()> {
     session.flush().await?;
     println!("{}", args.item_id);
     Ok(())
+}
+
+// ---------- when / deadline ----------
+
+#[derive(Parser, Debug)]
+pub struct DateArg {
+    pub item_id: String,
+    /// The value to set, or `-` to clear.
+    pub value: String,
+}
+
+/// Set or clear the planned date: `YYYY-MM-DD` (all-day) or
+/// `YYYY-MM-DDTHH:MM` (timed); `-` clears. Validation lives in the core.
+pub async fn when(args: DateArg, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
+    session
+        .doc()
+        .set_item_when(&args.item_id, clear_or(&args.value))?;
+    session.flush().await?;
+    println!("{}", args.item_id);
+    Ok(())
+}
+
+/// Set or clear the date-only deadline (`YYYY-MM-DD`); `-` clears.
+pub async fn deadline(args: DateArg, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
+    session
+        .doc()
+        .set_item_deadline(&args.item_id, clear_or(&args.value))?;
+    session.flush().await?;
+    println!("{}", args.item_id);
+    Ok(())
+}
+
+fn clear_or(value: &str) -> Option<&str> {
+    if value == "-" { None } else { Some(value) }
 }
 
 // ---------- edit ----------

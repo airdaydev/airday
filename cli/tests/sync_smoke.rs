@@ -439,6 +439,85 @@ async fn focus_curation_converges_across_devices() {
     session_b2.flush().await.unwrap();
 }
 
+#[tokio::test]
+async fn when_converges_across_devices() {
+    let server = TestServer::start().await;
+    let dek = Dek::generate();
+    let signup = signup_via_http(&server, &dek, "when-A").await;
+
+    let tmp_a = tempfile::tempdir().unwrap();
+    let profile_a = materialize_signup_profile(
+        tmp_a.path(),
+        &server.base,
+        &signup,
+        &dek,
+        "when@example.com",
+        true,
+    )
+    .await;
+
+    let device_b = register_device(&server, &signup.device_token, "when-B").await;
+    let tmp_b = tempfile::tempdir().unwrap();
+    let profile_b = materialize_profile(
+        tmp_b.path(),
+        &server.base,
+        &signup.account_id,
+        &signup.primary_doc_id,
+        &device_b.device_id,
+        &device_b.device_token,
+        &dek,
+        "when@example.com",
+        false,
+    )
+    .await;
+
+    // A: one timed `when`, one all-day, and a deadline beside the first.
+    let session_a = Session::open_with_profile(profile_a, true).await.unwrap();
+    let timed = session_a.doc().add_item(LIST_INBOX, "timed").unwrap();
+    let allday = session_a.doc().add_item(LIST_INBOX, "all day").unwrap();
+    session_a
+        .doc()
+        .set_item_when(&timed, Some("2026-09-12T14:00"))
+        .unwrap();
+    session_a
+        .doc()
+        .set_item_deadline(&timed, Some("2026-10-31"))
+        .unwrap();
+    session_a
+        .doc()
+        .set_item_when(&allday, Some("2026-09-12"))
+        .unwrap();
+    let fp_set = session_a.doc().fingerprint();
+    session_a.flush().await.unwrap();
+
+    // B pulls on open: both values present, fingerprint parity.
+    let session_b = Session::open_with_profile(profile_b, true).await.unwrap();
+    assert!(session_b.is_online());
+    let b_timed = session_b.doc().get_item(&timed).unwrap();
+    assert_eq!(b_timed.when.as_deref(), Some("2026-09-12T14:00"));
+    assert_eq!(b_timed.deadline.as_deref(), Some("2026-10-31"));
+    assert_eq!(
+        session_b.doc().get_item(&allday).unwrap().when.as_deref(),
+        Some("2026-09-12")
+    );
+    assert_eq!(session_b.doc().fingerprint(), fp_set, "when is hashed");
+
+    // B clears the timed one's `when`; the deadline must survive.
+    session_b.doc().set_item_when(&timed, None).unwrap();
+    let fp_cleared = session_b.doc().fingerprint();
+    session_b.flush().await.unwrap();
+
+    // A reopens and observes the clear.
+    let session_a2 = Session::open_with_profile(reopen_profile(tmp_a.path()), true)
+        .await
+        .unwrap();
+    let a_timed = session_a2.doc().get_item(&timed).unwrap();
+    assert_eq!(a_timed.when, None, "A observes B's clear");
+    assert_eq!(a_timed.deadline.as_deref(), Some("2026-10-31"));
+    assert_eq!(session_a2.doc().fingerprint(), fp_cleared);
+    session_a2.flush().await.unwrap();
+}
+
 async fn wait_for_ops(server: &TestServer, doc_id: Uuid, target: usize) -> queries::FetchedBatch {
     let deadline = std::time::Instant::now() + Duration::from_secs(2);
     loop {

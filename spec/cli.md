@@ -19,7 +19,7 @@ Single binary `airday`. Subcommands:
 
 ### Items
 - `airday add <text> [--list <list>]` — `<text>` of `-` reads from stdin; one item per non-blank line. New items are created in **Backlog** (the workflow register is omitted).
-- `airday ls [--list <list>]`
+- `airday ls [--list <list>]` — rows carry a trailing ` @<when>` and ` !<deadline>` when set; `--json` adds `when` / `deadline` fields (omitted when unset)
 - `airday backlog <item_id>` — workflow → Backlog
 - `airday todo <item_id>` — workflow → Todo
 - `airday start <item_id>` — workflow → In Progress (stamps `started_at` on first entry)
@@ -29,6 +29,9 @@ Single binary `airday`. Subcommands:
 - `airday restore <item_id>` — clear the bin mask only; reveals the preserved workflow state (Backlog / Todo / In Progress / Review / Done)
 - `airday mv <item_id> <list>`
 - `airday edit <item_id> <text>`
+- `airday when <item_id> <YYYY-MM-DD[THH:MM] | ->` — set (all-day or timed, floating) or clear (`-`) the planned date; validation is the core's (`spec/calendar-plan.md`)
+- `airday deadline <item_id> <YYYY-MM-DD | ->` — set or clear the deadline
+- `airday agenda [--days N] [--today YYYY-MM-DD] [--json]` — Open dated items by day: Today first (always shown, with overdue deadlines and slipped planned dates folded in, oldest first), then each non-empty day up to `N` days out (default 14). Rows carry the same `@` / `!` tags as `ls` plus a trailing `(overdue)` / `(due today)` / `(slipped)` tone. `--today` overrides the local date, for scripts and tests. `--json` emits `[{ day, today, rows: [{ id, text, list_id, state, when?, deadline?, placed_by, tone }] }]`.
 
 Lifecycle is the atomic `lifecycle` workflow register (`[state, at]`, states Backlog | Todo | In Progress | Review | Done) masked by the orthogonal `binned_at` bin flag — see `spec/data-model.md` "Lifecycle". Each workflow command writes the register `[state, now]` (and clears any bin mask) in a single commit; re-applying the current resolved state is a no-op. `ls` boxes carry a one-character state mark (` ` backlog, `-` todo, `>` in progress, `?` review, `x` done, `~` binned).
 

@@ -41,7 +41,8 @@ One child `LoroMap` under `items`, keyed by `ItemId`.
 | `location` | string | **atomic placement register** — encoded `"<list_id>:<placement_id>"`, see below |
 | `lifecycle` | value | **atomic workflow register** — a plain `LoroValue` list `[state, at]`: the current workflow state (integer `0..=4`, see "Lifecycle") and the unix millis it was entered. Absent ≡ `[Backlog, created_at]`; new items omit it. |
 | `binned_at` | i64? | **bin mask** — unix millis when the item was binned. Present ≡ binned (masking the workflow state); absent ≡ not binned. Restore deletes the key, revealing the preserved workflow state. Orthogonal to `lifecycle`. |
-| `deadline` | string? | optional **date-only** deadline, a floating local calendar date in `YYYY-MM-DD` format (no time, no timezone, not unix millis). Absent ≡ no deadline; clearing deletes the key. Values that are not a well-formed `YYYY-MM-DD` calendar date are rejected by the mutation. |
+| `deadline` | string? | optional **date-only** deadline, a floating local calendar date in `YYYY-MM-DD` format (no time, no timezone, not unix millis). Absent ≡ no deadline; clearing deletes the key. Values that are not a well-formed `YYYY-MM-DD` calendar date are rejected by the mutation. Means "owed by": past it the item is overdue. |
+| `when` | string? | optional **planned date**, shape-discriminated: `YYYY-MM-DD` (all-day, 10 chars) or `YYYY-MM-DDTHH:MM` (timed, 16 chars, `HH` 00–23, `MM` 00–59). Floating wall-clock, no seconds, no zone; an RFC 9557 `[Zone]` suffix is reserved and rejected for now. Absent ≡ unset; clearing deletes the key. One register so date and time cannot tear under concurrent edit; sorts by plain string compare (all-day leads its day). Means "happens on" or "act on": past it the item slipped, never overdue. Independent of `deadline`. See `calendar-plan.md`. |
 | `created_at` | i64 | unix millis (client clock) |
 | `started_at` | i64? | **reflection stamp**: set (write-once) the first time the item enters In Progress; never cleared. Feeds analytics (created → started); no view reads it. |
 | `done_at` | i64? | **reflection stamp**: set each time the item enters Done; never cleared, so it survives later binning and un-doing. Feeds analytics (started → done); view sorts use the register's `at`, not this. |
@@ -328,7 +329,7 @@ without destroying anything. It is a single-register write on the ListMeta row
 (`archived_at`), and **nothing else**:
 
 - Item `location` registers, placements, and order containers are untouched.
-- Item lifecycle, timestamps, notes, and deadlines are untouched.
+- Item lifecycle, timestamps, notes, deadlines, and planned dates are untouched.
 - Focus refs are untouched.
 - The list keeps its id, name, icon, saved view, `created_at`, and its position
   in the `lists` MovableList.
@@ -407,6 +408,11 @@ All mutations go through Loro APIs internally; the core exposes typed helpers:
 - `set_item_deadline(item_id, deadline)` — `Some(date)` validates a `YYYY-MM-DD`
   calendar date and writes the `deadline` register; `None` deletes the key. One
   commit. Rejects malformed dates with `Invalid`.
+- `set_item_when(item_id, when)` — `Some(value)` validates `YYYY-MM-DD` or
+  `YYYY-MM-DDTHH:MM` and writes the `when` register with the trimmed value;
+  `None` deletes the key. One commit. Rejects anything else (seconds, offsets,
+  the reserved zone suffix) with `Invalid`. Emits `ItemWhenChanged { id, when }`;
+  `ItemAdded` carries `when` too. Export dumps carry `when` only when set.
 - `add_list(name) -> ListId`
 - `rename_list(list_id, name)`
 - `set_list_archived(list_id, archived)` — archives (`true`) or unarchives

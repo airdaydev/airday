@@ -3,6 +3,7 @@ use dialoguer::Password;
 
 pub const MIN_PASSWORD_LEN: usize = 10;
 
+pub mod agenda;
 pub mod bin;
 pub mod cache;
 pub mod export;
@@ -73,6 +74,12 @@ enum Cmd {
     Mv(items::MvArgs),
     /// Edit an item's text.
     Edit(items::EditArgs),
+    /// Set (YYYY-MM-DD or YYYY-MM-DDTHH:MM) or clear (-) an item's planned date.
+    When(items::DateArg),
+    /// Set (YYYY-MM-DD) or clear (-) an item's deadline.
+    Deadline(items::DateArg),
+    /// Open items by day: Today (with overdue and slipped folded in), then the coming days.
+    Agenda(agenda::AgendaArgs),
     /// Curated Focus lens: list (default), add, rm, mv.
     Focus(focus::FocusArgs),
     /// Manage lists.
@@ -107,6 +114,9 @@ impl Cli {
             Cmd::Restore(a) => items::restore(a, sync).await,
             Cmd::Mv(a) => items::mv(a, sync).await,
             Cmd::Edit(a) => items::edit(a, sync).await,
+            Cmd::When(a) => items::when(a, sync).await,
+            Cmd::Deadline(a) => items::deadline(a, sync).await,
+            Cmd::Agenda(a) => agenda::run(a, sync).await,
             Cmd::Focus(a) => focus::run(a, sync).await,
             Cmd::Lists(a) => lists::run(a, sync).await,
             Cmd::Cache(a) => cache::run(a).await,

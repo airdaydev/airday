@@ -306,6 +306,7 @@ fn import(cfg: &Cfg) {
                 lifecycle: None,
                 live: false,
                 deadline: None,
+                when: None,
                 created_at: 1_700_000_000_000 + i as i64,
                 started_at: None,
                 done_at: None,

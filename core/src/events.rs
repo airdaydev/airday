@@ -53,6 +53,9 @@ pub enum AppEvent {
         /// Date-only deadline (`YYYY-MM-DD`) or `None`. Floating local
         /// calendar date — consumers format without timezone conversion.
         deadline: Option<String>,
+        /// Planned date (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`) or `None`.
+        /// Floating wall-clock; consumers format without zone conversion.
+        when: Option<String>,
         open_index: Option<usize>,
     },
     /// Item removed from the doc (deleteBinned / emptyBin). Toggling
@@ -95,6 +98,13 @@ pub enum AppEvent {
     ItemDeadlineChanged {
         id: String,
         deadline: Option<String>,
+    },
+    /// Item's planned date changed. The payload is the raw value after
+    /// the write (`YYYY-MM-DD` all-day or `YYYY-MM-DDTHH:MM` timed) —
+    /// `None` when cleared. Floating; format locally.
+    ItemWhenChanged {
+        id: String,
+        when: Option<String>,
     },
     /// Lifecycle changed (`spec/data-model.md`). Emitted whenever the
     /// workflow register, a reflection stamp, or the `binned_at` mask
