@@ -1,10 +1,12 @@
 # Calendar: plan
 
-**Status: plan, not built. Decided 2026-09-09.** Adds a second date to
-items, `when`, alongside the existing `deadline`, and grows the Upcoming
-view into a basic day-granular calendar: an agenda plus a month grid. No
-recurrence rules, no time zones, no export in the first cut, each with its
-extension point reserved so it lands later without a migration.
+**Status: plan, not built. Decided 2026-09-09, trimmed the same day.** Adds
+a second date to items, `when`, alongside the existing `deadline`, and grows
+the Upcoming view into a day-granular agenda over both dates. The first cut
+is the basics only: the field, the agenda, and a When control with an
+optional time. No month grid, no drag-to-reschedule, no recurrence rules, no
+time zones, no export, each with its extension point reserved so it lands
+later without a migration.
 
 Companion to `data-model.md` (fields, mutations), `board.md` (lens model),
 `urls.md` (view tokens), `cli.md` (verbs). Amend those in place as each phase
@@ -20,7 +22,8 @@ lands; this file is the design record.
 | Time zone? | **Floating only, now.** A `when` is a wall-clock intent, the devices travel together, and floating keeps sorting a string compare. The grammar reserves an RFC 9557 bracketed IANA suffix (`...T14:00[Europe/London]`) for fixed-instant values. Writers may later default to appending the device zone; untouched values stay floating, so nothing migrates. Note this is the task-manager default, not the calendar default: Apple and Google pin timed events to a zone. |
 | Recurrence? | **Not in the first cut.** No `repeat` field, no hint of one in the doc. Repeat-on-done (clone with the date advanced when ticked Done) is the likely first form; RRULE-style schedules are a calendar app's job. |
 | Does the clock ever write? | **Never.** A slipped `when` rolls into Today as a derived view rule. Nothing promotes an item to Live, adds it to Focus, or moves it because a day arrived: every device would race to do it. |
-| Calendar surface | **Two lenses over the same rows.** Upcoming becomes the agenda (day sections, both dates). A month grid joins as a sibling lens, reusing the corvu calendar already under the date picker. Day granularity only: no hour grid, no durations, no overlap. |
+| Calendar surface | **One lens: Upcoming becomes the agenda** (day sections, both dates). Day granularity only: no hour grid, no durations, no overlap. A month grid and drag-to-reschedule are deferred; the agenda's shape does not change when they land. |
+| Time input | **Kobalte `TimeField`**, segmented hour / minute, 12 or 24-hour cycle from the existing time-format preference. Blank means all-day. See "Task surface and rows". |
 | Export / CalDAV | **Deferred.** Mapping is recorded below. A subscribable feed needs a server that can read items, which the E2EE server cannot; a non-E2EE CalDAV carve-out is a separate conversation. |
 | Schema | **Additive within v4.** No break, no import step. |
 
@@ -121,50 +124,45 @@ Upcoming keeps its token, nav entry, and shape. `groupByDeadline` becomes
   label.
 - Today is always the first group, empty if nothing is due, so the surface
   anchors on the current day.
-- Still not a `Dnd` listbox in this phase; drag-to-reschedule is Phase 3.
-
-## Month grid (new lens, `calendar`)
-
-A sibling of the agenda, not a per-list view: a workspace-level lens like
-Upcoming, Done, and Bin.
-
-- One month at a time, Monday or Sunday start per locale, today highlighted.
-  Built on `@corvu/calendar`, which already backs the date picker.
-- Each day cell shows up to a small fixed number of row titles in placement
-  order, then a "+k" overflow. Tone follows the agenda rules, so overdue and
-  slipped rows are visible at a glance in Today's cell only (past cells show
-  nothing: the fold moved their rows to Today).
-- Clicking a day opens the agenda anchored on that day (the agenda gains an
-  optional anchor day; Today stays the first group when the anchor is today).
-  Clicking a title opens the task surface as agenda rows do.
-- Keyboard: arrows move the focused day, PageUp/PageDown move months, Enter
-  opens the agenda on the day. The grid itself is `tabIndex=-1` like every
-  other chrome surface; keyboard nav enters through the palette or the nav
-  shortcut.
-- No hour rows, no week view, no durations. Those are the calendar app's.
-
-## Reschedule
-
-Drag a row between agenda day sections, or between grid cells, to reschedule.
-
-- For a row placed by `when`: write `set_item_when` with the day replaced and
-  the time part kept.
-- For a row placed by `deadline` only: write `set_item_deadline`.
-- A row with both moves its `when`; the deadline is a commitment and moves
-  only through the explicit control.
-- Drop on Today from a slipped state clears the slipped tone without any
-  other change.
-
-Requires the agenda to become a keyed listbox with group headers, which the
-current flat virtualised list cannot host. Phase 3.
+- Stays the flat virtualised list it is today, not a `Dnd` listbox.
+  Drag-to-reschedule is deferred (see below).
 
 ## Task surface and rows
 
 - The task dialog and side panel gain a **When** control beside Deadline,
   same badge-with-popover pattern as `DeadlineField`: Set date…, Today,
   Tomorrow, Remove. Set date… opens the shared calendar modal, which gains an
-  optional time input (blank ≡ all-day). Changing the date keeps the time;
-  Remove clears both.
+  optional time field under the grid (blank ≡ all-day). Changing the date
+  keeps the time; Remove clears both.
+- **Time field** is Kobalte's `TimeField` (`@kobalte/core/time-field`,
+  already in the installed 0.13.x), `granularity="minute"`, no seconds. It
+  is unstyled and segmented (hour, minute, and a day-period segment in the
+  12-hour cycle), keyboard-driven with arrow spin and typed digits, and
+  reads the locale from the Kobalte `I18nProvider` that `AppI18nProvider`
+  already mounts.
+- **Hour cycle** follows the time-format preference, not the locale alone.
+  `format.tsx` gains `hourCycle(locale): 12 | 24`: `"12h"` → 12, `"24h"` →
+  24, `"auto"` → whatever `Intl.DateTimeFormat(locale, { hour: "numeric" })`
+  resolves to (`h11` / `h12` → 12, `h23` / `h24` → 24). The result is passed
+  as the field's `hourCycle` prop every time, never left to the component's
+  own locale default, so the field and every formatted time in the app agree
+  by construction. Changing the preference in Settings re-renders the field
+  in the new cycle; the stored value is unaffected (it is always 24-hour
+  `HH:MM`).
+- **Value bridge.** The field's `value` is `{ hour?, minute? }`, plain
+  numbers, no date library. The 16-character register maps to
+  `{ hour: HH, minute: MM }`; the 10-character register maps to `{}`.
+  `onChange` fires on every segment edit, including partial states (an hour
+  typed with the minute still blank, or one segment cleared with Backspace),
+  so the dialog holds the field state locally and writes through only when
+  it is **complete** (both hour and minute set → timed) or **empty** (both
+  unset → all-day). A partial state writes nothing and keeps the previous
+  register value; the calendar's date pick applies the last complete or
+  empty time. Clearing both segments on a timed value is how the user drops
+  back to all-day without removing the date.
+- The calendar modal is shared with Deadline. The time field mounts only
+  when the modal is opened for `when`; the deadline path is unchanged and
+  keeps writing 10-character stamps.
 - `WhenBadge` beside `DeadlineBadge` on list rows and board cards. When both
   are set, `when` renders first. Muted on done/binned items as deadline is.
 - Row context menus gain the same quick actions for When.
@@ -174,15 +172,14 @@ current flat virtualised list cannot host. Phase 3.
 
 ## URLs
 
-`spec/urls.md` gains a token:
+No new token in the first cut. `upcoming` stays the agenda. Two forms are
+reserved so later phases add without renaming:
 
-```
-token = ... | "upcoming" | "calendar" | ...
-```
+- `calendar`, for a month-grid lens.
+- A day anchor with an underscore, `upcoming_2026-07-13` and
+  `calendar_2026-07`.
 
-`upcoming` stays the agenda. `calendar` is the month grid. A day anchor
-(`upcoming_2026-07-13`, `calendar_2026-07`) is the obvious extension; not in
-the first cut, but the underscore form is reserved for it.
+Amend `spec/urls.md` with the reservation only.
 
 ## CLI
 
@@ -225,6 +222,20 @@ here.
 - **Fixed instants.** The bracketed suffix above. Flipping the default means
   writers append the device zone; sorting then needs instant normalisation
   for mixed values, which is why it waits.
+- **Month grid.** A workspace-level lens, sibling of Upcoming, on the
+  `calendar` token: one month at a time on `@corvu/calendar` (already under
+  the date picker), a few row titles per cell in placement order with a
+  "+k" overflow, tone per the agenda rules (past cells empty, since the fold
+  moved their rows to Today), click or Enter on a day opens the agenda
+  anchored on it. Needs the agenda to accept an anchor day. Nothing in the
+  data model changes for it.
+- **Reschedule.** Drag a row between agenda day sections or grid cells. A
+  row placed by `when` moves its `when` with the time part kept; a row placed
+  by `deadline` only moves its deadline; a row with both moves `when`, the
+  deadline being a commitment that moves only through the explicit control.
+  Needs the agenda to become a keyed grouped listbox, which the flat
+  virtualised list cannot host. That is the whole cost, and the reason it
+  waits.
 - **Export**, per the mapping above.
 - **CalDAV carve-out.** Separate conversation.
 - **Week view, durations, end times, hour grid.** Not planned.
@@ -238,6 +249,9 @@ here.
 - `deadlineGroups.test.ts` becomes the `groupByDay` suite: placement day,
   clamping, tone precedence, within-day ordering including timed rows, items
   with both fields.
+- `format.test.ts`: `hourCycle` for each preference and for `"auto"` under a
+  12-hour and a 24-hour locale; register ⇄ `{ hour, minute }` bridge
+  including the empty and partial cases.
 - CLI system test: `when` set on one device, observed on the other after
   sync, cleared, observed cleared.
 - Web: typecheck plus source reading (no browser automation here).
@@ -248,9 +262,8 @@ here.
    bindings, `when` / `deadline` / `agenda` verbs. Amend `data-model.md`,
    `cli.md`. Unit and system tests.
 1. **Web field and agenda.** Store field and mutation, `WhenBadge`, When
-   control with time input, `groupByDay`, agenda tone rules, i18n. Amend
-   `urls.md` for the reserved anchor form.
-2. **Month grid.** `calendar` token, nav entry, palette entry, grid lens,
-   agenda anchor.
-3. **Reschedule.** Agenda as a keyed grouped listbox, drag between days and
-   cells.
+   control with the Kobalte time field and `hourCycle`, `groupByDay`, agenda
+   tone rules, i18n. Amend `urls.md` for the reserved tokens.
+
+Month grid and reschedule are deferred, not phased; see "Deferred, with their
+extension points".
