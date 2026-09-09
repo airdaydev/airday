@@ -420,7 +420,7 @@ body {
 .upcoming-day-label {
   margin: 0;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text);
 }
 
@@ -550,17 +550,18 @@ body {
 }
 
 .nav-section {
-  padding: 8px 8px 4px;
   color: var(--text-faint);
 }
 
-/* Clickable workspace heading: collapses the group beneath it. Reset the
-   button chrome so it reads as a heading, with the caret revealing the
-   affordance. */
+/* Clickable workspace heading: collapses the group beneath it. Spans the
+   full nav width, the label filling the leading space and the caret +
+   new-list button grouped at the trailing edge, both hover-revealed so
+   the heading reads as a plain label at rest. */
 .nav-section-toggle {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 2px;
+  box-sizing: border-box;
   width: 100%;
   height: 28px;
   padding: 0 8px;
@@ -570,6 +571,12 @@ body {
   cursor: pointer;
   font: inherit;
   text-align: left;
+  user-select: none;
+}
+
+.nav-section-label {
+  flex: 1;
+  min-width: 0;
 }
 
 @media (max-width: 768px) and (pointer: coarse) {
@@ -603,6 +610,46 @@ body {
 
 .nav-section-caret[data-collapsed] {
   transform: rotate(-90deg);
+}
+
+/* New-list button: hover-only like the caret, revealed when any part of
+   the heading row is hovered, or when it holds keyboard focus. Sized to
+   match the caret so the two glyphs read as a pair. Stays visible on
+   coarse pointers, where there is no hover to reveal it. */
+.nav-section-add {
+  width: 20px;
+  height: 20px;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.nav-section-add svg {
+  width: 12px;
+  height: 12px;
+}
+
+.nav-section-toggle:hover .nav-section-add,
+.nav-section-add:focus-visible {
+  opacity: 1;
+}
+
+@media (pointer: coarse) {
+  .nav-section-add {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) and (pointer: coarse) {
+  .nav-section-add {
+    width: 40px;
+    height: 40px;
+  }
+
+  .nav-section-add svg {
+    width: 16px;
+    height: 16px;
+  }
 }
 
 .nav-item {
@@ -673,12 +720,6 @@ body {
 
 .nav-item[data-drop-active] {
   background: var(--dnd-select-bg);
-}
-
-/* "+ Add list" affordance: muted so it reads as a secondary action rather
-   than another list row. */
-.nav-item-add {
-  color: var(--text-faint);
 }
 
 .nav-item-label {

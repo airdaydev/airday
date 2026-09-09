@@ -24,6 +24,7 @@ import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import externalLinkSvg from "./icons/external-link.svg?raw";
 import fileSvg from "./icons/file.svg?raw";
+import plusSvg from "./icons/plus.svg?raw";
 import { formatRelative } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { AuthDialog, type Session } from "./Login.tsx";
@@ -378,6 +379,13 @@ export function Nav(props: {
     setPersonalCollapsed(next);
     savePersonalCollapsed(next);
   };
+  const startAdding = () => {
+    if (personalCollapsed()) {
+      setPersonalCollapsed(false);
+      savePersonalCollapsed(false);
+    }
+    setAdding(true);
+  };
   const onNavKeyDown = (e: KeyboardEvent) => {
     if (e.key !== "Enter") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
@@ -542,10 +550,9 @@ export function Nav(props: {
             ("Personal"); shared workspaces will add sibling groups, each
             with its own heading. Click collapses the group; the state is
             local to this browser. */}
-        <button
-          type="button"
+        <div
           class="nav-section nav-section-toggle"
-          tabIndex={-1}
+          role="button"
           aria-expanded={!personalCollapsed()}
           onClick={togglePersonal}
         >
@@ -555,7 +562,26 @@ export function Nav(props: {
             data-collapsed={personalCollapsed() ? "" : undefined}
             innerHTML={caretDownSvg}
           />
-        </button>
+          {/* New-list affordance sits inside the heading, after the caret,
+              rather than as a trailing "+ Add list" row: hover-only like
+              the caret, so the group reads as a plain label at rest. The
+              heading is a div (not a button) so this real button can nest
+              inside it; stopPropagation keeps the click from also toggling
+              the group. Opening the form expands a collapsed group, since
+              the input renders inside it. */}
+          <button
+            type="button"
+            class="icon-button nav-section-add"
+            tabIndex={-1}
+            aria-label={m().nav.newList}
+            title={m().nav.newList}
+            innerHTML={plusSvg}
+            onClick={(e) => {
+              e.stopPropagation();
+              startAdding();
+            }}
+          />
+        </div>
         <Show when={!personalCollapsed()}>
         {/* Inbox is reserved: it has no `ListMeta` row and carries the
             localized built-in label, so it's a static entry with no rename
@@ -687,14 +713,7 @@ export function Nav(props: {
             }}
           </Dnd>
         </Show>
-        <Show
-          when={adding()}
-          fallback={
-            <button type="button" class="nav-item nav-item-add" tabIndex={-1} onClick={() => setAdding(true)}>
-              {m().nav.newList}
-            </button>
-          }
-        >
+        <Show when={adding()}>
           <NewListForm
             name={name()}
             setName={setName}
@@ -979,6 +998,17 @@ function NewListForm(props: {
         onInput={(e) => props.setName(e.currentTarget.value)}
         onBlur={() => {
           if (!props.name.trim()) props.onDismiss();
+        }}
+        // Escape commits a typed name (same as Enter) and dismisses an
+        // empty input. Native listener + stopPropagation so the
+        // document-level Escape handlers (side panel close, dnd selection
+        // clear) don't also fire on the same keystroke.
+        on:keydown={(e) => {
+          if (e.key !== "Escape") return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (props.name.trim()) props.onSubmit(e);
+          else props.onDismiss();
         }}
       />
     </form>
