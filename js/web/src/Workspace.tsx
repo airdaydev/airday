@@ -358,7 +358,6 @@ export function Workspace(props: {
   } | null>(null);
   // Which field the dialog focuses on open — the note badge opens to notes,
   // everything else to the title. Reset to title whenever the dialog closes.
-  const [openFocus, setOpenFocus] = createSignal<"title" | "notes">("title");
   // Lists this browser renders differently from their saved default.
   // Persisted per browser (not synced); absent ≡ follow the default.
   const [viewOverrides, setViewOverrides] = createSignal<Record<string, string>>(
@@ -515,7 +514,6 @@ export function Workspace(props: {
   createEffect(() => {
     if (openItemId() === null) {
       setLiveEdit(null);
-      setOpenFocus("title");
     }
   });
   const matchesKbDevice = createKbDeviceSignal();
@@ -2253,7 +2251,6 @@ export function Workspace(props: {
         setNewItem={setNewItemTarget}
         app={app}
         lists={activeLists}
-        focusField={openFocus}
         passive={openPassive}
         onClosed={restoreItemsFocus}
         onReleaseFocus={restoreItemsFocus}
@@ -2693,10 +2690,7 @@ export function Workspace(props: {
                         duplicateBlock={duplicateBlock}
                         copyBlock={copyBlock}
                         onDraftSettle={settleDraft}
-                        onOpen={(id, focus) => {
-                          if (focus) setOpenFocus(focus);
-                          setOpenItemId(id);
-                        }}
+                        onOpen={(id) => setOpenItemId(id)}
                         onSetDeadline={openDeadlineCalendar}
                         onSetWhen={openWhenCalendar}
                         onReveal={revealItemIn}
@@ -2714,10 +2708,7 @@ export function Workspace(props: {
             <Board
               app={app}
               listId={listId}
-              onOpen={(id, focus) => {
-                if (focus) setOpenFocus(focus);
-                setOpenItemId(id);
-              }}
+              onOpen={(id) => setOpenItemId(id)}
               onSetDeadline={openDeadlineCalendar}
               onSetWhen={openWhenCalendar}
               onReveal={revealItemIn}

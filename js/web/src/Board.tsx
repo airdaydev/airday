@@ -76,7 +76,7 @@ const H_SCROLL_STEP = 14;
 export function Board(props: {
   app: DocApp;
   listId: string;
-  onOpen: (id: string, focus?: "notes") => void;
+  onOpen: (id: string) => void;
   onSetDeadline: (ids: readonly string[], initial: string | null) => void;
   onSetWhen: (ids: readonly string[], initial: string | null) => void;
   /** Row context-menu jump to the item's other appearance (the Focus
@@ -644,7 +644,7 @@ function BoardColumn(props: {
   onReorder: (op: DndOp<ItemView>) => void;
   /** Open the new-item dialog targeting this lane. */
   onAddItem: () => void;
-  onOpen: (id: string, focus?: "notes") => void;
+  onOpen: (id: string) => void;
   onSetDeadline: (ids: readonly string[], initial: string | null) => void;
   onSetWhen: (ids: readonly string[], initial: string | null) => void;
   onReveal?: (id: string, where: "list" | "focus") => void;

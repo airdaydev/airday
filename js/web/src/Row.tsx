@@ -62,7 +62,7 @@ export function Row(props: {
   onDraftSettle?: (text: string, chain: boolean) => void;
   /** Open this item in the detail dialog. `focus` picks which field the
    *  dialog lands the caret in — the note badge opens straight to notes. */
-  onOpen?: (id: string, focus?: "notes") => void;
+  onOpen?: (id: string) => void;
   /** When true (mobile), a plain tap on the row opens the dialog instead
    *  of only selecting — inline editing is unpleasant on touch. */
   openOnTap?: () => boolean;
@@ -134,21 +134,13 @@ export function Row(props: {
   // Whether the item carries any notes text. Whitespace-only notes don't
   // count — the dialog would open to an empty-looking editor.
   const hasNotes = () => props.item().notes.trim().length > 0;
-  // The badge is a button (it opens the dialog to notes), so it swallows
-  // pointer-down to keep the dnd / selection from treating it as a row
-  // press.
+  // Purely an indicator, like the focus badge: it has no click behaviour
+  // of its own, so a press on it is just a press on the row.
   const NotesBadge = () => (
-    <button
-      type="button"
-      tabIndex={-1}
+    <span
       class="badge row-notes-badge"
       title={m().workspace.hasNotes}
       aria-label={m().workspace.hasNotes}
-      onPointerDown={(e) => e.stopPropagation()}
-      onClick={(e) => {
-        e.stopPropagation();
-        props.onOpen?.(props.item().id, "notes");
-      }}
       innerHTML={noteSvg}
     />
   );
@@ -543,8 +535,8 @@ export function Row(props: {
               if (e.key !== "Escape") e.stopPropagation();
             }}
           />
-          {/* Has-notes badge: a corner-fold glyph that opens the dialog
-              straight to the notes editor. Sits inline right after the
+          {/* Has-notes badge: a corner-fold glyph marking that the item
+              carries notes. Sits inline right after the
               title — the text is the shrinking flex child of .row-body,
               so the badge hugs the last word of a short title and sits
               just past the ellipsis of a truncated one. List rows only:

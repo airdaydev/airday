@@ -31,7 +31,6 @@ import checkSvg from "./icons/check.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import drawingPinSvg from "./icons/drawing-pin.svg?raw";
 import drawingPinFilledSvg from "./icons/drawing-pin-filled.svg?raw";
-import noteSvg from "./icons/note.svg?raw";
 import sidebarRightSvg from "./icons/sidebar-right.svg?raw";
 import { formatDialogStamp, nowMs } from "./format.tsx";
 import { useAppI18n, laneLabel } from "./i18n.tsx";
@@ -89,8 +88,6 @@ export function TaskDialog(props: {
   app: DocApp;
   /** Active (non-archived) user lists — the move/capture destinations. */
   lists: () => ListView[];
-  /** Which field to focus on open (default title). */
-  focusField?: () => "title" | "notes";
   /** True when the open was selection-driven (the side panel following
    *  the list selection): the non-modal shells then leave focus on the
    *  list instead of landing the caret. Flipping back to false on an
@@ -242,20 +239,6 @@ export function TaskDialog(props: {
 
   const [text, setText] = createSignal("");
   const [notes, setNotes] = createSignal("");
-  const hasNotes = () => notes().trim().length > 0;
-  const focusNotes = () => {
-    const el = notesRef;
-    if (!el) return;
-    el.focus();
-    // Land the caret at the end rather than the start.
-    const sel = window.getSelection();
-    if (!sel) return;
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-  };
   // New-item mode's deadline buffer: nothing exists to write to until the
   // capture commits, so picks are held here and applied after creation.
   const [newDeadline, setNewDeadline] = createSignal<string | null>(null);
@@ -739,13 +722,11 @@ export function TaskDialog(props: {
     if (insertNewline(notesRef)) e.preventDefault();
   };
 
-  // Land the caret on open: at the end of the title (or notes when
-  // asked). rAF defers past the load effect that linkifies the title value.
+  // Land the caret on open at the end of the title. rAF defers past the
+  // load effect that linkifies the title value.
   const focusOnOpen = () => {
     requestAnimationFrame(() => {
-      const toNotes = props.focusField?.() === "notes";
-      const el = toNotes ? notesRef : titleRef;
-      if (el) placeCaretAtEnd(el);
+      if (titleRef) placeCaretAtEnd(titleRef);
     });
   };
 
@@ -891,7 +872,6 @@ export function TaskDialog(props: {
               open={deadlineCalOpen}
               setOpen={setDeadlineCalOpen}
             />
-            <NotesBadge shown={hasNotes} onClick={focusNotes} />
             <Show when={!(newItemTarget()?.done ?? false)}>
               <PinToggle
                 pinned={newFocus}
@@ -1062,7 +1042,6 @@ export function TaskDialog(props: {
               open={deadlineCalOpen}
               setOpen={setDeadlineCalOpen}
             />
-            <NotesBadge shown={hasNotes} onClick={focusNotes} />
             <Show when={!isDone(it()) && !isBinned(it())}>
               <PinToggle pinned={focused} onToggle={toggleFocus} />
             </Show>
@@ -1263,25 +1242,6 @@ function LifecycleBadge(props: {
 /** Pin-to-Focus toggle shown beside the deadline badge: outline pin when
  *  unpinned, filled when pinned. Backed by live Focus state for open items
  *  and by the `newFocus` buffer in new-item capture mode. */
-// Has-notes badge in the dialog's badge row: same pill as the row badge,
-// mirrors the live editor contents so it appears as soon as notes are
-// typed. Clicking drops the caret into the notes editor.
-function NotesBadge(props: { shown: () => boolean; onClick: () => void }) {
-  const { m } = useAppI18n();
-  return (
-    <Show when={props.shown()}>
-      <button
-        type="button"
-        class="badge task-dialog-notes-badge"
-        title={m().workspace.hasNotes}
-        aria-label={m().workspace.hasNotes}
-        onClick={props.onClick}
-        innerHTML={noteSvg}
-      />
-    </Show>
-  );
-}
-
 function PinToggle(props: {
   pinned: () => boolean;
   onToggle: () => void;
