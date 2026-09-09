@@ -69,8 +69,13 @@ Opening `#list_<id>` for an unknown list is ignored.
 
 The address bar always reflects `(view, openItem)`: an open item wins,
 so the URL is `#item_<id>` while an item is open and the view's token
-otherwise. Board vs list mode, lane visibility and the side-panel
-state are prefs, not URL state: the URL names *what*, prefs name *how*.
+otherwise. "Open" here means explicitly entered (row open, Enter, a
+Find pick, a link). The side panel passively following the list
+selection does not count: the URL stays on the view token until the
+user actually focuses the item, either by opening it explicitly or by
+clicking into the panel, which promotes the passive open. Board vs list mode, lane visibility
+and the side-panel state are prefs, not URL state: the URL names
+*what*, prefs name *how*.
 
 History entries:
 
@@ -78,8 +83,9 @@ History entries:
 - An explicit item open (row open, Enter, a Find pick, a link) pushes
   one entry, so Back closes the item. Switching from one open item to
   another replaces it. Selection-driven passive opens (the side panel
-  following the list selection) only replace, so arrowing through a
-  list never grows history.
+  following the list selection) never touch the URL; arrowing away from
+  an explicitly opened item replaces its entry with the view's token in
+  place, so arrowing through a list never grows history.
 - Closing the item replaces the entry with the view's token.
 - Boot writes the initial hash with a replace, never a push.
 

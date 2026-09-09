@@ -104,6 +104,10 @@ export function TaskDialog(props: {
    *  back to the list/board without closing the item (the pane keeps
    *  showing it). The owner focuses its items listbox here. */
   onReleaseFocus?: () => void;
+  /** Side-panel shell only: focus entered the pane (a click into it)
+   *  while the open was passive. The owner promotes it to an explicit
+   *  open, which is what the address bar follows (`spec/urls.md`). */
+  onFocused?: () => void;
   /** Pushes the in-progress title into a UI-only channel so the list row
    *  mirrors the edit live — without a sync op per keystroke. The real
    *  write still happens once, via the close/flush path. */
@@ -1111,6 +1115,9 @@ export function TaskDialog(props: {
     props.itemId();
     newItemTarget();
     if (props.passive?.()) return;
+    // A passive open promoted by a click into the pane already has focus
+    // where the user put it; don't yank the caret to the title.
+    if (shellRef?.contains(document.activeElement)) return;
     focusOnOpen();
   });
   createEffect(() => {
@@ -1145,6 +1152,9 @@ export function TaskDialog(props: {
                 aria-label={m().common.close}
                 data-shortcuts-inert=""
                 onKeyDown={onShellKeyDown}
+                onFocusIn={() => {
+                  if (props.passive?.()) props.onFocused?.();
+                }}
               >
                 {body()}
               </section>

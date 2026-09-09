@@ -1721,12 +1721,15 @@ export function Workspace(props: {
 
   // ---------- Fragment URLs (`spec/urls.md`) ----------
   //
-  // The address bar mirrors `(view, openItemId)`; hash navigation (a
-  // pasted link, Back / Forward, an internal note link) applies the
-  // route back onto the same two signals. One effect derives the hash
-  // from both, so a route that sets view + item together writes the
-  // URL once, and a state change that already matches the hash (i.e.
-  // one we just applied from the hash) writes nothing.
+  // The address bar mirrors `(view, explicitly opened item)`; hash
+  // navigation (a pasted link, Back / Forward, an internal note link)
+  // applies the route back onto the same two signals. One effect derives
+  // the hash from both, so a route that sets view + item together writes
+  // the URL once, and a state change that already matches the hash (i.e.
+  // one we just applied from the hash) writes nothing. A passive open
+  // (the side panel following the list selection) is not an "open" as
+  // far as the URL is concerned: the address bar keeps the view token
+  // until the user actually enters the item (Enter, row open, a link).
 
   // The view that shows `it`: Bin if binned, Done if done, else its home
   // list. A stale list id falls back to Inbox; archived lists still render.
@@ -1791,17 +1794,23 @@ export function Workspace(props: {
     if (state.itemsById[id]) untrack(() => openItemFromUrl(id));
   });
 
+  // The item the URL names: the open item unless the open is passive
+  // (selection-driven), which the address bar doesn't follow.
+  const urlItemId = (): string | null => (openPassive() ? null : openItemId());
+
   // State → address bar. History rules: a view change pushes; an
   // explicit open pushes once (so Back closes the item) and is marked
-  // in `history.state`; item → item and passive (selection-driven)
-  // opens replace; closing an item we pushed for goes Back instead of
-  // leaving a duplicate entry. The first run (boot) always replaces.
+  // in `history.state`; item → item replaces; a passive (selection-
+  // driven) open reads as no item, so arrowing away from an explicitly
+  // opened item drops the URL back to the view token in place; closing
+  // an item we pushed for goes Back instead of leaving a duplicate
+  // entry. The first run (boot) always replaces.
   const ITEM_ENTRY = { airdayItem: true };
   let prevUrlState: { viewKey: string; item: string | null } | undefined;
   createEffect(() => {
     const v = view();
-    const item = openItemId();
     const passive = openPassive();
+    const item = urlItemId();
     const hash = stateHash(v, item);
     const cur = { viewKey: viewKey(v), item };
     const prev = prevUrlState;
@@ -1816,11 +1825,11 @@ export function Workspace(props: {
     const closed = prev.item !== null && item === null;
     if (closed && !viewChanged && history.state?.airdayItem === true) {
       if (passive) {
-        // A selection-driven close (the side panel swapping to its
-        // multi-select surface) stays on this entry rather than popping
-        // it mid-interaction. Drop the marker so a later close doesn't
-        // pop for it either; the spare entry is inert (Back re-lands on
-        // the same view).
+        // A selection-driven close (the side panel moving on to the next
+        // selected row, or swapping to its multi-select surface) stays
+        // on this entry rather than popping it mid-interaction. Drop the
+        // marker so a later close doesn't pop for it either; the spare
+        // entry is inert (Back re-lands on the same view).
         history.replaceState(null, "", hash);
         return;
       }
@@ -1844,7 +1853,7 @@ export function Workspace(props: {
   const onPopState = () => {
     const route = parseHash(location.hash);
     if (route) applyRoute(route);
-    else history.replaceState(history.state, "", stateHash(view(), openItemId()));
+    else history.replaceState(history.state, "", stateHash(view(), urlItemId()));
   };
   window.addEventListener("popstate", onPopState);
   onCleanup(() => window.removeEventListener("popstate", onPopState));
@@ -2248,6 +2257,7 @@ export function Workspace(props: {
         passive={openPassive}
         onClosed={restoreItemsFocus}
         onReleaseFocus={restoreItemsFocus}
+        onFocused={() => setOpenPassive(false)}
         onLiveText={(text) => {
           const id = openItemId();
           if (id) setLiveEdit({ id, text });
