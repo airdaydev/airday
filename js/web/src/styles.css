@@ -2676,8 +2676,10 @@ input.task-check:hover {
   color: #fff;
 }
 
-.time-field-hint {
-  color: var(--text-faint);
+/* "Clear time" sits at the row's far end so the field keeps its slot
+   whether or not the button is showing. */
+.deadline-dialog-time .deadline-dialog-remove {
+  margin-left: auto;
 }
 
 .deadline-dialog-remove {

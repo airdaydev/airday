@@ -6,11 +6,12 @@
 // dismisses; a modal doesn't.
 //
 // In `when` mode a Kobalte `TimeField` sits under the grid. Blank means
-// all-day. The field fires on every segment edit, including partial
-// states, so it is held locally and written through only when complete
-// (both segments) or empty (neither): a date pick applies the last such
-// state and closes; a time edit against an already-set date writes through
-// and stays open (`spec/calendar-plan.md` "Task surface and rows").
+// all-day; a "Clear time" button beside it blanks both segments at once.
+// The field fires on every segment edit, including partial states, so it
+// is held locally and written through only when complete (both segments)
+// or empty (neither): a date pick applies the last such state and closes;
+// a time edit against an already-set date writes through and stays open
+// (`spec/calendar-plan.md` "Task surface and rows").
 
 import Calendar from "@corvu/calendar";
 import { Dialog } from "@kobalte/core/dialog";
@@ -198,7 +199,19 @@ export function DeadlineCalendarDialog(props: {
                     )}
                   </TimeField.Input>
                 </TimeField>
-                <span class="time-field-hint">{m().when.allDay}</span>
+                <Show when={!isEmptyTime(time())}>
+                  <button
+                    type="button"
+                    class="deadline-dialog-remove"
+                    onClick={() => {
+                      setTime({});
+                      const cur = props.value();
+                      if (cur) props.onPick(whenDay(cur));
+                    }}
+                  >
+                    {m().when.clearTime}
+                  </button>
+                </Show>
               </div>
             </Show>
             <Show when={props.onRemove && props.value()}>

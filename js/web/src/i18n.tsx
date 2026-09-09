@@ -259,8 +259,8 @@ export type Messages = {
     dialogTitle: string;
     /** Label of the optional time field under the calendar. */
     time: string;
-    /** Hint beside the time field: leaving it blank means all-day. */
-    allDay: string;
+    /** Button beside the time field that blanks it (back to all-day). */
+    clearTime: string;
   };
   upcoming: {
     /** Upcoming view's Today group when nothing is due today. */
@@ -521,7 +521,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       setDate: "Elegir fecha…",
       dialogTitle: "Establecer fecha",
       time: "Hora",
-      allDay: "Vacío = todo el día",
+      clearTime: "Quitar hora",
     },
     upcoming: {
       emptyToday: "Nada para hoy",
@@ -766,7 +766,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       setDate: "Set date…",
       dialogTitle: "Set date",
       time: "Time",
-      allDay: "Blank = all day",
+      clearTime: "Clear time",
     },
     upcoming: {
       emptyToday: "Nothing due today",
