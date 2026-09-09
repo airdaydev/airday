@@ -1,6 +1,6 @@
 ## Product Thesis
 
-Airday is a low-friction, FOSS, single-human-user/small-tteam, E2EE, multi-device capture/clarify/organise tool for ideas, intents, goals, projects. It is flexible but built with particular regard to improving users' productivity & focus.
+Airday is a low-friction, FOSS, single-human-user/small-team, E2EE, multi-device capture/clarify/organise tool for ideas, intents, goals, projects. It is flexible but built with particular regard to improving users' productivity & focus.
 
 Workflow: a reserved primary capture list ("Inbox", id `inbox`), any number of user-created lists (each viewable as a fixed Backlog/Live/Done board), and a bin. Items move between lists, transition through the lifecycle (Backlog, Live, Done, Binned), can be restored, and deleted.
 
