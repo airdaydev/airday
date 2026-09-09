@@ -14,7 +14,9 @@
 //! - `import`: `import_json` of a synthetic v3 export of the same size.
 
 use airday_core::doc::Doc;
-use airday_core::{Dek, ExportItem, ExportList, ExportSettings, JsonExport, LIST_INBOX};
+use airday_core::{
+    Dek, ExportItem, ExportLifecycle, ExportList, ExportSettings, JsonExport, LIST_INBOX,
+};
 use loro::{Container, ExportMode, LoroDoc, LoroMap, LoroValue, UpdateOptions, ValueOrContainer};
 use std::time::Instant;
 
@@ -303,8 +305,10 @@ fn import(cfg: &Cfg) {
                 text: format!("item {i}"),
                 notes: notes_for(cfg, i),
                 list_id: LIST_INBOX.to_string(),
-                lifecycle: None,
-                live: false,
+                lifecycle: ExportLifecycle {
+                    state: "backlog".to_string(),
+                    at: 1_700_000_000_000 + i as i64,
+                },
                 deadline: None,
                 when: None,
                 created_at: 1_700_000_000_000 + i as i64,

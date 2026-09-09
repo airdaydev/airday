@@ -375,9 +375,7 @@ Airday has one reserved primary capture list:
   but it is not stored as a `ListMeta` row in the `lists` MovableList. Its
   order container is `order/inbox`. Its label is client-defined (the localized
   built-in) and it is non-renamable, non-movable, and non-deletable — there is
-  no display-name override. Doc-level settings for it live in `settings`. (Pre-rename docs stored this id as `main`; the JSON
-  importer aliases `main` ⇒ `inbox` for the reserved list — see "Schema
-  versioning & compatibility".)
+  no display-name override. Doc-level settings for it live in `settings`.
 
 The bin is *not* a list; it's the `binned_at` mask on items.
 
@@ -457,11 +455,9 @@ and the `order/*` name differ), so **no schema-version renumber** — it stays v
 but it rides the same one-time **export → wipe → import** cutover as the v1→v2
 break above, run once on the live doc at a clean checkpoint.
 
-The **JSON importer aliases the legacy reserved id `main` ⇒ `inbox`** for the
-reserved list only: exported JSON carries `list_id: "main"` for reserved-list
-items, and the new build reserves `inbox`. This keeps the cutover a pure data
-round-trip (no `sed` on the export file). `main` is stored verbatim in exported
-JSON *only* as the reserved list's id — the alias is the only translation needed.
+The cutover was a one-time export → edit → import; the importer no longer
+aliases `main` ⇒ `inbox`. Exports carry `list_id: "inbox"` for reserved-list
+items.
 
 ### Focus container — additive within v2
 
@@ -480,20 +476,12 @@ Same clean-break policy as v1 → v2 — wire protocol stays 1, `001_init.sql` i
 untouched (op blobs are opaque), and the cutover is the one-time
 **export → wipe → import** at a clean checkpoint.
 
-The v3 JSON export carries `lifecycle: { state, at }` with `state` as a name —
-`"backlog" | "todo" | "in_progress" | "review" | "done"` — plus `binned_at`
-and the reflection stamps when present. The importer maps a **v2 export** onto
-v3 state:
-
-- `binned_at` ⇒ carried through unchanged (the mask is the same field)
-- `done_at` set ⇒ register `[Done, done_at]` (even when also binned — restore
-  then reveals Done, matching v2's masking)
-- else `live == true` ⇒ register `[InProgress, created_at]` (v2 recorded no
-  live-transition time; `created_at` is the deterministic stand-in)
-- else ⇒ register omitted (Backlog)
-
-A v2 `done_at` also seeds the v3 `done_at` reflection stamp; `started_at`
-starts absent everywhere — it accrues only from v3 transitions onward.
+The JSON export carries `lifecycle: { state, at }` for every item, with
+`state` as a name — `"backlog" | "todo" | "in_progress" | "review" | "done"` —
+plus `binned_at` and the reflection stamps when present. `lifecycle` is
+required on import; there is no mapping from the v2 `live` / `done_at` shape
+(the v2 → v3 cutover was a one-time export → wipe → import and its importer
+bridge has been removed). An unrecognized `state` name degrades to Backlog.
 
 ### Notes text container — the v3 → v4 break
 

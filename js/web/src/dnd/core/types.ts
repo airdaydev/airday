@@ -35,10 +35,6 @@ export interface DndRenderer<T> {
   ): Array<{ type: string; data: string }>;
 }
 
-export interface DragContext {
-  register(renderer: DndRenderer<any>, source: any): void;
-}
-
 /** Payload of `primavera-dnd-drag{start,move,end}`. `keys` and `items`
  *  are lazy getters — a whole-selection drag can carry thousands of
  *  entries and this event fires per pointermove, so per-move handlers

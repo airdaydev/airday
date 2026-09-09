@@ -110,7 +110,7 @@ const isMac =
  * drag/hover/expansion/click-pair state and coordinates the DOM-bound
  * subsystems (autoscroll, drag overlay, native drag, touch, placeholder).
  *
- * Hosts (vanilla custom element OR Solid component) provide the structural
+ * Hosts (the Solid component) provide the structural
  * DOM, wire DOM events into the controller's handlers, and read render
  * state via getRenderState() to draw items.
  */

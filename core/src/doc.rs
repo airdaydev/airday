@@ -61,9 +61,6 @@ use crate::events::AppEvent;
 use airday_protocol::EncryptedBlob;
 
 pub const LIST_INBOX: &str = "inbox";
-/// Legacy reserved id from before the Inbox rename; the JSON importer
-/// aliases it to [`LIST_INBOX`] during the one-time cutover.
-pub const LEGACY_LIST_MAIN: &str = "main";
 pub const INBOX_NAME: &str = "Inbox";
 
 const ROOT_ITEMS: &str = "items";
@@ -595,8 +592,7 @@ pub struct ExportList {
 }
 
 /// The workflow register in export form (`spec/data-model.md` "Workflow
-/// register — the v2 → v3 break"): the state as a name plus the unix
-/// millis it was entered.
+/// register"): the state as a name plus the unix millis it was entered.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportLifecycle {
@@ -614,16 +610,8 @@ pub struct ExportItem {
     pub text: String,
     pub notes: String,
     pub list_id: String,
-    /// v3 workflow register (`{state, at}`) — always emitted by v3
-    /// exports, for every item. Absent marks a **v2 export**: the
-    /// importer then maps `live`/`done_at` onto the register
-    /// (`spec/data-model.md` "Workflow register — the v2 → v3 break").
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub lifecycle: Option<ExportLifecycle>,
-    /// v2 lifecycle flag — accepted on import only (for the v2 → v3
-    /// mapping); v3 exports never write it.
-    #[serde(skip_serializing, default)]
-    pub live: bool,
+    /// Workflow register (`{state, at}`), emitted for every item.
+    pub lifecycle: ExportLifecycle,
     /// Date-only deadline (`YYYY-MM-DD`). Skipped when unset to keep
     /// pre-deadline dumps byte-identical.
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -3090,13 +3078,10 @@ impl Doc {
                 text: item.text,
                 notes: item.notes,
                 list_id: item.list_id,
-                // Always emitted (fallback already applied) so the
-                // importer can tell a v3 item from a v2 one by presence.
-                lifecycle: Some(ExportLifecycle {
+                lifecycle: ExportLifecycle {
                     state: item.state.name().to_string(),
                     at: item.lifecycle_at,
-                }),
-                live: false,
+                },
                 deadline: item.deadline,
                 when: item.when,
                 created_at: item.created_at,
@@ -3160,14 +3145,11 @@ impl Doc {
 
         let mut id_map: HashMap<String, String> = HashMap::new();
         id_map.insert(LIST_INBOX.to_string(), LIST_INBOX.to_string());
-        // One-time cutover alias: pre-rename exports carry the reserved
-        // list as `inbox`; fold it onto the new reserved id.
-        id_map.insert(LEGACY_LIST_MAIN.to_string(), LIST_INBOX.to_string());
 
         let lists = self.lists();
         let mut lists_added: usize = 0;
         for src_list in &export.lists {
-            if src_list.builtin || src_list.id == LIST_INBOX || src_list.id == LEGACY_LIST_MAIN {
+            if src_list.builtin || src_list.id == LIST_INBOX {
                 id_map.insert(src_list.id.clone(), LIST_INBOX.to_string());
                 continue;
             }
@@ -3237,46 +3219,18 @@ impl Doc {
                 .as_str(),
             )?;
             map.insert(KEY_CREATED_AT, src_item.created_at)?;
-            // Workflow register + reflection stamps. A v3 export carries
-            // the register explicitly; a v2 export (no `lifecycle` key)
-            // is mapped per `spec/data-model.md` "Workflow register —
-            // the v2 → v3 break": `done_at` ⇒ `[Done, done_at]` (also
-            // seeding the `done_at` stamp), else `live` ⇒
-            // `[InProgress, created_at]`, else Backlog (register
-            // omitted). `started_at` accrues only from v3 exports.
-            let (register, started_at, done_stamp) = match &src_item.lifecycle {
-                Some(lc) => (
-                    Some((
-                        // An unrecognized state name in a hand-edited
-                        // export degrades to Backlog: visible and open.
-                        WorkflowState::parse_name(&lc.state).unwrap_or(WorkflowState::Backlog),
-                        lc.at,
-                    )),
-                    src_item.started_at,
-                    src_item.done_at,
-                ),
-                None => {
-                    if let Some(t) = src_item.done_at {
-                        (Some((WorkflowState::Done, t)), None, Some(t))
-                    } else if src_item.live {
-                        (
-                            Some((WorkflowState::InProgress, src_item.created_at)),
-                            None,
-                            None,
-                        )
-                    } else {
-                        (None, None, None)
-                    }
-                }
-            };
-            if let Some((state, at)) = register {
-                // The exact fallback value stays unwritten so a plain
-                // Backlog item round-trips to a keyless map.
-                if state != WorkflowState::Backlog || at != src_item.created_at {
-                    write_workflow(&map, state, at)?;
-                }
+            // Workflow register + reflection stamps. An unrecognized
+            // state name in a hand-edited export degrades to Backlog:
+            // visible and open.
+            let state = WorkflowState::parse_name(&src_item.lifecycle.state)
+                .unwrap_or(WorkflowState::Backlog);
+            let at = src_item.lifecycle.at;
+            // The exact fallback value stays unwritten so a plain
+            // Backlog item round-trips to a keyless map.
+            if state != WorkflowState::Backlog || at != src_item.created_at {
+                write_workflow(&map, state, at)?;
             }
-            if let Some(t) = started_at {
+            if let Some(t) = src_item.started_at {
                 map.insert(KEY_STARTED_AT, t)?;
             }
             // Carry a well-formed deadline through; a malformed one in a
@@ -3297,7 +3251,7 @@ impl Doc {
                 let text = map.ensure_mergeable_text(KEY_NOTES)?;
                 text.insert(0, notes)?;
             }
-            if let Some(t) = done_stamp {
+            if let Some(t) = src_item.done_at {
                 map.insert(KEY_DONE_AT, t)?;
             }
             if let Some(t) = src_item.binned_at {
@@ -3311,8 +3265,7 @@ impl Doc {
                 .encode()
                 .as_str(),
             )?;
-            let open =
-                src_item.binned_at.is_none() && register.is_none_or(|(state, _)| state.is_open());
+            let open = src_item.binned_at.is_none() && state.is_open();
             item_id_map.insert(src_item.id.clone(), (new_item_id, open));
             items_added += 1;
         }
@@ -4800,9 +4753,8 @@ fn read_string(map: &LoroMap, key: &str) -> Option<String> {
     value.into_string().ok().map(|s| s.to_string())
 }
 
-/// Read a text container's content. A plain string value at the key is a
-/// v3 leftover and, per the clean-break policy in `spec/data-model.md`,
-/// is not read: it yields `None` like an absent key.
+/// Read a text container's content. Anything other than a text container
+/// at the key yields `None`, like an absent key.
 fn read_text(map: &LoroMap, key: &str) -> Option<String> {
     match map.get(key)? {
         ValueOrContainer::Container(Container::Text(t)) => Some(t.to_string()),
@@ -8220,8 +8172,10 @@ mod tests {
             text: "   ".to_string(),
             notes: String::new(),
             list_id: LIST_INBOX.to_string(),
-            lifecycle: None,
-            live: false,
+            lifecycle: ExportLifecycle {
+                state: "backlog".to_string(),
+                at: 1,
+            },
             deadline: None,
             when: None,
             created_at: 1,
@@ -8256,10 +8210,10 @@ mod tests {
         // item (a live doc self-compacts these, so force it in the JSON).
         for item in &mut export.items {
             if item.text == "done-later" {
-                item.lifecycle = Some(ExportLifecycle {
+                item.lifecycle = ExportLifecycle {
                     state: "done".to_string(),
                     at: 42,
-                });
+                };
             }
         }
 
@@ -8685,8 +8639,10 @@ mod tests {
                 text: "stranded".to_string(),
                 notes: String::new(),
                 list_id: "no-such-list".to_string(),
-                lifecycle: None,
-                live: false,
+                lifecycle: ExportLifecycle {
+                    state: "backlog".to_string(),
+                    at: 1_700_000_000_000,
+                },
                 deadline: None,
                 when: None,
                 created_at: 1_700_000_000_000,
@@ -9418,23 +9374,12 @@ mod tests {
         let export = src.export_json();
         let by_text = |t: &str| export.items.iter().find(|i| i.text == t).unwrap();
         // Every v3 item carries the register with a named state.
-        assert_eq!(
-            by_text("backlog").lifecycle.as_ref().unwrap().state,
-            "backlog"
-        );
-        assert_eq!(
-            by_text("review").lifecycle.as_ref().unwrap().state,
-            "review"
-        );
-        assert_eq!(
-            by_text("started").lifecycle.as_ref().unwrap().state,
-            "in_progress"
-        );
-        assert_eq!(by_text("done").lifecycle.as_ref().unwrap().state, "done");
+        assert_eq!(by_text("backlog").lifecycle.state, "backlog");
+        assert_eq!(by_text("review").lifecycle.state, "review");
+        assert_eq!(by_text("started").lifecycle.state, "in_progress");
+        assert_eq!(by_text("done").lifecycle.state, "done");
         assert!(by_text("started").started_at.is_some());
         assert!(by_text("done").done_at.is_some());
-        // The exported JSON never carries the v2 `live` flag.
-        assert!(!src.export_json_string().contains("\"live\""));
 
         let dst = Doc::new().unwrap();
         dst.import_json(&export).unwrap();
@@ -9456,63 +9401,14 @@ mod tests {
     }
 
     #[test]
-    fn import_maps_v2_exports_onto_the_register() {
-        // A v2 export has no `lifecycle` key: `binned_at` carries through,
-        // `done_at` ⇒ [Done, done_at] (even when also binned), `live` ⇒
-        // [InProgress, created_at], else Backlog.
-        let json = r#"{
-            "version": 1,
-            "settings": { "showListCounts": true },
-            "lists": [
-                { "id": "inbox", "name": "Inbox", "createdAt": null, "builtin": true }
-            ],
-            "items": [
-                { "id": "i1", "text": "plain", "notes": "", "listId": "inbox",
-                  "createdAt": 100, "doneAt": null, "binnedAt": null },
-                { "id": "i2", "text": "was live", "notes": "", "listId": "inbox", "live": true,
-                  "createdAt": 200, "doneAt": null, "binnedAt": null },
-                { "id": "i3", "text": "was done", "notes": "", "listId": "inbox",
-                  "createdAt": 300, "doneAt": 350, "binnedAt": null },
-                { "id": "i4", "text": "done then binned", "notes": "", "listId": "inbox",
-                  "createdAt": 400, "doneAt": 450, "binnedAt": 460 }
-            ]
-        }"#;
-        let doc = Doc::new().unwrap();
-        doc.import_json_str(json).unwrap();
-        let by_text = |t: &str| doc.all_items().into_iter().find(|i| i.text == t).unwrap();
-        let plain = by_text("plain");
-        assert_eq!(plain.lifecycle(), ItemLifecycle::Backlog);
-        assert_eq!(plain.lifecycle_at, 100);
-        let live = by_text("was live");
-        assert_eq!(live.lifecycle(), ItemLifecycle::InProgress);
-        assert_eq!(
-            live.lifecycle_at, 200,
-            "v2 recorded no live-transition time; created_at stands in"
-        );
-        assert!(live.started_at.is_none(), "started_at accrues from v3 only");
-        let done = by_text("was done");
-        assert_eq!(done.lifecycle(), ItemLifecycle::Done);
-        assert_eq!(done.lifecycle_at, 350);
-        assert_eq!(done.done_at, Some(350), "v2 done_at seeds the stamp");
-        let binned = by_text("done then binned");
-        assert_eq!(binned.lifecycle(), ItemLifecycle::Binned);
-        assert_eq!(binned.binned_at, Some(460));
-        assert_eq!(
-            binned.state,
-            WorkflowState::Done,
-            "restore then reveals Done, matching v2 masking"
-        );
-    }
-
-    #[test]
     fn import_degrades_unknown_register_state_to_backlog() {
         let src = Doc::new().unwrap();
         let _ = src.add_item(LIST_INBOX, "future").unwrap();
         let mut export = src.export_json();
-        export.items[0].lifecycle = Some(ExportLifecycle {
+        export.items[0].lifecycle = ExportLifecycle {
             state: "hologram".to_string(),
             at: 42,
-        });
+        };
         let dst = Doc::new().unwrap();
         dst.import_json(&export).unwrap();
         let it = dst.all_items().into_iter().next().unwrap();
@@ -10080,23 +9976,6 @@ mod tests {
         );
         assert!(doc.redo().unwrap());
         assert_eq!(doc.get_item(&id).unwrap().notes, "one two");
-    }
-
-    #[test]
-    fn v3_string_register_notes_read_as_empty_and_hash_stable() {
-        // Clean-break policy: a stray v3 string register at `notes` is
-        // not read. The fingerprint hashes the view, so it equals an
-        // item with no notes.
-        let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_INBOX, "item").unwrap();
-        let before = doc.fingerprint();
-        doc.find_item(&id)
-            .unwrap()
-            .insert(KEY_NOTES, "v3 leftover")
-            .unwrap();
-        doc.inner.commit();
-        assert_eq!(doc.get_item(&id).unwrap().notes, "");
-        assert_eq!(doc.fingerprint(), before);
     }
 
     #[test]
