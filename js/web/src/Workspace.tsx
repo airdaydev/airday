@@ -34,7 +34,7 @@ import eyeOpenSvg from "./icons/eye-open.svg?raw";
 import listBulletSvg from "./icons/list-bullet.svg?raw";
 import sidebarRightSvg from "./icons/sidebar-right.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
-import plusSvg from "./icons/card-stack-plus.svg?raw";
+import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
 import { Board, type BoardImperative } from "./Board.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
@@ -1863,6 +1863,17 @@ export function Workspace(props: {
   mobileMq.addEventListener("change", onMqChange);
   onCleanup(() => mobileMq.removeEventListener("change", onMqChange));
 
+  // Narrow desktop: below this width the side panel's third column
+  // squeezes the main surface into uselessness, so the task surface uses
+  // its modal shell instead and the panel controls are disabled. The
+  // `sidePanelOpen` preference is left untouched: widening the window
+  // brings the panel straight back if it was on.
+  const narrowMq = window.matchMedia("(max-width: 919px)");
+  const [isNarrow, setIsNarrow] = createSignal(narrowMq.matches);
+  const onNarrowChange = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
+  narrowMq.addEventListener("change", onNarrowChange);
+  onCleanup(() => narrowMq.removeEventListener("change", onNarrowChange));
+
   // Desktop sidebar collapse. Toggled from the app menu, which lives in
   // the sidebar's footer and floats bottom-left while the sidebar is hidden.
   const [navHidden, setNavHiddenSignal] = createSignal(loadNavHiddenPref());
@@ -1902,7 +1913,8 @@ export function Workspace(props: {
       // Quota/private-mode failures just lose the preference.
     }
   };
-  const sidePanelShown = () => !isMobile() && sidePanelOpen();
+  const sidePanelAvailable = () => !isMobile() && !isNarrow();
+  const sidePanelShown = () => sidePanelAvailable() && sidePanelOpen();
   // The panel's task host element, set by ref while the panel is mounted.
   // Gated on `sidePanelShown` so the dialog falls back to its modal shell
   // the moment the panel closes (the stale element is never handed out).
@@ -2133,6 +2145,7 @@ export function Workspace(props: {
               navHidden={navHidden()}
               onToggleNav={() => setNavHidden(!navHidden())}
               sidePanelOpen={sidePanelOpen()}
+              sidePanelAvailable={sidePanelAvailable()}
               onToggleSidePanel={() => setSidePanelOpen(!sidePanelOpen())}
             />
             <StatusSlot
@@ -2228,8 +2241,12 @@ export function Workspace(props: {
           if (boardListId() !== null) setBoardRevealIds([id]);
         }}
         panelMount={() => (sidePanelShown() ? panelMount() : null)}
-        onSwapShell={() =>
-          setSidePanelOpen(!sidePanelOpen(), { keepItem: true })
+        onSwapShell={
+          // Too narrow for the panel: no shell to swap to, so the
+          // surface drops its sidebar button.
+          !sidePanelAvailable()
+            ? undefined
+            : () => setSidePanelOpen(!sidePanelOpen(), { keepItem: true })
         }
       />
       <DeadlineCalendarDialog

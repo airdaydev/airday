@@ -736,6 +736,9 @@ export function NavMenu(props: {
   /** Desktop side panel state + toggle (Show / Hide side panel item).
    *  The panel hosts the open task surface, else the deadline list. */
   sidePanelOpen: boolean;
+  /** False when the viewport is too narrow to fit the panel: the item is
+   *  disabled (the preference is preserved, not cleared). */
+  sidePanelAvailable: boolean;
   onToggleSidePanel: () => void;
 }) {
   const { m } = useAppI18n();
@@ -867,6 +870,7 @@ export function NavMenu(props: {
             <DropdownMenu.Separator class="dropdown-menu-separator" />
             <DropdownMenu.Item
               class="dropdown-menu-item"
+              disabled={!props.sidePanelAvailable}
               onSelect={() => props.onToggleSidePanel()}
             >
               {props.sidePanelOpen ? m().sidePanel.hide : m().sidePanel.show}

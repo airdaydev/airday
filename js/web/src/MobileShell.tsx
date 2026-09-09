@@ -12,7 +12,7 @@ import { Show, type JSX } from "solid-js";
 import { useAppI18n } from "./i18n.tsx";
 import caretUpDownSvg from "./icons/caret-up-down.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
-import plusSvg from "./icons/card-stack-plus.svg?raw";
+import plusSvg from "./icons/plus.svg?raw";
 
 export function MobileBars(props: {
   onFind: () => void;
