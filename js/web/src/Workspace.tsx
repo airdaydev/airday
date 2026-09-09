@@ -2692,7 +2692,6 @@ export function Workspace(props: {
                         onReveal={revealItemIn}
                         onMoveToList={openMovePalette}
                         openOnTap={itemsIsMobile}
-                        scrollToKey={(k) => dndHandle?.scrollToKey(k)}
                       />
                     );
                   }}

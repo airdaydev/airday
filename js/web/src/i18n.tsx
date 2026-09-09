@@ -281,14 +281,6 @@ export type Messages = {
     /** Bulk-action button that drops the whole selection. */
     clearSelection: string;
   };
-  order: {
-    /** Submenu label for the item-ordering actions. */
-    label: string;
-    /** Move the target item(s) to the top of the list. */
-    moveToTop: string;
-    /** Move the target item(s) to the bottom of the list. */
-    moveToBottom: string;
-  };
   shortcuts: {
     title: string;
     newItem: string;
@@ -544,11 +536,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       selectionActions: "Acciones sobre la selección",
       clearSelection: "Deseleccionar",
     },
-    order: {
-      label: "Ordenar",
-      moveToTop: "Mover al principio",
-      moveToBottom: "Mover al final",
-    },
     shortcuts: {
       title: "Atajos de teclado",
       newItem: "Nuevo elemento",
@@ -793,11 +780,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       selectedCount: (n) => `${n} items selected`,
       selectionActions: "Selection actions",
       clearSelection: "Clear selection",
-    },
-    order: {
-      label: "Order",
-      moveToTop: "Move to top",
-      moveToBottom: "Move to bottom",
     },
     shortcuts: {
       title: "Keyboard shortcuts",

@@ -672,9 +672,6 @@ function BoardColumn(props: {
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
   createEffect(() => setDndItems(props.members()));
   onCleanup(() => props.registerHandle(props.laneKey, null));
-  // Kept alongside the board-level registration so this lane's rows can steer
-  // their own viewport (reorder actions scroll the moved cards into view).
-  let handle: DndImperative | null = null;
 
   return (
     <section
@@ -706,10 +703,7 @@ function BoardColumn(props: {
       <div class="board-col-body">
         <Dnd
           class="board-col-dnd"
-          ref={(h) => {
-            handle = h;
-            props.registerHandle(props.laneKey, h);
-          }}
+          ref={(h) => props.registerHandle(props.laneKey, h)}
           items={dndItems()}
           setItems={setDndItems}
           getKey={(it) => it.id}
@@ -737,7 +731,6 @@ function BoardColumn(props: {
               onReveal={props.onReveal}
               onMoveToList={props.onMoveToList}
               openOnTap={props.openOnTap}
-              scrollToKey={(k) => handle?.scrollToKey(k)}
               deadlineInFooter
             />
           )}

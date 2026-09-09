@@ -92,10 +92,6 @@ export function Row(props: {
    *  when this row is part of it, else this row alone) — the menu twin of
    *  the `m` shortcut. */
   onMoveToList?: (ids: readonly string[]) => void;
-  /** Scroll the enclosing Dnd viewport so `key` is visible. Supplied by the
-   *  host that owns the Dnd handle (the list view, or the board per lane) so
-   *  the reorder actions below can keep the moved rows in sight. */
-  scrollToKey?: (key: string) => void;
 }) {
   const { m, locale } = useAppI18n();
   // Origin-list badge text for the flat cross-list views (Focus and Done),
@@ -377,64 +373,6 @@ export function Row(props: {
   };
   const onSetWhenDate = () => {
     props.onSetWhen?.(targetIds(), props.item().when ?? null);
-  };
-  // Move the target set to the top / bottom of the item's list Open order,
-  // preserving the targets' relative order. `moveItem`'s index is applied
-  // after the item is removed (splice semantics, see reorder.ts), so the
-  // bottom slot is `open.length - 1`. Targets are taken in list order (not
-  // selection-click order) so a multi-row move keeps their visual sequence.
-  // In the Focus lens the same operation reorders FocusRefs via `moveInFocus`
-  // over `focusOrder` (the curated visible order) instead of the list Open.
-  const orderedTargets = (order: string[]): string[] => {
-    const set = new Set(targetIds());
-    return order.filter((id) => set.has(id));
-  };
-  // The moved rows only reach the Dnd's item list once the store update has
-  // propagated, so defer the scroll a tick — scrolling inline would resolve
-  // the row's pre-move index. `key` is the edge of the moved block that ends
-  // up furthest from the old viewport (first for top, last for bottom).
-  const scrollAfterMove = (key: string) => {
-    const scroll = props.scrollToKey;
-    if (!scroll) return;
-    setTimeout(() => scroll(key), 0);
-  };
-  const onMoveToTop = () => {
-    if (props.viewKind === "focus") {
-      const ordered = orderedTargets(props.app.state.focusOrder);
-      if (ordered.length === 0) return;
-      props.app.withActionBatch(() => {
-        ordered.forEach((id, i) => props.app.moveInFocus(id, i));
-      });
-      scrollAfterMove(ordered[0]);
-      return;
-    }
-    const listId = props.item().listId;
-    const ordered = orderedTargets(props.app.state.listOpen[listId] ?? []);
-    if (ordered.length === 0) return;
-    props.app.withActionBatch(() => {
-      ordered.forEach((id, i) => props.app.moveItem(id, listId, i));
-    });
-    scrollAfterMove(ordered[0]);
-  };
-  const onMoveToBottom = () => {
-    if (props.viewKind === "focus") {
-      const ordered = orderedTargets(props.app.state.focusOrder);
-      if (ordered.length === 0) return;
-      const lastIndex = Math.max(props.app.state.focusOrder.length - 1, 0);
-      props.app.withActionBatch(() => {
-        for (const id of ordered) props.app.moveInFocus(id, lastIndex);
-      });
-      scrollAfterMove(ordered[ordered.length - 1]);
-      return;
-    }
-    const listId = props.item().listId;
-    const ordered = orderedTargets(props.app.state.listOpen[listId] ?? []);
-    if (ordered.length === 0) return;
-    const lastIndex = Math.max((props.app.state.listOpen[listId]?.length ?? 1) - 1, 0);
-    props.app.withActionBatch(() => {
-      for (const id of ordered) props.app.moveItem(id, listId, lastIndex);
-    });
-    scrollAfterMove(ordered[ordered.length - 1]);
   };
   const onOpenChange = (open: boolean) => {
     // Register the menu in the shared overlay count so the workspace's
@@ -873,32 +811,6 @@ export function Row(props: {
                     onSelect={onDeadlineTomorrow}
                   >
                     <span>{m().deadline.tomorrow}</span>
-                  </ContextMenu.Item>
-                </ContextMenu.SubContent>
-              </ContextMenu.Portal>
-            </ContextMenu.Sub>
-          </Show>
-          <Show when={canPinToFocus() || inFocusView()}>
-            <ContextMenu.Sub gutter={4}>
-              <ContextMenu.SubTrigger class="context-menu-item">
-                <span>{m().order.label}</span>
-                <span class="menu-sub-arrow" aria-hidden="true">
-                  ›
-                </span>
-              </ContextMenu.SubTrigger>
-              <ContextMenu.Portal>
-                <ContextMenu.SubContent class="context-menu-content">
-                  <ContextMenu.Item
-                    class="context-menu-item"
-                    onSelect={onMoveToTop}
-                  >
-                    <span>{m().order.moveToTop}</span>
-                  </ContextMenu.Item>
-                  <ContextMenu.Item
-                    class="context-menu-item"
-                    onSelect={onMoveToBottom}
-                  >
-                    <span>{m().order.moveToBottom}</span>
                   </ContextMenu.Item>
                 </ContextMenu.SubContent>
               </ContextMenu.Portal>
