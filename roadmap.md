@@ -81,3 +81,4 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 - dependency/dependent links? e.g. "blocked by", "solved by", "duplicate of"
 - in sidebar mode, the open item overrules the current list in history, always (it used to close on enter and push history of the list)
 - show keyboard shortcuts when hovered over an item somehow?
+- cancelled status (child of done?!)
