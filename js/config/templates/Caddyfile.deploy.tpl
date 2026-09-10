@@ -32,7 +32,3 @@
 		file_server
 	}
 }
-
-www.{{ mustEnv "MONOPLAN_HOST" }} {
-	redir https://{{ mustEnv "MONOPLAN_HOST" }}{uri} 308
-}
