@@ -51,7 +51,12 @@ import { MovePalette } from "./MovePalette.tsx";
 import { EditableNavLabel, Nav, NavMenu, StatusSlot } from "./nav.tsx";
 import { MobileBars } from "./MobileShell.tsx";
 import { digitNavTarget } from "./navShortcuts.ts";
-import { isOverlayOpen, onGlobalKey } from "./overlay.ts";
+import {
+  focusItems,
+  isOverlayOpen,
+  onGlobalKey,
+  registerFocusHome,
+} from "./overlay.ts";
 import type { ViewKey } from "./prefs.ts";
 import { Row, DRAFT_ID_PREFIX } from "./Row.tsx";
 import { planReorderMoves } from "./reorder.ts";
@@ -1421,6 +1426,9 @@ export function Workspace(props: {
     if (boardListId() !== null) boardHandle?.focusActive();
     else dndHandle?.focus();
   };
+  // Every dialog (auth, settings, confirm, shortcuts, the calendar pickers
+  // opened from the list) closes to the same place via overlay.ts.
+  registerFocusHome(restoreItemsFocus);
 
   // Enter: open the topmost selected item in the detail dialog. The dialog
   // owns Enter while open (commits & closes, or in the side pane commits
@@ -2215,9 +2223,9 @@ export function Workspace(props: {
           if (open) return;
           setMoveIds(null);
           // Hand keyboard focus back to the items listbox — the palette
-          // stole it into its filter input. Same restore the task dialog
+          // stole it into its filter input. Same restore every dialog
           // does on close.
-          restoreItemsFocus();
+          focusItems();
         }}
         options={moveListOptions}
         currentId={moveCurrentId}
@@ -2277,6 +2285,7 @@ export function Workspace(props: {
         }
       />
       <DeadlineCalendarDialog
+        closeToItems
         open={() => deadlineTarget() !== null}
         setOpen={(o) => {
           if (!o) setDeadlineTarget(null);
@@ -2293,6 +2302,7 @@ export function Workspace(props: {
       />
       <DeadlineCalendarDialog
         kind="when"
+        closeToItems
         open={() => whenTarget() !== null}
         setOpen={(o) => {
           if (!o) setWhenTarget(null);
@@ -2314,7 +2324,6 @@ export function Workspace(props: {
       <ShortcutsDialog
         open={shortcutsOpen()}
         onOpenChange={setShortcutsOpen}
-        onClosed={restoreItemsFocus}
       />
       <div class="content">
       <main class="main" tabIndex={-1}>

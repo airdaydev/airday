@@ -7,14 +7,11 @@
 import { Dialog } from "@kobalte/core/dialog";
 import { createEffect, For, onCleanup } from "solid-js";
 import { useAppI18n } from "./i18n.tsx";
-import { trackOverlay } from "./overlay.ts";
+import { closeToItems, trackOverlay } from "./overlay.ts";
 
 export function ShortcutsDialog(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Fired in place of Kobalte's focus restore on close: the host sends
-   *  focus back to the list rather than to whatever opened the sheet. */
-  onClosed?: () => void;
 }) {
   const { m } = useAppI18n();
   trackOverlay(() => props.open);
@@ -62,13 +59,7 @@ export function ShortcutsDialog(props: {
         <div class="dialog-positioner">
           <Dialog.Content
             class="shortcuts-dialog"
-            onCloseAutoFocus={(e) => {
-              // Kobalte would restore focus to whatever opened the sheet
-              // (the app-menu item, say). Take over and send it to the
-              // list so keyboard nav resumes there.
-              e.preventDefault();
-              props.onClosed?.();
-            }}
+            onCloseAutoFocus={closeToItems}
           >
             <Dialog.Title class="shortcuts-dialog-title">
               {m().shortcuts.title}

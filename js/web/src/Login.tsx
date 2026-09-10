@@ -15,7 +15,7 @@ import {
 import { api, ApiError, type LoginResponse } from "./api.ts";
 import { dekVault } from "./sync/dekVault.ts";
 import { useAppI18n } from "./i18n.tsx";
-import { trackOverlay } from "./overlay.ts";
+import { closeToItems, trackOverlay } from "./overlay.ts";
 
 export interface Session {
   /** Local-only session with no server account behind it. The web client
@@ -152,7 +152,7 @@ export function AuthDialog(props: {
       <Dialog.Portal>
         <Dialog.Overlay class="dialog-overlay" />
         <div class="dialog-positioner">
-          <Dialog.Content class="auth-dialog">
+          <Dialog.Content class="auth-dialog" onCloseAutoFocus={closeToItems}>
             <Dialog.CloseButton class="auth-dialog-close" aria-label={m().common.close}>
               <CloseIcon />
             </Dialog.CloseButton>

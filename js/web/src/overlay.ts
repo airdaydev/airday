@@ -30,6 +30,38 @@ export function trackOverlay(open: () => boolean): void {
   });
 }
 
+// Where focus goes when an overlay closes. Kobalte's default is "back to
+// whatever opened the dialog" (a menu item, a row's icon button, …), but
+// the workspace's keyboard model wants it on the items listbox so nav
+// resumes there. The workspace registers its listbox-focus routine here
+// and every dialog's `onCloseAutoFocus` sends focus to it — no per-mount
+// prop plumbing, and nested pickers (a calendar inside the task surface)
+// simply don't opt in.
+let focusHome: (() => void) | null = null;
+
+/** Register the routine that focuses the items listbox. Call from the
+ *  workspace's reactive scope; unregisters on unmount. */
+export function registerFocusHome(fn: () => void): void {
+  focusHome = fn;
+  onCleanup(() => {
+    if (focusHome === fn) focusHome = null;
+  });
+}
+
+/** Focus the items listbox, if a workspace is mounted. */
+export function focusItems(): void {
+  focusHome?.();
+}
+
+/** Kobalte `onCloseAutoFocus` handler: send focus to the items listbox
+ *  instead of the element that opened the dialog. Falls through to
+ *  Kobalte's default when no workspace is registered. */
+export function closeToItems(e: Event): void {
+  if (!focusHome) return;
+  e.preventDefault();
+  focusHome();
+}
+
 /** Register a document-level keyboard shortcut that is inert whenever an
  *  overlay is open or focus sits in an editable surface (input, textarea,
  *  contenteditable) — or anywhere inside a `data-shortcuts-inert` region:

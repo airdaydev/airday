@@ -29,6 +29,7 @@ import {
   type TimeParts,
 } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
+import { closeToItems } from "./overlay.ts";
 
 export function DeadlineCalendarDialog(props: {
   open: () => boolean;
@@ -48,6 +49,10 @@ export function DeadlineCalendarDialog(props: {
   /** Clear the value. When provided and a value is set, a "Remove" button
    *  shows at the bottom of the dialog. */
   onRemove?: () => void;
+  /** Send focus to the items listbox on close (the workspace-level mounts,
+   *  opened from a row). Off for the pickers nested in the task surface,
+   *  where Kobalte's default return-to-opener lands on the field button. */
+  closeToItems?: boolean;
 }) {
   const { m, locale } = useAppI18n();
   const isWhen = () => props.kind === "when";
@@ -84,7 +89,10 @@ export function DeadlineCalendarDialog(props: {
       <Dialog.Portal>
         <Dialog.Overlay class="dialog-overlay deadline-dialog-overlay" />
         <div class="dialog-positioner deadline-dialog-positioner">
-          <Dialog.Content class="deadline-dialog">
+          <Dialog.Content
+            class="deadline-dialog"
+            onCloseAutoFocus={props.closeToItems ? closeToItems : undefined}
+          >
             <Dialog.Title class="deadline-dialog-title">
               {labels().dialogTitle}
             </Dialog.Title>

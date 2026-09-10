@@ -1,7 +1,7 @@
 import { Dialog } from "@kobalte/core/dialog";
 import { Show } from "solid-js";
 import { useAppI18n } from "./i18n";
-import { trackOverlay } from "./overlay.ts";
+import { closeToItems, trackOverlay } from "./overlay.ts";
 
 /** In-page replacement for `window.confirm()`. Controlled Kobalte Dialog
  *  in the same portal/overlay/positioner shape as `AuthDialog`. The owner
@@ -30,6 +30,7 @@ export function ConfirmDialog(props: {
         <div class="dialog-positioner">
           <Dialog.Content
             class="confirm-dialog"
+            onCloseAutoFocus={closeToItems}
             onOpenAutoFocus={(e) => {
               // Kobalte focuses the first tabbable (Cancel, on the left);
               // put focus on the confirm button instead so Enter confirms.

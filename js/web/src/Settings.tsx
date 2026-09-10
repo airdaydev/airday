@@ -14,7 +14,7 @@ import { api, type Device } from "./api.ts";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import type { Session } from "./Login.tsx";
 import { useAppI18n } from "./i18n.tsx";
-import { trackOverlay } from "./overlay.ts";
+import { closeToItems, trackOverlay } from "./overlay.ts";
 import { densityPref, setDensityPref, type ListDensity } from "./density.ts";
 import type { ThemePreference } from "./theme.ts";
 import {
@@ -174,7 +174,7 @@ export function Settings(props: {
       <Dialog.Portal>
         <Dialog.Overlay class="dialog-overlay" />
         <div class="dialog-positioner">
-          <Dialog.Content class="settings-dialog">
+          <Dialog.Content class="settings-dialog" onCloseAutoFocus={closeToItems}>
             <aside class="settings-sidebar">
               <button
                 type="button"
