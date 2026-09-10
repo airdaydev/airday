@@ -88,23 +88,25 @@ export function TaskDialog(props: {
   app: DocApp;
   /** Active (non-archived) user lists — the move/capture destinations. */
   lists: () => ListView[];
-  /** True when the open was selection-driven (the side panel following
-   *  the list selection): the non-modal shells then leave focus on the
-   *  list instead of landing the caret. Flipping back to false on an
-   *  explicit open of the same item focuses the editor. */
-  passive?: () => boolean;
+  /** True when the user has entered the shown item (Enter on a row, a
+   *  row's open control, a Find pick, a link, a click into the pane):
+   *  the non-modal shells land the caret. False while the side pane is
+   *  merely following the list selection, which leaves focus on the list.
+   *  Notifies (without changing) on a re-entry of the same item, which
+   *  re-lands the caret. Treated as true when omitted. */
+  entered?: () => boolean;
   /** Called as the dialog closes so the owner can restore focus (to the
    *  list). Fires from Kobalte's close-auto-focus hook, which we take over
    *  to steer focus back to the listbox instead of the trigger. */
   onClosed?: () => void;
-  /** Side-panel shell only: plain Enter in the title (or Escape) hands
-   *  keyboard focus back to the list/board without closing the item (the
-   *  pane keeps showing it). The owner focuses its items listbox here and
-   *  demotes the open back to passive, the inverse of `onFocused`. */
+  /** Side-panel shell only: Enter in the title, Escape, or ⌘Enter hands
+   *  keyboard focus back to the list/board. The owner focuses its items
+   *  listbox and un-enters the item, which the pane keeps showing as the
+   *  followed row; the inverse of `onFocused`. */
   onReleaseFocus?: () => void;
   /** Side-panel shell only: focus entered the pane (a click into it)
-   *  while the open was passive. The owner promotes it to an explicit
-   *  open, which is what the address bar follows (`spec/urls.md`). */
+   *  while it was following the selection. The owner enters the shown
+   *  item, which is what the address bar follows (`spec/urls.md`). */
   onFocused?: () => void;
   /** Pushes the in-progress title into a UI-only channel so the list row
    *  mirrors the edit live — without a sync op per keystroke. The real
@@ -742,6 +744,14 @@ export function TaskDialog(props: {
   const onShellKeyDown = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
+      // The pane can't close out from under a selected row (it would
+      // just show it again), so commit-and-close means commit and hand
+      // focus back, as Enter in the title does.
+      if (panelMode() && !isNew()) {
+        flush(loadedId);
+        props.onReleaseFocus?.();
+        return;
+      }
       close();
       return;
     }
@@ -1085,18 +1095,19 @@ export function TaskDialog(props: {
 
   // Non-modal shells: focus the editor whenever the target changes (the
   // dialog does this via onOpenAutoFocus, but it can't swap targets while
-  // open) and hand focus back once nothing is open. A passive (selection-
-  // driven) open skips the focus so keyboard nav stays on the list.
+  // open) and hand focus back once nothing is open. A followed (not
+  // entered) item skips the focus so keyboard nav stays on the list.
   const nonModal = () => isMobile() || panelMode();
   createEffect(() => {
     if (!nonModal() || !open()) return;
     // Re-run per target, not just per open: a row click while the pane
-    // shows another item lands the caret in the new title.
+    // shows another item lands the caret in the new title. Also re-runs
+    // when the same item is re-entered (`entered` notifies).
     props.itemId();
     newItemTarget();
-    if (props.passive?.()) return;
-    // A passive open promoted by a click into the pane already has focus
-    // where the user put it; don't yank the caret to the title.
+    if (props.entered?.() === false) return;
+    // A click into the pane entered it with focus already where the
+    // user put it; don't yank the caret to the title.
     if (shellRef?.contains(document.activeElement)) return;
     focusOnOpen();
   });
@@ -1133,7 +1144,7 @@ export function TaskDialog(props: {
                 data-shortcuts-inert=""
                 onKeyDown={onShellKeyDown}
                 onFocusIn={() => {
-                  if (props.passive?.()) props.onFocused?.();
+                  if (props.entered?.() === false) props.onFocused?.();
                 }}
               >
                 {body()}

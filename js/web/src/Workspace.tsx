@@ -1,6 +1,5 @@
 import {
   batch,
-  createComputed,
   createEffect,
   createMemo,
   createSignal,
@@ -281,25 +280,25 @@ export function Workspace(props: {
   const [emptyBinConfirmOpen, setEmptyBinConfirmOpen] = createSignal(false);
   const [findOpen, setFindOpen] = createSignal(false);
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
-  // The item currently opened in the detail dialog, or null when closed.
-  const [openItemId, setOpenItemIdRaw] = createSignal<string | null>(null);
-  // Whether the current open was selection-driven (side panel follows the
-  // list/board selection) rather than explicit (row open icon, Enter, a
-  // find pick). Passive opens must not pull focus off the list, or arrow
-  // keys would land in the panel's title editor after the first step.
-  // `equals: false` so an explicit open of the item the panel already
-  // shows (Enter on the list after the pane handed focus back) still
-  // notifies the surface, which re-lands the caret in the title.
-  const [openPassive, setOpenPassive] = createSignal(false, { equals: false });
+  // The item the user has entered (Enter on a row, a row's open control,
+  // a Find pick, a link, a click into the side pane), or null. This is
+  // what the address bar mirrors and what the modal / mobile page show.
+  // The side pane shows `shownItemId` (below, with the selection wiring):
+  // this when set, else the row the selection is on. `equals: false` so
+  // re-entering the item the pane already shows (Enter on the list after
+  // the pane handed focus back) still notifies the surface, which
+  // re-lands the caret in the title.
+  const [openItemId, setOpenItemIdRaw] = createSignal<string | null>(null, {
+    equals: false,
+  });
   // An `#item_` link whose id isn't in the store yet (not synced, or
   // gone). Retried on every store change until it resolves or the user
-  // navigates elsewhere (`spec/urls.md`). Declared here so explicit opens
-  // can drop it.
+  // navigates elsewhere (`spec/urls.md`). Declared here so opens can drop
+  // it.
   const [pendingItemId, setPendingItemId] = createSignal<string | null>(null);
   const setOpenItemId = (id: string | null) =>
     batch(() => {
       setPendingItemId(null);
-      setOpenPassive(false);
       setOpenItemIdRaw(id);
     });
   // Rows the move palette will re-file (visible order), or null when the
@@ -519,11 +518,6 @@ export function Workspace(props: {
       // Quota/private-mode failures just lose the preference.
     }
   };
-  createEffect(() => {
-    if (openItemId() === null) {
-      setLiveEdit(null);
-    }
-  });
   const matchesKbDevice = createKbDeviceSignal();
 
   // Draft state: a transient ItemView injected into dndItems but not into
@@ -1736,10 +1730,11 @@ export function Workspace(props: {
   // applies the route back onto the same two signals. One effect derives
   // the hash from both, so a route that sets view + item together writes
   // the URL once, and a state change that already matches the hash (i.e.
-  // one we just applied from the hash) writes nothing. A passive open
-  // (the side panel following the list selection) is not an "open" as
-  // far as the URL is concerned: the address bar keeps the view token
-  // until the user actually enters the item (Enter, row open, a link).
+  // one we just applied from the hash) writes nothing. The side pane
+  // following the list selection is not an "open" as far as the URL is
+  // concerned (it isn't `openItemId`, see `shownItemId`): the address
+  // bar keeps the view token until the user actually enters the item
+  // (Enter, row open, a link, a click into the pane).
 
   // The view that shows `it`: Bin if binned, Done if done, else its home
   // list. A stale list id falls back to Inbox; archived lists still render.
@@ -1773,18 +1768,16 @@ export function Workspace(props: {
         return;
       const sameView = viewKey(route.view) === viewKey(untrack(view));
       batch(() => {
-        // A pop back onto the view already on screen leaves a passive
-        // open alone: the URL never named it, so the side panel keeps
-        // following the selection (this is the pop the mirror effect
-        // issues when the panel hands focus back to the list). Anything
-        // else closes the item.
-        if (!(sameView && untrack(openPassive))) setOpenItemId(null);
+        // Closing the entered item leaves the side pane on the selection
+        // (`shownItemId`), so the pop the mirror effect issues for a
+        // hand-back doesn't blank it.
+        setOpenItemId(null);
         // Only switch when the route names a different view. Closing an
-        // explicitly opened item pops the history entry it pushed, and
-        // that popstate routes back to the view already on screen: a
-        // fresh `ViewKey` object for the same view would still trip the
-        // view-change effect (selection cleared, draft dropped), which is
-        // how Enter-to-close in the list view used to lose the row's
+        // opened item pops the history entry it pushed, and that popstate
+        // routes back to the view already on screen: a fresh `ViewKey`
+        // object for the same view would still trip the view-change
+        // effect (selection cleared, draft dropped), which is how
+        // Enter-to-close in the list view used to lose the row's
         // selection. Board selections live inside Board and never saw it.
         if (!sameView) setView(route.view);
       });
@@ -1810,27 +1803,18 @@ export function Workspace(props: {
     if (state.itemsById[id]) untrack(() => openItemFromUrl(id));
   });
 
-  // The item the URL names: the open item unless the open is passive
-  // (selection-driven, or handed back to the list), which the address
-  // bar doesn't follow. In the side panel "open" is thus "has focus":
-  // Enter on a row / a click into the pane promotes, Escape / Enter in
-  // the pane demotes, and the URL tracks that the way it tracks the
-  // modal opening and closing.
-  const urlItemId = (): string | null => (openPassive() ? null : openItemId());
-
-  // State → address bar. History rules: a view change pushes; an
-  // explicit open pushes once (so Back closes the item) and is marked
-  // in `history.state`; item → item replaces; a passive (selection-
-  // driven) open reads as no item, so arrowing away from an explicitly
-  // opened item drops the URL back to the view token in place; closing
-  // an item we pushed for, or demoting it to passive, goes Back instead
-  // of leaving a duplicate entry. The first run (boot) always replaces.
+  // State → address bar. History rules: a view change pushes; an open
+  // pushes once (so Back closes the item) and is marked in
+  // `history.state`; item → item replaces; closing an item we pushed for
+  // goes Back instead of leaving a duplicate entry. In the side pane a
+  // close is the pane handing focus back (Escape, Enter): it carries on
+  // showing the selection, so an Enter / Escape cycle there nets zero
+  // history. The first run (boot) always replaces.
   const ITEM_ENTRY = { airdayItem: true };
   let prevUrlState: { viewKey: string; item: string | null } | undefined;
   createEffect(() => {
     const v = view();
-    const passive = openPassive();
-    const item = urlItemId();
+    const item = openItemId();
     const hash = stateHash(v, item);
     const cur = { viewKey: viewKey(v), item };
     const prev = prevUrlState;
@@ -1845,16 +1829,13 @@ export function Workspace(props: {
     const closed = prev.item !== null && item === null;
     if (closed && !viewChanged && history.state?.airdayItem === true) {
       // The popstate handler sees the view we're already on and leaves
-      // it (and the selection) alone; when the close is a demotion
-      // (`passive`: the pane handing focus back, or swapping to its
-      // multi-select surface) it leaves the panel's item alone too, so
-      // an Enter / Escape cycle in the pane nets zero history.
+      // it (and the selection) alone.
       history.back();
       return;
     }
     if (viewChanged) {
       history.pushState(null, "", hash);
-    } else if (opened && !passive) {
+    } else if (opened) {
       history.pushState(ITEM_ENTRY, "", hash);
     } else {
       // Keep the entry's marker so a later close still pops it.
@@ -1867,7 +1848,7 @@ export function Workspace(props: {
   const onPopState = () => {
     const route = parseHash(location.hash);
     if (route) applyRoute(route);
-    else history.replaceState(history.state, "", stateHash(view(), urlItemId()));
+    else history.replaceState(history.state, "", stateHash(view(), openItemId()));
   };
   window.addEventListener("popstate", onPopState);
   onCleanup(() => window.removeEventListener("popstate", onPopState));
@@ -1933,8 +1914,8 @@ export function Workspace(props: {
   );
   const setSidePanelOpen = (open: boolean, opts?: { keepItem?: boolean }) => {
     batch(() => {
-      // Hiding the sidebar closes whatever it was showing; otherwise the
-      // task surface would fall back to its modal shell and pop up. The
+      // Hiding the sidebar closes an entered item too; otherwise the task
+      // surface would fall back to its modal shell and pop up. The
       // dialog's load effect settles pending edits on the way out. A
       // capture in progress is left alone (its text would be lost). The
       // surface's own swap button opts out (`keepItem`): there the pop
@@ -1951,36 +1932,15 @@ export function Workspace(props: {
   };
   const sidePanelAvailable = () => !isMobile() && !isNarrow();
   const sidePanelShown = () => sidePanelAvailable() && sidePanelOpen();
-  // The panel losing its room (the window narrowing, or flipping to the
-  // mobile shell) hands the task surface to its modal / page shell. Only
-  // an item the user actually has open (focused: an explicit open) goes
-  // with it; a passive open was just the panel following the selection,
-  // and the user never asked for a modal, so it closes instead. Widening
-  // again re-follows the selection. A computed rather than an effect so
-  // the close lands before the shell swap renders (no modal flash), and
-  // the hide-sidebar path already handles its own close.
-  createComputed(
-    on(
-      sidePanelAvailable,
-      (available) => {
-        if (available) return;
-        if (untrack(openPassive) && untrack(openItemId) !== null) setOpenItemId(null);
-      },
-      { defer: true },
-    ),
-  );
   // The panel's task host element, set by ref while the panel is mounted.
   // Gated on `sidePanelShown` so the dialog falls back to its modal shell
   // the moment the panel closes (the stale element is never handed out).
   const [panelMount, setPanelMount] = createSignal<HTMLElement | null>(null);
 
-  // Side panel follows the selection: while the panel is showing, the
-  // topmost selected item (list view or the board's active lane) opens in
-  // it passively. `equals: false` so re-selecting the same row after
-  // closing the panel reopens it. Modal / mobile shells are untouched —
-  // nothing fires unless `sidePanelShown`. A capture in progress keeps the
-  // panel (the effect re-runs once it commits, so a board "+" capture ends
-  // with the new card open). Draft rows and stale keys are skipped.
+  // Every mutation of the active selection (list view's, or the board's
+  // active lane). `equals: false`: the selection object is mutated in
+  // place, so each change must notify. Feeds `multiSelectIds` and the
+  // side pane's followed item below.
   const [selectionTick, setSelectionTick] = createSignal<DndSelection | null>(
     null,
     { equals: false },
@@ -2088,53 +2048,63 @@ export function Workspace(props: {
     return out;
   });
 
-  let panelWasShown = untrack(sidePanelShown);
-  createEffect(() => {
-    const shown = sidePanelShown();
-    const justShown = shown && !panelWasShown;
-    panelWasShown = shown;
+  // The row the side pane follows: while the pane is showing and nothing
+  // is being captured, the topmost selected item (list view, or the
+  // board's active lane). Null for a multi-row selection (the pane shows
+  // its bulk actions instead), an empty one, a draft row, or a key the
+  // store no longer has. Modal / mobile shells never follow anything.
+  const followedItemId = createMemo((): string | null => {
+    if (!sidePanelShown() || newItemTarget() !== null) return null;
     const sel = selectionTick();
-    if (!sel || !shown || newItemTarget() !== null) return;
-    // The panel appearing under an already-open item (the surface's swap
-    // button moving it out of the modal) keeps that item; only a later
-    // selection change pulls the panel along.
-    if (justShown && untrack(openItemId) !== null) return;
-    if (sel !== untrack(actionSelection)) return;
-    // Growing to a multi-row selection hands the panel to the bulk
-    // actions surface: close the single item it was showing (the load
-    // effect settles its pending edits on the way out). Enter still opens
-    // the topmost row explicitly over it, until the selection next moves.
-    if (multiSelectIds() !== null) {
-      if (untrack(openItemId) !== null) {
-        // Passive, like the opens: the address-bar mirror replaces
-        // rather than pops, so the entry stays put mid-interaction.
-        batch(() => {
-          setPendingItemId(null);
-          setOpenPassive(true);
-          setOpenItemIdRaw(null);
-        });
-      }
-      return;
-    }
+    if (!sel || sel !== actionSelection()) return null;
+    if (multiSelectIds() !== null) return null;
     const top = sel.getSelectionTop();
-    if (top === null) return;
+    if (top === null) return null;
     const id = String(top);
-    if (!app.state.itemsById[id]) return;
-    if (untrack(openItemId) === id) return;
-    batch(() => {
-      setOpenPassive(true);
-      setOpenItemIdRaw(id);
-    });
+    return app.state.itemsById[id] ? id : null;
   });
 
+  // What the task surface shows: the entered item wherever it lives, else
+  // (side pane only) the followed row. Entering is what focuses the
+  // editor and what the URL follows; following is ambient and keeps the
+  // keys on the list. The pane losing its room (a narrow window, the
+  // mobile shell, the app menu hiding it) drops the followed half on its
+  // own, so only an entered item carries over to the modal / page shell;
+  // the pane coming back picks the selection up again.
+  const shownItemId = createMemo((): string | null => {
+    const entered = openItemId();
+    if (entered !== null) return entered;
+    return followedItemId();
+  });
+  createEffect(() => {
+    if (shownItemId() === null) setLiveEdit(null);
+  });
+
+  // An entered item follows the selection out: moving to a different row,
+  // or growing to several, drops it, so the URL falls back to the view and
+  // the pane shows the selection instead. An emptied selection is left
+  // alone: a link reveal clears then reselects on its way in, and Escape
+  // handles its own case below. Only while the pane is showing; the modal
+  // and mobile page don't have a live selection under them.
+  createEffect(
+    on(selectionTick, (sel) => {
+      if (!sel || !sidePanelShown() || sel !== actionSelection()) return;
+      const entered = untrack(openItemId);
+      if (entered === null) return;
+      const top = sel.getSelectionTop();
+      const movedAway = top !== null && String(top) !== entered;
+      if (movedAway || multiSelectIds() !== null) setOpenItemId(null);
+    }),
+  );
+
   // Escape: the dnd (bound on its listbox, so it runs first) has already
-  // cleared the selection; the side panel followed that selection in, so
-  // it follows it out too and closes the item it was showing. Only when
-  // the selection really is empty afterwards — an Escape that merely
-  // collapsed an inline edit leaves the row selected and the panel alone.
+  // cleared the selection, which takes the pane's followed row with it;
+  // an entered item outlives the selection, so it is closed here. Only
+  // when the selection really is empty afterwards — an Escape that merely
+  // collapsed an inline edit leaves the row selected and the pane alone.
   // `isTrusted` skips the Row's synthetic Escapes (Enter-commit and blur
   // drive collapse through the dnd by dispatching their own), so clicking
-  // out of an inline edit into the panel doesn't close it underfoot.
+  // out of an inline edit into the pane doesn't close it underfoot.
   // Modal / mobile shells take Escape themselves, so nothing to do there.
   const onEscapeKey = (e: KeyboardEvent) => {
     if (e.key !== "Escape" || !e.isTrusted) return;
@@ -2279,25 +2249,27 @@ export function Workspace(props: {
         onConfirm={() => app.emptyBin()}
       />
       <TaskDialog
-        itemId={openItemId}
+        itemId={shownItemId}
         setItemId={setOpenItemId}
         newItem={newItemTarget}
         setNewItem={setNewItemTarget}
         app={app}
         lists={activeLists}
-        passive={openPassive}
+        entered={() => openItemId() !== null}
         onClosed={restoreItemsFocus}
         onReleaseFocus={() => {
-          // Handing focus back demotes the open to passive: the pane
-          // keeps showing the item, but the address bar (which follows
-          // focus in the side panel, `spec/urls.md`) drops back to the
-          // view, as closing the modal would.
-          setOpenPassive(true);
+          // Handing focus back closes the entered item; the pane carries
+          // on showing it as the followed row, and the address bar drops
+          // back to the view as it would for the modal (`spec/urls.md`).
+          setOpenItemId(null);
           restoreItemsFocus();
         }}
-        onFocused={() => setOpenPassive(false)}
+        onFocused={() => {
+          const id = shownItemId();
+          if (id !== null) setOpenItemId(id);
+        }}
         onLiveText={(text) => {
-          const id = openItemId();
+          const id = shownItemId();
           if (id) setLiveEdit({ id, text });
         }}
         onCreated={(id) => {
@@ -2311,7 +2283,14 @@ export function Workspace(props: {
           // surface drops its sidebar button.
           !sidePanelAvailable()
             ? undefined
-            : () => setSidePanelOpen(!sidePanelOpen(), { keepItem: true })
+            : () => {
+                // Swapping is an act on the item: enter it first, so a
+                // followed row survives the trip into the modal (the
+                // click alone needn't have focused the pane).
+                const id = shownItemId();
+                if (id !== null) setOpenItemId(id);
+                setSidePanelOpen(!sidePanelOpen(), { keepItem: true });
+              }
         }
       />
       <DeadlineCalendarDialog
@@ -2787,7 +2766,7 @@ export function Workspace(props: {
               the task surface's shell-swap button lands, closing the
               panel. The surface brings its own, so this hides once it
               mounts. */}
-          <Show when={openItemId() === null && newItemTarget() === null}>
+          <Show when={shownItemId() === null && newItemTarget() === null}>
             <header class="side-panel-blank">
               {/* Multi-select: the count shares the header row with the
                   sidebar button (space-between), so the actions below
