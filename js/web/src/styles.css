@@ -1910,18 +1910,49 @@ input.task-check:hover {
 
 .auth-dialog {
   position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 20px;
-  width: 360px;
-  max-width: 100%;
+  width: min(720px, 100%);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
   outline: none;
+  overflow: hidden;
 }
 
 [data-theme="dark"] .auth-dialog {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+/* Left half: logo artwork, letterboxed on its own cream ground so the
+   wordmark never crops. Drops out on narrow viewports so the form gets
+   the full width. */
+.auth-dialog-art {
+  min-height: 320px;
+  padding: 16px;
+  background: #fefbf4;
+  border-right: 1px solid var(--border);
+}
+
+.auth-dialog-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+@media (max-width: 640px) {
+  .auth-dialog {
+    grid-template-columns: 1fr;
+    width: 360px;
+    max-width: 100%;
+  }
+
+  .auth-dialog-art {
+    display: none;
+  }
 }
 
 .confirm-dialog {
@@ -2014,7 +2045,10 @@ input.task-check:hover {
 .auth-form {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 12px;
+  padding: 20px;
+  min-width: 0;
 }
 
 .auth-form label {
@@ -2038,8 +2072,9 @@ input.task-check:hover {
   margin-top: 4px;
   padding: 10px;
   border: none;
-  background: #e2eeff;
-  box-shadow: 0 3px #dad6f3;
+  background: #fefbf4;
+  box-shadow: 0 3px #d3cdbf;
+  color: black;
   border-radius: 4px;
   cursor: pointer;
   font: inherit;

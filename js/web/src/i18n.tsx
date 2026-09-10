@@ -813,8 +813,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       badge: "Focus",
       showInList: "Show in list",
       showInFocus: "Show in Focus",
-      empty:
-        "Nothing in Focus yet. Add a new item here, or right-click an existing one and choose “Add to Focus”, to line up what you're working on.",
+      empty: "Nothing in Focus yet.",
     },
     settings: {
       general: "General",

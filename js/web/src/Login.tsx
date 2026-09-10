@@ -44,6 +44,10 @@ export interface Session {
   freshSignup: boolean;
 }
 
+/** Illustration shown as the left half of the auth dialog on wide
+ *  screens; hidden on narrow viewports (see `.auth-dialog-art`). */
+const AUTH_ART_URL = "https://rustfs.yokoso.golf/media/monoplan.png";
+
 function defaultDeviceName(): string {
   return `web-${typeof navigator !== "undefined" ? navigator.platform : "unknown"}`;
 }
@@ -152,6 +156,9 @@ export function AuthDialog(props: {
             <Dialog.CloseButton class="auth-dialog-close" aria-label={m().common.close}>
               <CloseIcon />
             </Dialog.CloseButton>
+            <div class="auth-dialog-art" aria-hidden="true">
+              <img src={AUTH_ART_URL} alt="" decoding="async" />
+            </div>
             <AuthForm
               initialMode={props.initialMode}
               onSession={props.onSession}

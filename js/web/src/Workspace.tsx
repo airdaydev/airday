@@ -201,11 +201,13 @@ function loadNavHiddenPref(): boolean {
   }
 }
 
+// Open by default: the side panel is the primary task surface on desktop,
+// so only an explicit hide is persisted (`"0"`); a missing key means open.
 function loadSidePanelOpenPref(): boolean {
   try {
-    return localStorage.getItem(SIDE_PANEL_OPEN_PREF_KEY) === "1";
+    return localStorage.getItem(SIDE_PANEL_OPEN_PREF_KEY) !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -1927,8 +1929,8 @@ export function Workspace(props: {
       setSidePanelOpenSignal(open);
     });
     try {
-      if (open) localStorage.setItem(SIDE_PANEL_OPEN_PREF_KEY, "1");
-      else localStorage.removeItem(SIDE_PANEL_OPEN_PREF_KEY);
+      if (open) localStorage.removeItem(SIDE_PANEL_OPEN_PREF_KEY);
+      else localStorage.setItem(SIDE_PANEL_OPEN_PREF_KEY, "0");
     } catch {
       // Quota/private-mode failures just lose the preference.
     }
