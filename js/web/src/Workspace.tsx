@@ -1438,9 +1438,10 @@ export function Workspace(props: {
   };
   onGlobalKey(onOpenKey);
 
-  // ? opens the keyboard-shortcut cheat sheet. `?` is Shift+/, so shift is
-  // expected; bail on the other modifiers. onGlobalKey already skips it
-  // while typing or when another overlay is open.
+  // ? opens the keyboard-shortcut cheat sheet (the sheet handles its own
+  // `?` to close). `?` is Shift+/, so shift is expected; bail on the other
+  // modifiers. onGlobalKey already skips it while typing or when another
+  // overlay is open.
   const onHelpKey = (e: KeyboardEvent) => {
     if (e.key !== "?") return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -2313,6 +2314,7 @@ export function Workspace(props: {
       <ShortcutsDialog
         open={shortcutsOpen()}
         onOpenChange={setShortcutsOpen}
+        onClosed={restoreItemsFocus}
       />
       <div class="content">
       <main class="main" tabIndex={-1}>

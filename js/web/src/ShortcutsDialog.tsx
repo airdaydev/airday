@@ -1,19 +1,38 @@
-// Keyboard-shortcut cheat sheet, opened with `?`. A plain reference list —
+// Keyboard-shortcut cheat sheet, toggled with `?`. A plain reference list —
 // the shortcuts themselves live in Workspace.tsx / Row.tsx; this just
 // documents them. Registered with trackOverlay so it suppresses the global
-// shortcuts while open, like the other dialogs.
+// shortcuts while open, like the other dialogs; `?` is handled on the
+// dialog itself so it closes the sheet too.
 
 import { Dialog } from "@kobalte/core/dialog";
-import { For } from "solid-js";
+import { createEffect, For, onCleanup } from "solid-js";
 import { useAppI18n } from "./i18n.tsx";
 import { trackOverlay } from "./overlay.ts";
 
 export function ShortcutsDialog(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Fired in place of Kobalte's focus restore on close: the host sends
+   *  focus back to the list rather than to whatever opened the sheet. */
+  onClosed?: () => void;
 }) {
   const { m } = useAppI18n();
   trackOverlay(() => props.open);
+
+  // Listen on `document` rather than the content element: the sheet has
+  // no tabbable controls, so where focus lands on open is Kobalte's call
+  // and the keystroke may never reach the content node.
+  createEffect(() => {
+    if (!props.open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "?") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      e.preventDefault();
+      props.onOpenChange(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    onCleanup(() => document.removeEventListener("keydown", onKeyDown));
+  });
 
   const rows = (): { label: string; key: string | string[] }[] => {
     const s = m().shortcuts;
@@ -41,7 +60,16 @@ export function ShortcutsDialog(props: {
       <Dialog.Portal>
         <Dialog.Overlay class="dialog-overlay" />
         <div class="dialog-positioner">
-          <Dialog.Content class="shortcuts-dialog">
+          <Dialog.Content
+            class="shortcuts-dialog"
+            onCloseAutoFocus={(e) => {
+              // Kobalte would restore focus to whatever opened the sheet
+              // (the app-menu item, say). Take over and send it to the
+              // list so keyboard nav resumes there.
+              e.preventDefault();
+              props.onClosed?.();
+            }}
+          >
             <Dialog.Title class="shortcuts-dialog-title">
               {m().shortcuts.title}
             </Dialog.Title>

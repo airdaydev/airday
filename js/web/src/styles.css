@@ -1930,7 +1930,6 @@ input.task-check:hover {
    the full width. */
 .auth-dialog-art {
   min-height: 320px;
-  padding: 16px;
   background: #fefbf4;
   border-right: 1px solid var(--border);
 }
