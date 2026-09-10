@@ -78,7 +78,11 @@ focus back to the list from the panel (Escape, or Enter in the title)
 demotes it again: the panel keeps showing the item, but the URL
 returns to the view token. In the side panel, "open" is therefore
 "has focus", so the address bar behaves the same whether the item is
-in the modal or the panel. Board vs list mode, lane visibility
+in the modal or the panel. The same distinction decides what survives
+the panel losing its room (a narrow window, the mobile shell): a
+focused item carries over to the modal / page shell, a passive one
+closes rather than popping up unasked, and the panel re-follows the
+selection when the room comes back. Board vs list mode, lane visibility
 and the side-panel state are prefs, not URL state: the URL names
 *what*, prefs name *how*.
 

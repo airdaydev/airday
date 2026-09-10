@@ -1,5 +1,6 @@
 import {
   batch,
+  createComputed,
   createEffect,
   createMemo,
   createSignal,
@@ -1950,6 +1951,24 @@ export function Workspace(props: {
   };
   const sidePanelAvailable = () => !isMobile() && !isNarrow();
   const sidePanelShown = () => sidePanelAvailable() && sidePanelOpen();
+  // The panel losing its room (the window narrowing, or flipping to the
+  // mobile shell) hands the task surface to its modal / page shell. Only
+  // an item the user actually has open (focused: an explicit open) goes
+  // with it; a passive open was just the panel following the selection,
+  // and the user never asked for a modal, so it closes instead. Widening
+  // again re-follows the selection. A computed rather than an effect so
+  // the close lands before the shell swap renders (no modal flash), and
+  // the hide-sidebar path already handles its own close.
+  createComputed(
+    on(
+      sidePanelAvailable,
+      (available) => {
+        if (available) return;
+        if (untrack(openPassive) && untrack(openItemId) !== null) setOpenItemId(null);
+      },
+      { defer: true },
+    ),
+  );
   // The panel's task host element, set by ref while the panel is mounted.
   // Gated on `sidePanelShown` so the dialog falls back to its modal shell
   // the moment the panel closes (the stale element is never handed out).
