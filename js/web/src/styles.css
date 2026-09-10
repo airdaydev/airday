@@ -463,7 +463,6 @@ body {
    line up down the day. */
 .upcoming-row-time {
   flex-shrink: 0;
-  min-width: 4.5em;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
 }
