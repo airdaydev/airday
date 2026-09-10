@@ -12,37 +12,37 @@
 			containerPortal = 6587CA872FA94D9D0014C048 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 6587CA8E2FA94D9D0014C048;
-			remoteInfo = Airday;
+			remoteInfo = Monoplan;
 		};
 		6587CAA72FA94D9F0014C048 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 6587CA872FA94D9D0014C048 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 6587CA8E2FA94D9D0014C048;
-			remoteInfo = Airday;
+			remoteInfo = Monoplan;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		6587CA8F2FA94D9D0014C048 /* Airday.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Airday.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		6587CA9C2FA94D9F0014C048 /* AirdayTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AirdayTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		6587CAA62FA94D9F0014C048 /* AirdayUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AirdayUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6587CA8F2FA94D9D0014C048 /* Monoplan.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Monoplan.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6587CA9C2FA94D9F0014C048 /* MonoplanTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MonoplanTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6587CAA62FA94D9F0014C048 /* MonoplanUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MonoplanUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		6587CA912FA94D9D0014C048 /* Airday */ = {
+		6587CA912FA94D9D0014C048 /* Monoplan */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Airday;
+			path = Monoplan;
 			sourceTree = "<group>";
 		};
-		6587CA9F2FA94D9F0014C048 /* AirdayTests */ = {
+		6587CA9F2FA94D9F0014C048 /* MonoplanTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = AirdayTests;
+			path = MonoplanTests;
 			sourceTree = "<group>";
 		};
-		6587CAA92FA94D9F0014C048 /* AirdayUITests */ = {
+		6587CAA92FA94D9F0014C048 /* MonoplanUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = AirdayUITests;
+			path = MonoplanUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -75,9 +75,9 @@
 		6587CA862FA94D9D0014C048 = {
 			isa = PBXGroup;
 			children = (
-				6587CA912FA94D9D0014C048 /* Airday */,
-				6587CA9F2FA94D9F0014C048 /* AirdayTests */,
-				6587CAA92FA94D9F0014C048 /* AirdayUITests */,
+				6587CA912FA94D9D0014C048 /* Monoplan */,
+				6587CA9F2FA94D9F0014C048 /* MonoplanTests */,
+				6587CAA92FA94D9F0014C048 /* MonoplanUITests */,
 				6587CA902FA94D9D0014C048 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -85,9 +85,9 @@
 		6587CA902FA94D9D0014C048 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				6587CA8F2FA94D9D0014C048 /* Airday.app */,
-				6587CA9C2FA94D9F0014C048 /* AirdayTests.xctest */,
-				6587CAA62FA94D9F0014C048 /* AirdayUITests.xctest */,
+				6587CA8F2FA94D9D0014C048 /* Monoplan.app */,
+				6587CA9C2FA94D9F0014C048 /* MonoplanTests.xctest */,
+				6587CAA62FA94D9F0014C048 /* MonoplanUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,9 +95,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		6587CA8E2FA94D9D0014C048 /* Airday */ = {
+		6587CA8E2FA94D9D0014C048 /* Monoplan */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6587CAB02FA94D9F0014C048 /* Build configuration list for PBXNativeTarget "Airday" */;
+			buildConfigurationList = 6587CAB02FA94D9F0014C048 /* Build configuration list for PBXNativeTarget "Monoplan" */;
 			buildPhases = (
 				6587CA8B2FA94D9D0014C048 /* Sources */,
 				6587CA8C2FA94D9D0014C048 /* Frameworks */,
@@ -108,18 +108,18 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				6587CA912FA94D9D0014C048 /* Airday */,
+				6587CA912FA94D9D0014C048 /* Monoplan */,
 			);
-			name = Airday;
+			name = Monoplan;
 			packageProductDependencies = (
 			);
-			productName = Airday;
-			productReference = 6587CA8F2FA94D9D0014C048 /* Airday.app */;
+			productName = Monoplan;
+			productReference = 6587CA8F2FA94D9D0014C048 /* Monoplan.app */;
 			productType = "com.apple.product-type.application";
 		};
-		6587CA9B2FA94D9F0014C048 /* AirdayTests */ = {
+		6587CA9B2FA94D9F0014C048 /* MonoplanTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6587CAB32FA94D9F0014C048 /* Build configuration list for PBXNativeTarget "AirdayTests" */;
+			buildConfigurationList = 6587CAB32FA94D9F0014C048 /* Build configuration list for PBXNativeTarget "MonoplanTests" */;
 			buildPhases = (
 				6587CA982FA94D9F0014C048 /* Sources */,
 				6587CA992FA94D9F0014C048 /* Frameworks */,
@@ -131,18 +131,18 @@
 				6587CA9E2FA94D9F0014C048 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				6587CA9F2FA94D9F0014C048 /* AirdayTests */,
+				6587CA9F2FA94D9F0014C048 /* MonoplanTests */,
 			);
-			name = AirdayTests;
+			name = MonoplanTests;
 			packageProductDependencies = (
 			);
-			productName = AirdayTests;
-			productReference = 6587CA9C2FA94D9F0014C048 /* AirdayTests.xctest */;
+			productName = MonoplanTests;
+			productReference = 6587CA9C2FA94D9F0014C048 /* MonoplanTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		6587CAA52FA94D9F0014C048 /* AirdayUITests */ = {
+		6587CAA52FA94D9F0014C048 /* MonoplanUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6587CAB62FA94D9F0014C048 /* Build configuration list for PBXNativeTarget "AirdayUITests" */;
+			buildConfigurationList = 6587CAB62FA94D9F0014C048 /* Build configuration list for PBXNativeTarget "MonoplanUITests" */;
 			buildPhases = (
 				6587CAA22FA94D9F0014C048 /* Sources */,
 				6587CAA32FA94D9F0014C048 /* Frameworks */,
@@ -154,13 +154,13 @@
 				6587CAA82FA94D9F0014C048 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				6587CAA92FA94D9F0014C048 /* AirdayUITests */,
+				6587CAA92FA94D9F0014C048 /* MonoplanUITests */,
 			);
-			name = AirdayUITests;
+			name = MonoplanUITests;
 			packageProductDependencies = (
 			);
-			productName = AirdayUITests;
-			productReference = 6587CAA62FA94D9F0014C048 /* AirdayUITests.xctest */;
+			productName = MonoplanUITests;
+			productReference = 6587CAA62FA94D9F0014C048 /* MonoplanUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -186,7 +186,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 6587CA8A2FA94D9D0014C048 /* Build configuration list for PBXProject "Airday" */;
+			buildConfigurationList = 6587CA8A2FA94D9D0014C048 /* Build configuration list for PBXProject "Monoplan" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -200,9 +200,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				6587CA8E2FA94D9D0014C048 /* Airday */,
-				6587CA9B2FA94D9F0014C048 /* AirdayTests */,
-				6587CAA52FA94D9F0014C048 /* AirdayUITests */,
+				6587CA8E2FA94D9D0014C048 /* Monoplan */,
+				6587CA9B2FA94D9F0014C048 /* MonoplanTests */,
+				6587CAA52FA94D9F0014C048 /* MonoplanUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -258,12 +258,12 @@
 /* Begin PBXTargetDependency section */
 		6587CA9E2FA94D9F0014C048 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 6587CA8E2FA94D9D0014C048 /* Airday */;
+			target = 6587CA8E2FA94D9D0014C048 /* Monoplan */;
 			targetProxy = 6587CA9D2FA94D9F0014C048 /* PBXContainerItemProxy */;
 		};
 		6587CAA82FA94D9F0014C048 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 6587CA8E2FA94D9D0014C048 /* Airday */;
+			target = 6587CA8E2FA94D9D0014C048 /* Monoplan */;
 			targetProxy = 6587CAA72FA94D9F0014C048 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -410,7 +410,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = airday.Airday;
+				PRODUCT_BUNDLE_IDENTIFIER = monoplan.Monoplan;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -442,7 +442,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = airday.Airday;
+				PRODUCT_BUNDLE_IDENTIFIER = monoplan.Monoplan;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -464,7 +464,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = airday.AirdayTests;
+				PRODUCT_BUNDLE_IDENTIFIER = monoplan.MonoplanTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -472,7 +472,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Airday.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Airday";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Monoplan.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Monoplan";
 			};
 			name = Debug;
 		};
@@ -486,7 +486,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = airday.AirdayTests;
+				PRODUCT_BUNDLE_IDENTIFIER = monoplan.MonoplanTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -494,7 +494,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Airday.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Airday";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Monoplan.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Monoplan";
 			};
 			name = Release;
 		};
@@ -506,7 +506,7 @@
 				DEVELOPMENT_TEAM = 28R7V4CUW4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = airday.AirdayUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = monoplan.MonoplanUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -514,7 +514,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = Airday;
+				TEST_TARGET_NAME = Monoplan;
 			};
 			name = Debug;
 		};
@@ -526,7 +526,7 @@
 				DEVELOPMENT_TEAM = 28R7V4CUW4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = airday.AirdayUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = monoplan.MonoplanUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -534,14 +534,14 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = Airday;
+				TEST_TARGET_NAME = Monoplan;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		6587CA8A2FA94D9D0014C048 /* Build configuration list for PBXProject "Airday" */ = {
+		6587CA8A2FA94D9D0014C048 /* Build configuration list for PBXProject "Monoplan" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6587CAAE2FA94D9F0014C048 /* Debug */,
@@ -550,7 +550,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6587CAB02FA94D9F0014C048 /* Build configuration list for PBXNativeTarget "Airday" */ = {
+		6587CAB02FA94D9F0014C048 /* Build configuration list for PBXNativeTarget "Monoplan" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6587CAB12FA94D9F0014C048 /* Debug */,
@@ -559,7 +559,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6587CAB32FA94D9F0014C048 /* Build configuration list for PBXNativeTarget "AirdayTests" */ = {
+		6587CAB32FA94D9F0014C048 /* Build configuration list for PBXNativeTarget "MonoplanTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6587CAB42FA94D9F0014C048 /* Debug */,
@@ -568,7 +568,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6587CAB62FA94D9F0014C048 /* Build configuration list for PBXNativeTarget "AirdayUITests" */ = {
+		6587CAB62FA94D9F0014C048 /* Build configuration list for PBXNativeTarget "MonoplanUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6587CAB72FA94D9F0014C048 /* Debug */,

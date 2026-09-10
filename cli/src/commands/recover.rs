@@ -1,10 +1,10 @@
-use airday_core::{Doc, WrappedDek, derive_recovery_master, parse_recovery_code, random_bytes};
-use airday_protocol::{
+use clap::Parser;
+use dialoguer::Input;
+use monoplan_core::{Doc, WrappedDek, derive_recovery_master, parse_recovery_code, random_bytes};
+use monoplan_protocol::{
     KdfParams, PasswordResetRequest, PasswordResetResponse, PreloginRequest, PreloginResponse,
     RecoverRequest, RecoverResponse,
 };
-use clap::Parser;
-use dialoguer::Input;
 
 use crate::config::{Config, Profile, Secrets};
 use crate::keystore::{dek_to_hex, derive_master};
@@ -76,7 +76,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         )
         .await?;
 
-    let r_nonce: [u8; airday_core::AEAD_NONCE_LEN] = recovered
+    let r_nonce: [u8; monoplan_core::AEAD_NONCE_LEN] = recovered
         .recovery_wrapped_dek_nonce
         .as_slice()
         .try_into()
@@ -115,7 +115,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     let profile = Profile::create()?;
     let primary_doc_uuid = uuid::Uuid::parse_str(&reset.primary_doc_id)
         .map_err(|e| anyhow::anyhow!("server returned malformed primary_doc_id: {e}"))?;
-    let doc_id = airday_core::DocId(primary_doc_uuid);
+    let doc_id = monoplan_core::DocId(primary_doc_uuid);
     let storage = crate::storage::open_storage(&profile)?;
     crate::storage::seed_snapshot(&storage, &dek, doc_id, &Doc::empty())?;
     storage.write_account(&Account {

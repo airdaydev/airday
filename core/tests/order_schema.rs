@@ -19,9 +19,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use airday_core::crypto::Dek;
-use airday_core::doc::{Doc, ItemLifecycle, LIST_INBOX};
-use airday_core::events::AppEvent;
+use monoplan_core::crypto::Dek;
+use monoplan_core::doc::{Doc, ItemLifecycle, LIST_INBOX};
+use monoplan_core::events::AppEvent;
 
 // ---------- deterministic rng ----------
 
@@ -390,9 +390,9 @@ fn random_op(doc: &Doc, rng: &mut Lcg, op_no: usize) {
 
 #[test]
 fn randomized_multi_peer_convergence() {
-    // Deeper local runs: AIRDAY_FUZZ_SEEDS=50 cargo test -p airday-core \
+    // Deeper local runs: MONOPLAN_FUZZ_SEEDS=50 cargo test -p monoplan-core \
     //   --test order_schema --release
-    let seeds: u64 = std::env::var("AIRDAY_FUZZ_SEEDS")
+    let seeds: u64 = std::env::var("MONOPLAN_FUZZ_SEEDS")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
@@ -504,15 +504,15 @@ fn randomized_multi_peer_convergence() {
 #[test]
 fn large_synthetic_history_many_peers_lists_moves_undos() {
     let dek = Dek::generate();
-    let mut rows: Vec<airday_protocol::EncryptedBlob> = Vec::new();
+    let mut rows: Vec<monoplan_protocol::EncryptedBlob> = Vec::new();
 
-    let capture = |doc: &mut Doc, rows: &mut Vec<airday_protocol::EncryptedBlob>| {
+    let capture = |doc: &mut Doc, rows: &mut Vec<monoplan_protocol::EncryptedBlob>| {
         if let Some(blob) = doc.pending_export(&dek).unwrap() {
             rows.push(blob);
             doc.mark_persisted();
         }
     };
-    let boot = |rows: &[airday_protocol::EncryptedBlob]| -> Doc {
+    let boot = |rows: &[monoplan_protocol::EncryptedBlob]| -> Doc {
         let mut doc = Doc::empty();
         for row in rows {
             let plaintext = dek.open(&row.ciphertext, &row.nonce).unwrap();

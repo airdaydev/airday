@@ -1,16 +1,16 @@
 //! Focus lens commands: list (default action), add, rm, mv.
 //!
 //! The curated single-tier Focus lens (`spec/focus.md`). References items
-//! across lists; the referenced item stays in its home list. `airday
+//! across lists; the referenced item stays in its home list. `monoplan
 //! focus` with no sub-subcommand lists the view; `add` / `rm` / `mv`
 //! mutate the reference container.
 //!
 //! Positions on the CLI are **1-based** to match the numbered listing a
-//! user sees from `airday focus`; they are converted to the doc layer's
+//! user sees from `monoplan focus`; they are converted to the doc layer's
 //! 0-based visible index here.
 
-use airday_core::ItemView;
 use clap::{Parser, Subcommand};
+use monoplan_core::ItemView;
 use serde::Serialize;
 
 use crate::sync::Session;

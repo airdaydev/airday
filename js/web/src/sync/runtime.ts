@@ -7,14 +7,14 @@
 // invoked synchronously from a component body, not an async callback.
 
 import { createEffect, createSignal, on, onCleanup } from "solid-js";
-import { Doc, SyncEngine } from "@airday/core/wasm";
-import { IdbStorage, type InFlightPushJs, putDevice } from "@airday/core";
+import { Doc, SyncEngine } from "@monoplan/core/wasm";
+import { IdbStorage, type InFlightPushJs, putDevice } from "@monoplan/core";
 import { savePrefs, type Prefs, type ViewKey } from "../prefs.ts";
 import { type Session } from "../Login.tsx";
 import { createSyncedApp, type DocApp } from "./store.ts";
 import { createSyncBridge, SyncBridge } from "./sync.ts";
 
-const CLIENT_NAME = "airday-web";
+const CLIENT_NAME = "monoplan-web";
 const CLIENT_VERSION = "0.1.0";
 
 // Onboarding items for a brand-new account's "Welcome" list — learn by
@@ -23,14 +23,14 @@ const CLIENT_VERSION = "0.1.0";
 // its notes rather than as its own checkbox. Kept literal (user-list
 // content is user-authored plain text, not localized).
 const WELCOME_ITEMS = [
-  "Welcome to Airday",
+  "Welcome to Monoplan",
   "Press 'space' to create a new item",
   "Tick the box (or press 'x') to complete an item",
   "Press 'f' to add an item to Focus",
   "Press '?' to see all keyboard shortcuts",
 ] as const;
 const WELCOME_NOTE =
-  "Airday helps you capture and organise your ideas, tasks, and projects.";
+  "Monoplan helps you capture and organise your ideas, tasks, and projects.";
 
 /** Seed a fresh account's starter list and onboarding items; returns the
  *  new list's id so the caller can open it. The list is freshly created
@@ -50,7 +50,7 @@ function seedWelcome(app: DocApp): string {
 export type BootInfo = {
   doc: Doc;
   lastAcked: bigint;
-  /** Engine op-log store (the engine stores of IndexedDB `airday-web`).
+  /** Engine op-log store (the engine stores of IndexedDB `monoplan-web`).
    *  Mandatory — the
    *  engine has no storage-less mode; if IDB can't be opened the boot
    *  fails hard (see `BootGate`) rather than running without local

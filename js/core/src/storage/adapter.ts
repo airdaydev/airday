@@ -2,7 +2,7 @@
 //
 // This is the sync identity row — account/device ids, server URL, and
 // the observability-only "last synced" stamp. On web it's persisted in
-// the `device` store of the `airday-web` IDB via `device-store.ts`,
+// the `device` store of the `monoplan-web` IDB via `device-store.ts`,
 // alongside the engine's op log (`IdbStorage`) — one database, separate
 // stores. The DEK is never stored here — its browser lifetime is
 // in-memory only (see `DekVault`).

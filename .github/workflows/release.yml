@@ -47,7 +47,7 @@ jobs:
       - name: Install JS dependencies
         run: bun install --frozen-lockfile
 
-      # The web client imports @airday/core, whose browser export resolves to
+      # The web client imports @monoplan/core, whose browser export resolves to
       # the bundler-target wasm in js/core/wasm-web — build it before vite.
       - name: Build browser wasm
         run: bun run build:wasm:web
@@ -57,15 +57,15 @@ jobs:
 
       # Embeds js/web/dist into the binary via rust-embed at compile time.
       - name: Build server with embedded web
-        run: cargo build --release -p airday-server --features bundled-web
+        run: cargo build --release -p monoplan-server --features bundled-web
 
       - name: Package binary + checksum
         id: package
         run: |
           set -euo pipefail
-          name="airday-server-${GITHUB_REF_NAME}-${TARGET}"
+          name="monoplan-server-${GITHUB_REF_NAME}-${TARGET}"
           mkdir -p dist-release
-          cp target/release/airday-server "dist-release/${name}"
+          cp target/release/monoplan-server "dist-release/${name}"
           cd dist-release
           sha256sum "${name}" > "${name}.sha256"
           echo "name=${name}" >> "$GITHUB_OUTPUT"
@@ -101,7 +101,7 @@ jobs:
           set -euo pipefail
           image="ghcr.io/${GITHUB_REPOSITORY}-server"
           mkdir -p docker-ctx
-          cp target/release/airday-server docker-ctx/
+          cp target/release/monoplan-server docker-ctx/
           docker build -f deploy/Dockerfile -t "${image}:${GITHUB_REF_NAME}" docker-ctx
           docker push "${image}:${GITHUB_REF_NAME}"
           echo "Pushed ${image}:${GITHUB_REF_NAME}"

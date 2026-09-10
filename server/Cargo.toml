@@ -1,12 +1,12 @@
 [package]
-name = "airday-server"
+name = "monoplan-server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 build = "build.rs"
 
 [[bin]]
-name = "airday-server"
+name = "monoplan-server"
 path = "src/main.rs"
 
 [lib]
@@ -20,8 +20,8 @@ path = "src/lib.rs"
 bundled-web = ["dep:rust-embed"]
 
 [dependencies]
-airday-protocol = { path = "../crates/protocol" }
-airday-core = { path = "../core" }
+monoplan-protocol = { path = "../crates/protocol" }
+monoplan-core = { path = "../core" }
 tokio = { workspace = true }
 axum = { workspace = true }
 tower = { workspace = true }

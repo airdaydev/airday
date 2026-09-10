@@ -11,7 +11,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-db="$repo_root/local/airday.sqlite"
+db="$repo_root/local/monoplan.sqlite"
 cli_dir="$repo_root/local/cli"
 targets=("$db" "$db-wal" "$db-shm" "$cli_dir")
 
@@ -21,7 +21,7 @@ for arg in "$@"; do
     -y|--yes) assume_yes=1 ;;
     -h|--help)
       echo "Usage: bun run wipe [-y|--yes]"
-      echo "Deletes local/airday.sqlite{,-wal,-shm} and the local/cli/ CLI profile dir."
+      echo "Deletes local/monoplan.sqlite{,-wal,-shm} and the local/cli/ CLI profile dir."
       exit 0
       ;;
     *)

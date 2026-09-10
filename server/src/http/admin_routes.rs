@@ -39,7 +39,7 @@ impl IntoResponse for AdminError {
                     .into_response();
                 response.headers_mut().insert(
                     WWW_AUTHENTICATE,
-                    HeaderValue::from_static("Bearer realm=\"airday-admin\""),
+                    HeaderValue::from_static("Bearer realm=\"monoplan-admin\""),
                 );
                 response
             }

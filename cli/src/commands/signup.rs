@@ -1,7 +1,7 @@
-use airday_core::{Dek, Doc, generate_recovery_code, random_bytes};
-use airday_protocol::{KdfParams, RecoveryMaterial, SignupRequest, SignupResponse};
 use clap::Parser;
 use dialoguer::{Confirm, Input};
+use monoplan_core::{Dek, Doc, generate_recovery_code, random_bytes};
+use monoplan_protocol::{KdfParams, RecoveryMaterial, SignupRequest, SignupResponse};
 
 use crate::config::{Config, Profile, Secrets};
 use crate::keystore::{dek_to_hex, derive_master};
@@ -70,7 +70,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         let code_str = code.as_str().to_string();
         let salt_vec = recovery_salt.to_vec();
         let r_master = tokio::task::spawn_blocking(move || {
-            airday_core::derive_recovery_master(&code_str, &salt_vec, kdf_params)
+            monoplan_core::derive_recovery_master(&code_str, &salt_vec, kdf_params)
         })
         .await??;
         let r_kek = r_master.kek()?;
@@ -108,7 +108,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     let profile = Profile::create()?;
     let primary_doc_uuid = uuid::Uuid::parse_str(&resp.primary_doc_id)
         .map_err(|e| anyhow::anyhow!("server returned malformed primary_doc_id: {e}"))?;
-    let doc_id = airday_core::DocId(primary_doc_uuid);
+    let doc_id = monoplan_core::DocId(primary_doc_uuid);
     // Seed the local doc, written as the baseline snapshot. This device is
     // the account's device-1 (genesis); the starter "Welcome" list is
     // seeded here via the public API so a CLI-created account isn't an
@@ -129,7 +129,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     // learn-by-doing items, with the first item's descriptive line in its
     // notes. The list is empty, so index 0 keeps the authored order.
     let welcome_items = [
-        "Welcome to Airday",
+        "Welcome to Monoplan",
         "Press 'space' to create a new item",
         "Tick the box (or press 'x') to complete an item",
         "Press 'f' to add an item to Focus",
@@ -139,7 +139,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     if let Some(first) = item_ids.first() {
         doc.edit_item_notes(
             first,
-            "Airday helps you capture and organise your ideas, tasks, and projects.",
+            "Monoplan helps you capture and organise your ideas, tasks, and projects.",
         )?;
     }
     crate::storage::seed_snapshot(&storage, &dek, doc_id, &doc)?;
@@ -173,7 +173,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
             let mut line = String::new();
             stdin.lock().read_line(&mut line)?;
             let trimmed = line.trim();
-            match airday_core::parse_recovery_code(trimmed) {
+            match monoplan_core::parse_recovery_code(trimmed) {
                 Ok(parsed) if parsed.as_str() == code => break,
                 Ok(_) => println!("does not match the generated code"),
                 Err(_) => println!("not a valid 12-word phrase"),

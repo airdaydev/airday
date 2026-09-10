@@ -1,13 +1,13 @@
 //! Account / password / recovery HTTP handlers.
 
-use airday_protocol::{
+use anyhow::Context;
+use axum::extract::State;
+use axum::http::{HeaderMap, header};
+use monoplan_protocol::{
     DeviceCredential, LoginRequest, LoginResponse, PasswordChangeRequest, PasswordResetRequest,
     PasswordResetResponse, PreloginRequest, PreloginResponse, RecoverRequest, RecoverResponse,
     SignupRequest, SignupResponse,
 };
-use anyhow::Context;
-use axum::extract::State;
-use axum::http::{HeaderMap, header};
 
 use crate::auth::DeviceAuth;
 use crate::auth::cookie;

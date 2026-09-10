@@ -3,13 +3,13 @@
 //!
 //! Every action goes through `Session` (open → mutate → flush). The
 //! session reads from and writes to the local Loro doc; it only talks
-//! to the server when `-s/--sync` is passed (or `airday sync` is run
+//! to the server when `-s/--sync` is passed (or `monoplan sync` is run
 //! separately).
 
 use std::io::{BufRead, IsTerminal};
 
-use airday_core::{ItemLifecycle, ItemView, LIST_INBOX, WorkflowState};
 use clap::Parser;
+use monoplan_core::{ItemLifecycle, ItemView, LIST_INBOX, WorkflowState};
 use serde::Serialize;
 
 use crate::sync::Session;

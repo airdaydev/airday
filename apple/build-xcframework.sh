@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Build the AirdayCoreFFI XCFramework + Swift bindings from the
-# `airday-ffi` Rust crate. This is the single source of the two build
-# outputs the SwiftPM package (`apple/AirdayCore`) consumes:
+# Build the MonoplanCoreFFI XCFramework + Swift bindings from the
+# `monoplan-ffi` Rust crate. This is the single source of the two build
+# outputs the SwiftPM package (`apple/MonoplanCore`) consumes:
 #
-#   apple/AirdayCore/AirdayCoreFFI.xcframework          (static libs + headers)
-#   apple/AirdayCore/Sources/AirdayCore/Generated/*.swift  (uniffi bindings)
+#   apple/MonoplanCore/MonoplanCoreFFI.xcframework          (static libs + headers)
+#   apple/MonoplanCore/Sources/MonoplanCore/Generated/*.swift  (uniffi bindings)
 #
 # Both are gitignored; this script is how you (re)produce them. Run from
 # anywhere: `bun run build:apple` or `apple/build-xcframework.sh`.
@@ -17,14 +17,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-CRATE=airday-ffi
-STATICLIB=libairday_ffi.a
-DYLIB=libairday_ffi.dylib
-NAMESPACE=airday_ffi            # uniffi namespace == crate lib name
+CRATE=monoplan-ffi
+STATICLIB=libmonoplan_ffi.a
+DYLIB=libmonoplan_ffi.dylib
+NAMESPACE=monoplan_ffi            # uniffi namespace == crate lib name
 
-PKG_DIR="$ROOT/apple/AirdayCore"
-XCFRAMEWORK="$PKG_DIR/AirdayCoreFFI.xcframework"
-GEN_SWIFT_DIR="$PKG_DIR/Sources/AirdayCore/Generated"
+PKG_DIR="$ROOT/apple/MonoplanCore"
+XCFRAMEWORK="$PKG_DIR/MonoplanCoreFFI.xcframework"
+GEN_SWIFT_DIR="$PKG_DIR/Sources/MonoplanCore/Generated"
 
 # macOS host first: its release cdylib is what uniffi library-mode bindgen
 # reads metadata from. iOS device + simulator aren't consumed yet, but

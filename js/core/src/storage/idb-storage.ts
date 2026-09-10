@@ -27,7 +27,7 @@ import {
   type DocRow,
   type InFlightRow,
   type OpRow,
-  openAirdayDb,
+  openMonoplanDb,
   type SnapshotRow,
   STORE_DOCS,
   STORE_INFLIGHT,
@@ -132,7 +132,7 @@ export class IdbStorage {
   /** Open the database, ensure the `docs` row, and load this doc's
    *  full WAL + snapshot + cursors into the mirror. */
   static async open(docId: string): Promise<IdbStorage> {
-    const db = await openAirdayDb();
+    const db = await openMonoplanDb();
     const storage = new IdbStorage(db, docId);
     await storage.load();
     return storage;

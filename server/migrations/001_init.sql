@@ -1,4 +1,4 @@
--- Airday initial schema. Sqlite-only for now. Multi-account from day one so the
+-- Monoplan initial schema. Sqlite-only for now. Multi-account from day one so the
 -- SaaS Postgres path can reuse the shape.
 
 -- Each account owns exactly one `docs` row today (its primary doc / Home).

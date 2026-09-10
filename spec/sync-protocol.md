@@ -29,7 +29,7 @@ Server-assigned `seq` is **per-account** and **dense / gap-free**. The server bu
 
 First frame on every WS connection, before any payload exchange:
 
-- Client → Server: `Hello { client: "airday-cli", client_version: "0.1.0", supported_protocol_versions: [1] }`
+- Client → Server: `Hello { client: "monoplan-cli", client_version: "0.1.0", supported_protocol_versions: [1] }`
 - Server → Client: `HelloAck { server_version: "0.1.0", protocol_version: 1 }` — server picks the highest version it shares with the client. If no overlap → `HelloRejected { reason }` and connection closes.
 
 All subsequent frames are interpreted under the agreed `protocol_version`. Belt-and-braces against breaking changes; MessagePack handles additive evolution within a version on its own.
@@ -125,7 +125,7 @@ A snapshot carries **two seqs** that serve unrelated jobs:
 Orchestration:
 
 - Trigger: snapshot when **both**
-  - `(server_last_seq − latest_snapshot.up_to_seq) > snapshot_threshold_blobs` (default `500`, configurable via `snapshot_threshold_blobs` / `AIRDAY_SNAPSHOT_THRESHOLD_BLOBS`) — enough new state has accumulated that a new snapshot materially shortens a bootstrapping client's `PullOps` catch-up, and
+  - `(server_last_seq − latest_snapshot.up_to_seq) > snapshot_threshold_blobs` (default `500`, configurable via `snapshot_threshold_blobs` / `MONOPLAN_SNAPSHOT_THRESHOLD_BLOBS`) — enough new state has accumulated that a new snapshot materially shortens a bootstrapping client's `PullOps` catch-up, and
   - the triggering device is caught up to `server_last_seq` — that's what we set `up_to_seq` to, so the producer must be at that point to encode it. Lagging connections are skipped as producers but still contribute to horizon.
   Counts blobs, not user actions or bytes — see §"Terminology" for why that matters.
   Horizon is intentionally **not** a trigger condition. Snapshotting is valuable for bootstrap perf independent of compaction — a single snapshot row replaces an arbitrarily long `OpsBatch` replay. If horizon hasn't moved, the new snapshot's `compaction_floor_seq` is the same as the previous one, so compaction doesn't advance — but the new snapshot still cuts bootstrap cost.

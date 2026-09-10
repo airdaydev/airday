@@ -1,5 +1,5 @@
 // Browser-specific construction of the shared `SyncBridge`. The
-// pump + reconnect + auth-probe lifecycle lives in `@airday/core`;
+// pump + reconnect + auth-probe lifecycle lives in `@monoplan/core`;
 // this module only contributes the two things that depend on the
 // browser environment: the `WebSocket` factory (cookie auth via
 // same-origin, URL derived from `window.location`) and the auth
@@ -8,7 +8,7 @@
 import {
   SyncBridge,
   type SyncBridgeOpts,
-} from "@airday/core/sync-bridge";
+} from "@monoplan/core/sync-bridge";
 import { api, ApiError } from "../api.ts";
 
 type WebOpts = Omit<SyncBridgeOpts, "socketFactory" | "probeAuth">;

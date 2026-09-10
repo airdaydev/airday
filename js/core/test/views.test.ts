@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { Doc } from "../wasm/airday_core_web.js";
+import { Doc } from "../wasm/monoplan_core_web.js";
 
 const LIST_MAIN = "inbox";
 

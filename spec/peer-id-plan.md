@@ -7,7 +7,7 @@ multi-slot pool and multi-tab remain future work.
 Note for existing dev profiles: `peer_slots` was added to
 `cli/migrations/001_init.sql` in place (pre-release rule), so a profile
 whose `_migrations` ledger already contains `001_cli` lacks the table -
-wipe local dev state (`bun run wipe` / `airday logout`) rather than
+wipe local dev state (`bun run wipe` / `monoplan logout`) rather than
 adding a bridge migration.
 
 ## Problem
@@ -83,7 +83,7 @@ same-slot races, and sqlite's write serialisation covers the rest.
 Store as `i64` bit-cast (`peer as i64`), read back with `as u64`.
 
 Device-local, not CRDT state: the mapping never enters the Loro doc.
-It also survives `airday cache clear` deliberately - see counter
+It also survives `monoplan cache clear` deliberately - see counter
 continuity below.
 
 ### Core API change: peer id is an input, not a callback
@@ -166,7 +166,7 @@ lands:
   readwrite transaction (`peer-slots.ts`), mirroring the CLI's
   `read_or_mint_peer_slot`.
 - The claim IS the single-tab Web Lock: `BrowserTabGate.tsx` now
-  always requests `airday-single-tab` (ifAvailable) when the API
+  always requests `monoplan-single-tab` (ifAvailable) when the API
   exists, gates rendering only when enforcing, and passes `lockHeld`
   into `App`. Boot (`App.tsx`) reads the slot-0 peer concurrently with
   `IdbStorage.open` and constructs via `Doc.createWithPeer` /
@@ -194,7 +194,7 @@ lands:
   `ifAvailable`, auto-handover on close - owns the single WS, snapshot
   folding, and acks. VV-derived push means the leader ships follower
   ops with no forwarding protocol; the server still sees one device.
-- Hoisting the slot table/claim helper into `airday-storage-sqlite` for
+- Hoisting the slot table/claim helper into `monoplan-storage-sqlite` for
   the Apple FFI build (trivial move under the one-migration rule).
 - Shallow-snapshot/gc trimming of ancient peers as a compaction-era
   backstop for the historical peers already minted by today's

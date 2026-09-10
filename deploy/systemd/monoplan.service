@@ -1,25 +1,25 @@
 [Unit]
-Description=Airday server
+Description=Monoplan server
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=airday
-Group=airday
+User=monoplan
+Group=monoplan
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-WorkingDirectory=/opt/airday/current
-ExecStart=/opt/airday/current/target/release/airday-server --config /etc/airday/server.toml
+WorkingDirectory=/opt/monoplan/current
+ExecStart=/opt/monoplan/current/target/release/monoplan-server --config /etc/monoplan/server.toml
 Restart=always
 RestartSec=5
 
-# Sandboxing — sqlite db lives in /var/lib/airday so that's the only
+# Sandboxing — sqlite db lives in /var/lib/monoplan so that's the only
 # writable path the unit needs.
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/var/lib/airday
+ReadWritePaths=/var/lib/monoplan
 
 [Install]
 WantedBy=multi-user.target

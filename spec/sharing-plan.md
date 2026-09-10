@@ -72,7 +72,7 @@ Two candidates, decision deferred until sharing is built:
    - Generates a 32-byte unlock key locally.
    - Wraps the doc's DEK with the unlock key (XChaCha20-Poly1305, fresh nonce).
    - `POST /api/docs/:doc_id/invites { wrapped_dek, wrapped_dek_nonce, expires_in }` → returns `{ invite_token }`.
-   - Shares URL `https://airday.example/invite/{token}#unlock={base64_key}` out-of-band (Signal, email, paper).
+   - Shares URL `https://monoplan.example/invite/{token}#unlock={base64_key}` out-of-band (Signal, email, paper).
 
 2. **Invitee:**
    - Opens URL; client extracts `token` and `unlock_key` from fragment.

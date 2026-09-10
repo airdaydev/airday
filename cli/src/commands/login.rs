@@ -1,9 +1,9 @@
-use airday_core::{Doc, WrappedDek};
-use airday_protocol::{
-    DeviceRegistration, LoginRequest, LoginResponse, PreloginRequest, PreloginResponse,
-};
 use clap::Parser;
 use dialoguer::{Input, Password};
+use monoplan_core::{Doc, WrappedDek};
+use monoplan_protocol::{
+    DeviceRegistration, LoginRequest, LoginResponse, PreloginRequest, PreloginResponse,
+};
 
 use crate::config::{Config, Profile, Secrets};
 use crate::keystore::{dek_to_hex, derive_master};
@@ -69,11 +69,11 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         )
         .await?;
 
-    let nonce: [u8; airday_core::AEAD_NONCE_LEN] = resp
-        .wrapped_dek_nonce
-        .as_slice()
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("server returned wrapped_dek_nonce of wrong length"))?;
+    let nonce: [u8; monoplan_core::AEAD_NONCE_LEN] =
+        resp.wrapped_dek_nonce
+            .as_slice()
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("server returned wrapped_dek_nonce of wrong length"))?;
     let dek = kek.unwrap(&WrappedDek {
         ciphertext: resp.wrapped_dek,
         nonce,
@@ -86,7 +86,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     let profile = Profile::create()?;
     let primary_doc_uuid = uuid::Uuid::parse_str(&resp.primary_doc_id)
         .map_err(|e| anyhow::anyhow!("server returned malformed primary_doc_id: {e}"))?;
-    let doc_id = airday_core::DocId(primary_doc_uuid);
+    let doc_id = monoplan_core::DocId(primary_doc_uuid);
     // Empty doc baseline; the initial sync below pulls from seq 0,
     // applies device-1's seed + history, and we converge. secrets.toml
     // is written last — it's the "logged in" marker.

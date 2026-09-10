@@ -1,4 +1,4 @@
-//! Airday core: encryption + Loro CRDT engine + sync logic.
+//! Monoplan core: encryption + Loro CRDT engine + sync logic.
 
 pub mod crypto;
 pub mod doc;

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
-import { Dek, Doc, SyncEngine } from "@airday/core/wasm";
-import type { EngineStorage } from "@airday/core/wasm";
+import { Dek, Doc, SyncEngine } from "@monoplan/core/wasm";
+import type { EngineStorage } from "@monoplan/core/wasm";
 import { MemEngineStorage } from "../../core/test/mem-engine-storage.ts";
 import { createSyncedApp } from "../src/sync/store.ts";
 

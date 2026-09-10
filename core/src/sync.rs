@@ -41,11 +41,11 @@
 
 use std::collections::VecDeque;
 
-use airday_protocol::{
+use loro::VersionVector;
+use monoplan_protocol::{
     ClientFrame, Hello, HelloAck, HelloRejected, PROTOCOL_VERSION, PushBlob, ServerFrame,
     StoredBlob,
 };
-use loro::VersionVector;
 use serde::Serialize;
 
 use crate::crypto::Dek;
@@ -114,7 +114,7 @@ enum ConnState {
 /// In-memory view of the durable in-flight push record.
 struct InFlightState {
     push_id: PushId,
-    payload: airday_protocol::EncryptedBlob,
+    payload: monoplan_protocol::EncryptedBlob,
     /// Decoded `to_vv`: the oplog VV captured at export time. Merged
     /// into `server_known_vv` on ack — merged, never assigned, because
     /// remote updates may advance other peers' ranges mid-flight.
@@ -179,7 +179,7 @@ pub struct SyncEngine {
     events: VecDeque<Event>,
 }
 
-fn blob_len(blob: &airday_protocol::EncryptedBlob) -> u64 {
+fn blob_len(blob: &monoplan_protocol::EncryptedBlob) -> u64 {
     (blob.ciphertext.len() + blob.nonce.len()) as u64
 }
 
@@ -1046,7 +1046,7 @@ mod tests {
     use super::*;
     use crate::doc::{Doc, LIST_INBOX};
     use crate::storage::MemStorage;
-    use airday_protocol::{EncryptedBlob, PushAck, ServerFrame, StoredBlob};
+    use monoplan_protocol::{EncryptedBlob, PushAck, ServerFrame, StoredBlob};
 
     fn opts() -> EngineOptions {
         EngineOptions {

@@ -6,10 +6,10 @@ Wants=network-online.target
 
 [Service]
 Type=notify
-User=airday
-Group=airday
-ExecStart=/usr/local/bin/caddy run --environ --config /opt/airday/current/deploy/rendered/Caddyfile
-ExecReload=/usr/local/bin/caddy reload --config /opt/airday/current/deploy/rendered/Caddyfile --force
+User=monoplan
+Group=monoplan
+ExecStart=/usr/local/bin/caddy run --environ --config /opt/monoplan/current/deploy/rendered/Caddyfile
+ExecReload=/usr/local/bin/caddy reload --config /opt/monoplan/current/deploy/rendered/Caddyfile --force
 TimeoutStopSec=5s
 LimitNOFILE=1048576
 PrivateTmp=true

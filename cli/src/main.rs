@@ -1,5 +1,5 @@
-use airday_cli::commands::Cli;
 use clap::Parser;
+use monoplan_cli::commands::Cli;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

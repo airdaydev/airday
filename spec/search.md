@@ -302,7 +302,7 @@ Where feasible, use the same event stream the app uses rather than bespoke test-
 ## Open questions
 
 - Whether item `notes` should appear in the palette result preview, or only participate in matching.
-- Whether CLI should expose `airday find <query>` or defer search to the web UI first.
+- Whether CLI should expose `monoplan find <query>` or defer search to the web UI first.
 
 Resolved: built-in view labels are matched at the palette layer by their
 rendered (localized) names rather than indexed by the engine — see

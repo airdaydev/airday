@@ -14,12 +14,12 @@
 //
 // One record per origin keyed at `'current'`. Web is a single-account
 // surface; logging in as a different account overwrites. The vault is
-// one store in the `airday-web` IndexedDB database; the schema (every
+// one store in the `monoplan-web` IndexedDB database; the schema (every
 // store) is owned by `./web-db.ts` so no module's open path surprises
 // another with a missing object store.
 
-import type { Dek } from "../../wasm/airday_core_web.js";
-import { STORE_VAULT, openAirdayDb } from "./web-db.ts";
+import type { Dek } from "../../wasm/monoplan_core_web.js";
+import { STORE_VAULT, openMonoplanDb } from "./web-db.ts";
 
 const KEY = "current";
 
@@ -62,7 +62,7 @@ export class DekVault {
   async load(): Promise<VaultedSession | null> {
     let rec: VaultRecord | undefined;
     try {
-      const db = await openAirdayDb();
+      const db = await openMonoplanDb();
       rec = await idbGet<VaultRecord>(db, STORE_VAULT, KEY);
     } catch (e) {
       console.warn("DekVault.load: idb open/read failed:", e);
@@ -130,13 +130,13 @@ export class DekVault {
       iv,
       wrappedDek,
     };
-    const db = await openAirdayDb();
+    const db = await openMonoplanDb();
     await idbPut(db, STORE_VAULT, KEY, rec);
   }
 
   async clear(): Promise<void> {
     try {
-      const db = await openAirdayDb();
+      const db = await openMonoplanDb();
       await idbDelete(db, STORE_VAULT, KEY);
     } catch (e) {
       console.warn("DekVault.clear: idb delete failed:", e);

@@ -24,7 +24,7 @@ Single workspace. Always invoke wasm builds as `wasm-pack build core/` (never ba
 
 ## Cross-platform client boundary
 
-Airday's sync protocol state machine lives in shared Rust, not reimplemented per client. The shared `core::sync::SyncEngine` is **sans-IO**:
+Monoplan's sync protocol state machine lives in shared Rust, not reimplemented per client. The shared `core::sync::SyncEngine` is **sans-IO**:
 
 - it owns protocol state, doc application, encryption framing, and push/pull/ack sequencing
 - it does **not** own the socket, timers, reconnect policy, auth transport, or debounce policy
@@ -84,4 +84,4 @@ All HTTP bodies and all WebSocket frames are **MessagePack** (`rmp-serde`). Sing
 
 `Content-Type: application/msgpack` on HTTP. WS frames are binary.
 
-A `cargo run -p airday -- decode <file>` debug subcommand pretty-prints any captured frame as JSON for inspection (and, given the DEK, can decrypt op blobs in the same pass).
+A `cargo run -p monoplan -- decode <file>` debug subcommand pretty-prints any captured frame as JSON for inspection (and, given the DEK, can decrypt op blobs in the same pass).

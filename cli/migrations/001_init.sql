@@ -1,5 +1,5 @@
 -- CLI-only schema (spec/cli.md "Local state"). The generic doc-storage
--- tables (`docs`, `ops`, `snapshots`) live in `airday-storage-sqlite`
+-- tables (`docs`, `ops`, `snapshots`) live in `monoplan-storage-sqlite`
 -- and are applied first against the same db file; this migration adds
 -- only the CLI's identity row. Registered in the shared `_migrations`
 -- ledger under a distinct name (see `open_storage`) so it doesn't
@@ -26,7 +26,7 @@ CREATE TABLE account (
 -- count. Which slot a process may *use* is decided by the flock lease
 -- on `peer-<slot>.lock` in the profile dir, never by this table —
 -- device-local state, deliberately outside the CRDT doc, and
--- deliberately surviving `airday cache clear` (counters resume safely
+-- deliberately surviving `monoplan cache clear` (counters resume safely
 -- from replayed history).
 CREATE TABLE peer_slots (
   slot     INTEGER PRIMARY KEY,

@@ -6,13 +6,13 @@
 // engine ticks, and conversely shouldn't drag the frontier write
 // every time the user changes view.
 //
-// One row per account in the `prefs` store of the shared `airday-web`
-// IndexedDB database (schema declared in `@airday/core/storage/web-db`).
+// One row per account in the `prefs` store of the shared `monoplan-web`
+// IndexedDB database (schema declared in `@monoplan/core/storage/web-db`).
 // Single-write-replace: each `savePrefs` overwrites the whole row.
 // Callers compose a full `Prefs` object; we don't merge on the server
 // side because there isn't one — this is local-only state.
 
-import { STORE_PREFS, openAirdayDb } from "@airday/core/storage/web-db";
+import { STORE_PREFS, openMonoplanDb } from "@monoplan/core/storage/web-db";
 
 /** Last view the user was on. Mirrors the in-memory shape used by
  *  `App.tsx`; persisted verbatim. */
@@ -37,7 +37,7 @@ interface PrefsRow {
 
 /** Read the per-account prefs row, or null if none exists. */
 export async function loadPrefs(accountId: string): Promise<Prefs | null> {
-  const db = await openAirdayDb();
+  const db = await openMonoplanDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_PREFS, "readonly");
     const req = tx.objectStore(STORE_PREFS).get(accountId);
@@ -54,7 +54,7 @@ export async function savePrefs(
   accountId: string,
   prefs: Prefs,
 ): Promise<void> {
-  const db = await openAirdayDb();
+  const db = await openMonoplanDb();
   const row: PrefsRow = { account_id: accountId, prefs };
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_PREFS, "readwrite");

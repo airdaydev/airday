@@ -93,7 +93,7 @@ async function bundle() {
   try {
     // Test ESM import
     const { Tracer } = await import("./dist/index.esm.js");
-    const tracer = new Tracer("airday_tracer_tests");
+    const tracer = new Tracer("monoplan_tracer_tests");
     const span = tracer.startSpan("test-span");
     tracer.endSpan(span);
     console.log("✅ ESM bundle test passed");

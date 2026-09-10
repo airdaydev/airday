@@ -1,20 +1,20 @@
 use std::sync::OnceLock;
 
-use airday_cli::config::{Config, Profile, Secrets};
-use airday_cli::keystore::{dek_to_hex, derive_master};
-use airday_cli::net::Client;
-use airday_cli::storage::Account;
-use airday_core::{
+use monoplan_cli::config::{Config, Profile, Secrets};
+use monoplan_cli::keystore::{dek_to_hex, derive_master};
+use monoplan_cli::net::Client;
+use monoplan_cli::storage::Account;
+use monoplan_core::{
     AEAD_NONCE_LEN, Dek, Doc, WrappedDek, derive_password_master, derive_recovery_master,
     generate_recovery_code, random_bytes,
 };
-use airday_protocol::{
+use monoplan_protocol::{
     DeviceCredential, DeviceRegistration, KdfParams, LoginRequest, LoginResponse,
     PasswordChangeRequest, PasswordResetRequest, PasswordResetResponse, PreloginRequest,
     PreloginResponse, RecoverRequest, RecoverResponse, RecoveryMaterial, SignupRequest,
     SignupResponse,
 };
-use airday_server::{AppState, router};
+use monoplan_server::{AppState, router};
 use reqwest::header::CONTENT_TYPE;
 use uuid::Uuid;
 
@@ -399,9 +399,9 @@ pub async fn register_device(
     rmp_serde::from_slice(&resp.bytes().await.unwrap()).unwrap()
 }
 
-/// Stand up the on-disk profile a real `airday signup` would have
+/// Stand up the on-disk profile a real `monoplan signup` would have
 /// written. Constructed directly under `data_dir` so each test owns
-/// its profile and parallel runs don't race on `AIRDAY_DATA_DIR`.
+/// its profile and parallel runs don't race on `MONOPLAN_DATA_DIR`.
 pub async fn materialize_profile(
     data_dir: &std::path::Path,
     server_url: &str,
@@ -421,9 +421,9 @@ pub async fn materialize_profile(
         Doc::empty()
     };
     let doc_uuid = Uuid::parse_str(primary_doc_id).expect("test passed malformed primary_doc_id");
-    let doc_id = airday_core::DocId(doc_uuid);
-    let storage = airday_cli::storage::open_storage(&profile).unwrap();
-    airday_cli::storage::seed_snapshot(&storage, dek, doc_id, &doc).unwrap();
+    let doc_id = monoplan_core::DocId(doc_uuid);
+    let storage = monoplan_cli::storage::open_storage(&profile).unwrap();
+    monoplan_cli::storage::seed_snapshot(&storage, dek, doc_id, &doc).unwrap();
     storage
         .write_account(&Account {
             account_id: account_id.into(),

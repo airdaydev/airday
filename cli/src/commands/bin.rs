@@ -1,6 +1,6 @@
 //! Bin namespace + `bin <id>` action.
 //!
-//! `airday bin <id>` (the verb) lives in [`super::items::bin`]; this
+//! `monoplan bin <id>` (the verb) lives in [`super::items::bin`]; this
 //! module owns the namespace operations and the dispatcher that picks
 //! between them. Clap's `external_subcommand` captures any token that
 //! isn't a known sub-subcommand, which we then treat as an item id
@@ -49,7 +49,7 @@ pub async fn run(args: BinArgs, sync: bool) -> anyhow::Result<()> {
                 )
                 .await
             }
-            [] => anyhow::bail!("expected an item id; try `airday bin show`"),
+            [] => anyhow::bail!("expected an item id; try `monoplan bin show`"),
             _ => anyhow::bail!("unexpected extra arguments after item id"),
         },
     }

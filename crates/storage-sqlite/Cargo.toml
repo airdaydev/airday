@@ -1,16 +1,16 @@
 [package]
-name = "airday-storage-sqlite"
+name = "monoplan-storage-sqlite"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [lib]
-name = "airday_storage_sqlite"
+name = "monoplan_storage_sqlite"
 path = "src/lib.rs"
 
 [dependencies]
-airday-core = { path = "../../core" }
-airday-protocol = { path = "../protocol" }
+monoplan-core = { path = "../../core" }
+monoplan-protocol = { path = "../protocol" }
 rusqlite = { workspace = true }
 uuid = { workspace = true }
 thiserror = { workspace = true }

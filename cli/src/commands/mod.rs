@@ -21,12 +21,12 @@ mod sync;
 const DEFAULT_SERVER: &str = "http://127.0.0.1:8000";
 
 #[derive(Parser, Debug)]
-#[command(name = "airday", version, about = "Airday CLI")]
+#[command(name = "monoplan", version, about = "Monoplan CLI")]
 pub struct Cli {
     /// Connect to the server before running this command: pull peer
     /// ops first, then push any pending local ops on exit. Without
     /// this flag, commands operate against the local doc only.
-    /// Equivalent to setting `AIRDAY_SYNC=1`.
+    /// Equivalent to setting `MONOPLAN_SYNC=1`.
     #[arg(long, short = 's', global = true)]
     sync: bool,
 
@@ -130,11 +130,11 @@ impl Cli {
 pub fn default_device_name() -> String {
     gethostname::gethostname()
         .into_string()
-        .unwrap_or_else(|_| "airday-cli".to_string())
+        .unwrap_or_else(|_| "monoplan-cli".to_string())
 }
 
 pub fn default_server() -> String {
-    std::env::var("AIRDAY_SERVER").unwrap_or_else(|_| DEFAULT_SERVER.to_string())
+    std::env::var("MONOPLAN_SERVER").unwrap_or_else(|_| DEFAULT_SERVER.to_string())
 }
 
 /// Prompt for a new password with confirmation and the minimum-length rule.

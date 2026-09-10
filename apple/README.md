@@ -1,4 +1,4 @@
-# Airday on Apple
+# Monoplan on Apple
 
 The Rust↔Swift FFI boundary for the Apple clients. This is layers 1 & 2 of
 [`spec/swift-ffi-plan.md`](../spec/swift-ffi-plan.md): an **offline** capture/read
@@ -8,14 +8,14 @@ exposed; that plumbing is a follow-up once the boundary is proven.
 ## Layering
 
 ```
-airday-ffi (Rust staticlib)          core/ffi — uniffi object over Doc + sqlite storage + DEK
-   → AirdayCoreFFI.xcframework        static libs (macOS/iOS/iOS-sim) + C headers
-      → AirdayCore (SwiftPM)          generated Swift bindings + a thin facade
-         → future Xcode app           consumes AirdayCore as a local package
+monoplan-ffi (Rust staticlib)          core/ffi — uniffi object over Doc + sqlite storage + DEK
+   → MonoplanCoreFFI.xcframework        static libs (macOS/iOS/iOS-sim) + C headers
+      → MonoplanCore (SwiftPM)          generated Swift bindings + a thin facade
+         → future Xcode app           consumes MonoplanCore as a local package
 ```
 
-The one exported object, `AirdayStore`, mirrors the CLI's `boot_doc`: it opens
-`<dir>/airday.sqlite`, boots the `Doc` from persisted encrypted ops, and after
+The one exported object, `MonoplanStore`, mirrors the CLI's `boot_doc`: it opens
+`<dir>/monoplan.sqlite`, boots the `Doc` from persisted encrypted ops, and after
 every mutation captures the fresh Loro delta into an encrypted oplog row so a
 later reopen replays it. The DEK crosses the boundary as raw bytes — key storage
 (Keychain) is the caller's problem.
@@ -37,16 +37,16 @@ later reopen replays it. The DEK crosses the boundary as raw bytes — key stora
 bun run build:apple            # == apple/build-xcframework.sh
 
 # 2. Run the SwiftPM smoke test (open → mutate → read → reopen → assert).
-swift test --package-path apple/AirdayCore
+swift test --package-path apple/MonoplanCore
 # on a CLT-default machine:
-# DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path apple/AirdayCore
+# DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path apple/MonoplanCore
 ```
 
 `build:apple` is the **single** way to produce the two build outputs, both
 gitignored:
 
-- `apple/AirdayCore/AirdayCoreFFI.xcframework` — the static libs + headers.
-- `apple/AirdayCore/Sources/AirdayCore/Generated/` — the uniffi Swift bindings.
+- `apple/MonoplanCore/MonoplanCoreFFI.xcframework` — the static libs + headers.
+- `apple/MonoplanCore/Sources/MonoplanCore/Generated/` — the uniffi Swift bindings.
 
 Run it before `swift build` / `swift test` on a fresh checkout — the package
 won't compile without those outputs present.

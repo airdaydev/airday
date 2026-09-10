@@ -25,7 +25,7 @@ export interface PreloginResponse {
 export interface DeviceCredential {
   device_id: string;
   /** Present on the wire for CLI parity; the web client ignores this
-   *  field and relies on the `airday_device` cookie instead. */
+   *  field and relies on the `monoplan_device` cookie instead. */
   device_token: string;
 }
 

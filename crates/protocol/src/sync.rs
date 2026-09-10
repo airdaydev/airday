@@ -68,7 +68,7 @@ pub struct PushAck {
 /// First frame on every WS connection (client → server).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hello {
-    /// Free-form client identifier ("airday-cli", "airday-web", ...).
+    /// Free-form client identifier ("monoplan-cli", "monoplan-web", ...).
     pub client: String,
     pub client_version: String,
     /// Versions the client can speak. Server picks the highest shared.

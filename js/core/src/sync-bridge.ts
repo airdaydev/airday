@@ -19,7 +19,7 @@
 // short-circuit the backoff timer with `reconnectNow()` — that's the
 // hook platform layers wire to visibility/online events.
 
-import type { EngineEvent, SyncEngine } from "../wasm/airday_core_web.js";
+import type { EngineEvent, SyncEngine } from "../wasm/monoplan_core_web.js";
 
 export type ConnectionEvent = "online" | "offline" | "drain";
 

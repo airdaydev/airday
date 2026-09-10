@@ -10,14 +10,14 @@ Sqlite-only for now. No mocked database. No mocked server. The test pyramid skew
    - ID generation, prefix-matching
 2. **CLI/system tests** (`cli/tests/`)
    - Primary home for happy-path end-to-end coverage
-   - Real server + real sqlite + real `airday_cli` Rust client path (`net`, auth flows, `sync::Session`)
+   - Real server + real sqlite + real `monoplan_cli` Rust client path (`net`, auth flows, `sync::Session`)
    - Covers account bootstrap and the normal multi-device lifecycle:
      - signup/login/recovery/password-change success paths
      - two-device sync and convergence
      - offline edits followed by catch-up
      - snapshot upload / snapshot bootstrap success paths
    - Reuse `cli/tests/support/mod.rs` as the shared harness for server startup, profile materialization, auth helpers, and bounded polling
-   - Prefer long-lived `airday_cli::sync::Session` tests for snapshot/sync happy paths instead of ad hoc websocket clients
+   - Prefer long-lived `monoplan_cli::sync::Session` tests for snapshot/sync happy paths instead of ad hoc websocket clients
 3. **Server integration tests** (`server/tests/`)
    - Real server, real sqlite (temp file or `:memory:`)
    - Drives HTTP + WS via thin ad hoc clients only where that is the point of the test
@@ -75,7 +75,7 @@ proptest dependency (deterministic LCG seeds, no shrinking):
   contract: per-list Open arrays, remove-then-insert at `open_index`) that
   must never drift from the doc. Final fingerprints must converge.
   Default 6 seeds in CI; deepen locally with
-  `AIRDAY_FUZZ_SEEDS=50 cargo test -p airday-core --test order_schema --release`.
+  `MONOPLAN_FUZZ_SEEDS=50 cargo test -p monoplan-core --test order_schema --release`.
 - `large_synthetic_history_many_peers_lists_moves_undos` — sequential
   fresh-peer sessions booted from accumulated oplog rows doing bulk
   adds, multi-select cross-list moves, undos and captures, then

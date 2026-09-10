@@ -1,4 +1,4 @@
-# Runtime image for airday-server.
+# Runtime image for monoplan-server.
 #
 # There is no build stage: the binary is produced in the release workflow (with
 # the web client embedded via the `bundled-web` feature) and copied in here.
@@ -14,15 +14,15 @@
 FROM gcr.io/distroless/cc-debian12:debug
 
 # Staged next to this Dockerfile by the release workflow's build context.
-COPY airday-server /usr/local/bin/airday-server
+COPY monoplan-server /usr/local/bin/monoplan-server
 
 # Container defaults; override per `docker run -e`. Bind MUST be 0.0.0.0 to be
 # reachable from outside the container (the app default is 127.0.0.1). The
 # sqlite db lives on the /data volume so it survives container replacement.
-ENV AIRDAY_BIND=0.0.0.0:8000 \
-    AIRDAY_DB_PATH=/data/airday.sqlite
+ENV MONOPLAN_BIND=0.0.0.0:8000 \
+    MONOPLAN_DB_PATH=/data/monoplan.sqlite
 
 EXPOSE 8000
 VOLUME ["/data"]
 
-ENTRYPOINT ["/usr/local/bin/airday-server"]
+ENTRYPOINT ["/usr/local/bin/monoplan-server"]

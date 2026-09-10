@@ -1,4 +1,4 @@
-use airday_core::doc::{Doc, LIST_INBOX};
+use monoplan_core::doc::{Doc, LIST_INBOX};
 
 #[test]
 fn move_item_to_same_visible_slot_is_noop() {

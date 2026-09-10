@@ -19,7 +19,7 @@ storage this plan hoists).
 
 - **Don't break existing consumers.** `bun run test`, `bun run build`,
   and `bun run build:wasm` must all stay green. `core/` must stay
-  wasm-clean — no rusqlite or uniffi dependency lands in `airday-core`
+  wasm-clean — no rusqlite or uniffi dependency lands in `monoplan-core`
   itself.
 - **Migrations rule (CLAUDE.md):** exactly one migration file per
   database, edited in place. No incremental migrations.
@@ -34,7 +34,7 @@ storage this plan hoists).
 ## Milestone 0 — hoist sqlite storage out of the CLI
 
 New workspace crate `crates/storage-sqlite` (package name
-`airday-storage-sqlite`), added to `[workspace] members` but **not**
+`monoplan-storage-sqlite`), added to `[workspace] members` but **not**
 `default-members`.
 
 Move from `cli/`:
@@ -48,7 +48,7 @@ Move from `cli/`:
 - The free functions at the bottom of `cli/src/storage.rs`
   (`boot_doc`, `seed_snapshot`, `load_doc`) are DEK-holding glue over
   the `LocalStorage` trait. If they're generic over the trait (or can
-  trivially be made so), move them into `airday-core`'s `storage`
+  trivially be made so), move them into `monoplan-core`'s `storage`
   module where they belong; otherwise into `crates/storage-sqlite`.
 
 What stays in `cli/`: `Account`, `SyncCursor`, `open_storage(profile)`,
@@ -67,7 +67,7 @@ lint` no *new* warnings (lint is already red on main — pre-existing).
 
 ## Milestone 1 — FFI crate
 
-New crate `core/ffi` (package name `airday-ffi`), mirroring how
+New crate `core/ffi` (package name `monoplan-ffi`), mirroring how
 `core/web` sits next to `core`. Add to `[workspace] members`, not
 `default-members`.
 
@@ -83,8 +83,8 @@ New crate `core/ffi` (package name `airday-ffi`), mirroring how
 API surface — deliberately small; one exported object owning
 storage + doc + DEK, mirroring what `load_doc` does in the CLI:
 
-- `AirdayStore::open(dir: String, dek: Vec<u8>) -> Result<Arc<AirdayStore>>`
-  — opens/creates `<dir>/airday.sqlite` via `airday-storage-sqlite`,
+- `MonoplanStore::open(dir: String, dek: Vec<u8>) -> Result<Arc<MonoplanStore>>`
+  — opens/creates `<dir>/monoplan.sqlite` via `monoplan-storage-sqlite`,
   boots the doc (first boot = fresh doc). DEK is raw bytes; key
   storage is the caller's problem (Keychain in layer 3, a test
   fixture for now). Also export a free fn `generate_dek() -> Vec<u8>`.
@@ -95,7 +95,7 @@ storage + doc + DEK, mirroring what `load_doc` does in the CLI:
   `all_lists() -> Vec<ListView>`, `export_json_string() -> String`
   (debugging aid).
 - `ItemView` / `ListView` cross as uniffi Records — flat mirror
-  structs of the `airday_core` types (same pattern as `core/web`'s
+  structs of the `monoplan_core` types (same pattern as `core/web`'s
   JS-facing views), converted with `From` impls. Errors: one
   `#[derive(uniffi::Error)]` enum wrapping `DocError`/`StorageError`
   with readable messages.
@@ -103,11 +103,11 @@ storage + doc + DEK, mirroring what `load_doc` does in the CLI:
 Known risk to resolve here, not paper over: uniffi-exported objects
 must be `Send + Sync`. `SqliteStorage` is (`Arc<Mutex<Connection>>`),
 but check `Doc` (LoroDoc interior mutability) — if it isn't `Sync`,
-wrap the doc side in a `Mutex` inside `AirdayStore` and note why.
+wrap the doc side in a `Mutex` inside `MonoplanStore` and note why.
 
-**Verify:** `cargo test -p airday-ffi` with a native Rust round-trip
+**Verify:** `cargo test -p monoplan-ffi` with a native Rust round-trip
 test (open in tempdir → add → drop → reopen → item present), and
-`cargo build -p airday-ffi --target aarch64-apple-darwin --release`
+`cargo build -p monoplan-ffi --target aarch64-apple-darwin --release`
 succeeds.
 
 ## Milestone 2 — XCFramework build script
@@ -120,15 +120,15 @@ succeeds.
    for all three (`--release`). iOS isn't consumed yet but proving it
    *compiles* now is cheap insurance.
 2. Generate Swift bindings once via library mode from the host build:
-   `cargo run -p airday-ffi --bin uniffi-bindgen -- generate --library
+   `cargo run -p monoplan-ffi --bin uniffi-bindgen -- generate --library
    <host cdylib> --language swift --out-dir <gen dir>`.
 3. Assemble headers: the generated `.h` + modulemap (rename the
    generated `*.modulemap` to `module.modulemap`) into a headers dir
    per platform.
 4. `xcodebuild -create-xcframework` over the three static libs →
-   `apple/AirdayCore/AirdayCoreFFI.xcframework`.
+   `apple/MonoplanCore/MonoplanCoreFFI.xcframework`.
 5. Copy the generated `.swift` file(s) into
-   `apple/AirdayCore/Sources/AirdayCore/Generated/`.
+   `apple/MonoplanCore/Sources/MonoplanCore/Generated/`.
 
 Build artifacts (`.xcframework`, `Generated/`) are build outputs:
 gitignore them, and have the script be the single way to produce them.
@@ -139,10 +139,10 @@ outputs, re-run).
 
 ## Milestone 3 — SwiftPM package + smoke test
 
-`apple/AirdayCore/Package.swift`:
+`apple/MonoplanCore/Package.swift`:
 
-- `binaryTarget` `AirdayCoreFFI` → local path to the XCFramework.
-- Source target `AirdayCore`: the generated bindings plus (optionally)
+- `binaryTarget` `MonoplanCoreFFI` → local path to the XCFramework.
+- Source target `MonoplanCore`: the generated bindings plus (optionally)
   a thin hand-written Swift facade if the raw generated API is
   awkward — keep it minimal, don't build an abstraction layer yet.
 - Test target with the smoke test: create a temp directory, open a
@@ -152,7 +152,7 @@ outputs, re-run).
 - Platforms: `.macOS(.v14)`, `.iOS(.v17)` (adjust to whatever the
   toolchain on this machine supports — verify, don't assume).
 
-**Verify:** `swift test --package-path apple/AirdayCore` passes on the
+**Verify:** `swift test --package-path apple/MonoplanCore` passes on the
 macOS host. This is the acceptance gate for the whole plan.
 
 ## Milestone 4 — docs
@@ -166,8 +166,8 @@ to this plan. One paragraph each — not a manual.
 
 - [ ] `bun run test` green (CLI unaffected by the storage hoist)
 - [ ] `bun run build:wasm` green (core stayed wasm-clean)
-- [ ] `cargo test -p airday-ffi` green
+- [ ] `cargo test -p monoplan-ffi` green
 - [ ] `bun run build:apple` produces the XCFramework + bindings from scratch
-- [ ] `swift test --package-path apple/AirdayCore` green, including a
+- [ ] `swift test --package-path apple/MonoplanCore` green, including a
       close-and-reopen persistence assertion
 - [ ] No new files under `local/` or generated artifacts committed

@@ -1,4 +1,4 @@
-// End-to-end: real `airday-server` process, two wasm SyncEngines,
+// End-to-end: real `monoplan-server` process, two wasm SyncEngines,
 // real msgpack over a real WebSocket. Exercises the server-orchestrated
 // snapshot path: device A crosses the (test-tuned) snapshot threshold,
 // server requests a snapshot, A uploads it, device B then bootstraps
@@ -25,13 +25,13 @@ import {
   Doc,
   SyncEngine,
   wrapDek,
-} from "../wasm/airday_core_web.js";
-import type { EngineStorage } from "../wasm/airday_core_web.js";
+} from "../wasm/monoplan_core_web.js";
+import type { EngineStorage } from "../wasm/monoplan_core_web.js";
 import { SyncBridge } from "../src/sync-bridge.ts";
 import { MemEngineStorage } from "./mem-engine-storage.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "../../..");
-const SERVER_BIN = join(REPO_ROOT, "target/debug/airday-server");
+const SERVER_BIN = join(REPO_ROOT, "target/debug/monoplan-server");
 
 const LIST_MAIN = "inbox";
 const SNAPSHOT_THRESHOLD = 5;
@@ -47,25 +47,25 @@ interface ServerHandle {
 }
 
 async function ensureBuilt(): Promise<void> {
-  const proc = spawn(["cargo", "build", "-p", "airday-server"], {
+  const proc = spawn(["cargo", "build", "-p", "monoplan-server"], {
     cwd: REPO_ROOT,
     stdout: "inherit",
     stderr: "inherit",
   });
   const code = await proc.exited;
-  if (code !== 0) throw new Error(`cargo build airday-server failed (exit ${code})`);
+  if (code !== 0) throw new Error(`cargo build monoplan-server failed (exit ${code})`);
 }
 
 async function startServer(): Promise<ServerHandle> {
-  const workDir = mkdtempSync(join(tmpdir(), "airday-e2e-"));
-  const dbPath = join(workDir, "airday.sqlite");
+  const workDir = mkdtempSync(join(tmpdir(), "monoplan-e2e-"));
+  const dbPath = join(workDir, "monoplan.sqlite");
   const proc = spawn([SERVER_BIN, "--bind", "127.0.0.1:0", "--db", dbPath], {
     cwd: workDir,
     env: {
       ...process.env,
-      AIRDAY_SNAPSHOT_THRESHOLD_BLOBS: String(SNAPSHOT_THRESHOLD),
-      AIRDAY_SECURE_COOKIES: "false",
-      AIRDAY_LOG_LEVEL: "info",
+      MONOPLAN_SNAPSHOT_THRESHOLD_BLOBS: String(SNAPSHOT_THRESHOLD),
+      MONOPLAN_SECURE_COOKIES: "false",
+      MONOPLAN_LOG_LEVEL: "info",
       // tracing-subscriber emits ANSI even on piped output; off so
       // `readUntilListening`'s regex sees clean bytes.
       NO_COLOR: "1",
@@ -83,7 +83,7 @@ async function startServer(): Promise<ServerHandle> {
   };
 }
 
-// `airday-server` logs `airday-server listening addr=…` via tracing;
+// `monoplan-server` logs `monoplan-server listening addr=…` via tracing;
 // we tee both streams to our own stderr so the test output stays
 // useful when something blows up mid-handshake. We keep both
 // consumers running for the life of the process so the server's

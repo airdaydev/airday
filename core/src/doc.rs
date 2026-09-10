@@ -58,7 +58,7 @@ use uuid::Uuid;
 
 use crate::crypto::{AEAD_NONCE_LEN, Dek};
 use crate::events::AppEvent;
-use airday_protocol::EncryptedBlob;
+use monoplan_protocol::EncryptedBlob;
 
 pub const LIST_INBOX: &str = "inbox";
 pub const INBOX_NAME: &str = "Inbox";
@@ -3106,7 +3106,7 @@ impl Doc {
     }
 
     /// Pretty-printed JSON dump of `export_json` — what the web client
-    /// hands the user as `airday-*.json`. Pretty by default because the
+    /// hands the user as `monoplan-*.json`. Pretty by default because the
     /// file is meant to be opened in a text editor; consumers wanting a
     /// compact form can re-serialize. Serialization of `JsonExport` is
     /// statically infallible (only strings, ints, bools, vecs, options),
@@ -5560,7 +5560,7 @@ mod tests {
     /// Not a correctness test — a quick order-of-magnitude probe for
     /// the per-mutation cost terms at a realistic lifetime-item count.
     /// Run with:
-    ///   cargo test -p airday-core --release bench_mutation_terms_at_13k -- --ignored --nocapture
+    ///   cargo test -p monoplan-core --release bench_mutation_terms_at_13k -- --ignored --nocapture
     #[test]
     #[ignore]
     fn bench_mutation_terms_at_13k() {

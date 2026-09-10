@@ -8,7 +8,7 @@ storage question.
 
 Research date: 2026-09-04, amended 2026-09-08 after a source read of
 `loro` / `loro-internal` 1.13.9. Loro versions at that date: Rust crate
-`loro` 1.13.9 (2026-08-01), npm `loro-crdt` 1.15.1 (2026-08-29). Airday
+`loro` 1.13.9 (2026-08-01), npm `loro-crdt` 1.15.1 (2026-08-29). Monoplan
 pinned `loro = "1.10"` in `Cargo.toml` (now `"1.16"`, Phase 0); `Cargo.lock` resolved 1.13.9
 at research time and 1.16.0 after the bump.
 
@@ -16,9 +16,9 @@ at research time and 1.16.0 after the bump.
 
 | Question | Decision |
 |---|---|
-| Separate doc or same doc? | **Same doc.** `notes` becomes a `LoroText` child of the item map at `items/<id>/notes`. No Airday-managed root container (Loro itself backs the child with a derived-name root, see the correction below), no second doc. |
+| Separate doc or same doc? | **Same doc.** `notes` becomes a `LoroText` child of the item map at `items/<id>/notes`. No Monoplan-managed root container (Loro itself backs the child with a derived-name root, see the correction below), no second doc. |
 | Lazy creation | **Yes, via Loro mergeable containers** (`LoroMap::ensure_mergeable_text`, Rust 1.13.1+). Created on first write; concurrent first writes on two devices merge into one text. Items without notes carry nothing. |
-| Editor connector | **None fits as-is.** Every Loro editor binding needs a JS `LoroDoc`; Airday's doc lives in Rust wasm. We write a thin delta bridge across the wasm boundary instead. |
+| Editor connector | **None fits as-is.** Every Loro editor binding needs a JS `LoroDoc`; Monoplan's doc lives in Rust wasm. We write a thin delta bridge across the wasm boundary instead. |
 | Rich text model | **Flat rich text in one `LoroText`** (Quill delta model: inline marks, line formats as attributes on `\n`). Not a ProseMirror node tree. |
 | Images | **By reference**, never bytes in the CRDT. A `U+FFFC` placeholder character carrying an `image` attribute that names an encrypted attachment. Attachments are a new dumb server surface (own spec, later phase). |
 | `text` field | **Stays a string register.** A title is one short phrase rewritten whole, so a character merge of two concurrent rewrites interleaves them into nonsense; LWW gives one clean title. Also saves a container per item. Decided 2026-09-08 (see "Why `text` stays a register"). |
@@ -32,7 +32,7 @@ at research time and 1.16.0 after the bump.
   notes doc per item is the multi-doc substrate from `sharing-plan.md`
   Phases 1-5 (about six days) plus per-doc frontier and snapshot management
   for thousands of tiny docs. Nothing about notes needs it.
-- Notes are short. Airday holds next steps, not plans (`subtasks.md`); a
+- Notes are short. Monoplan holds next steps, not plans (`subtasks.md`); a
   note is context for one item, not a long-form document. The failure mode
   that justifies a separate doc (one huge text dominating snapshot size) is
   outside the product.
@@ -44,7 +44,7 @@ at research time and 1.16.0 after the bump.
 ### Why a child of the item map, not a `notes/<id>` root container
 
 A per-item root container (`doc.get_text("notes/<id>")`) is op-free and
-merges concurrent creation, and Airday already uses that pattern for
+merges concurrent creation, and Monoplan already uses that pattern for
 `order/<list-id>`. It was the fallback if mergeable containers had not
 shipped. Rejected because the item's fields would live in two places for
 reads, hashes, export, and duplication. The mergeable child gives the same
@@ -142,7 +142,7 @@ and UTF-16 code units. The unqualified methods and the positions inside
 `loro-internal`'s `wasm` feature is on. That feature is not forwarded by
 the public `loro` crate (its features are `counter`, `jsonpath`,
 `logging`); it exists for `loro-wasm`, the crate behind the `loro-crdt`
-npm package. Airday depends on `loro`, so in every Airday build, the
+npm package. Monoplan depends on `loro`, so in every Monoplan build, the
 browser wasm included, **core text indices are Unicode scalars**.
 
 Browser editors count UTF-16 code units. Scalars and UTF-16 agree until
@@ -277,7 +277,7 @@ Done 2026-09-08. Tests: `notes_*`, `remote_notes_edit_translates_to_one_surgical
 
 ## 3. Editor bindings: what exists and why none plug in
 
-| Binding | Version (date) | Model | Verdict for Airday |
+| Binding | Version (date) | Model | Verdict for Monoplan |
 |---|---|---|---|
 | `loro-prosemirror` (official) | 0.4.4 (2026-08-22) | PM node tree as `LoroMap{nodeName, attributes, children: LoroList}` with `LoroText` leaves; sync, undo, ephemeral cursors | Needs a JS `LoroDoc`. Tree model also means Rust could not render notes to text without reimplementing the PM shape. |
 | `loro-codemirror` (official) | 0.3.3 (2025-10-07, one commit since) | single `LoroText`, undo, cursors | Needs a JS `LoroDoc`. Its bridge is ~150 lines and is the template for ours. |
@@ -285,7 +285,7 @@ Done 2026-09-08. Tests: `notes_*`, `remote_notes_edit_translates_to_one_surgical
 | `loro-slate`, `lexical-loro`, ProseKit `defineLoro` | community / wrappers | trees over loro-prosemirror or their own | Same JS-doc requirement. |
 | Tiptap 3 | Yjs only officially | | loro-prosemirror can be registered as raw PM plugins (cooee did this), still JS-doc bound. |
 
-The blocking fact: **Airday's `LoroDoc` is inside `airday-core-web`
+The blocking fact: **Monoplan's `LoroDoc` is inside `monoplan-core-web`
 (Rust wasm).** Every binding constructs against `loro-crdt`'s JS `LoroDoc`.
 Shipping `loro-crdt` too would add a second Loro runtime (1.05 MB gzipped
 wasm plus glue) and require mirroring the notes container between two
@@ -304,7 +304,7 @@ itemNotesDelta { id, delta }          // remote / other-tab / undo changes as a 
 
 Delta shape is Quill's, plain text only for now: a JSON array of
 `{"retain": n}` / `{"insert": "s"}` / `{"delete": n}`
-(`airday_core::NotesDeltaOp`, `serde(untagged)`).
+(`monoplan_core::NotesDeltaOp`, `serde(untagged)`).
 
 Rust side: `ensure_mergeable_text`, validate the whole delta against the
 current text (bounds, and no position inside a surrogate pair; a bad
@@ -408,7 +408,7 @@ formats live on `\n`, images are embeds, and its history module handles
 remote transforms with `userOnly: true`. The adaptor translates
 `{ insert: { image: src } }` to `insert: "￼"` with
 `attributes: { image: <ref> }` and back. Quill's default themes are replaced
-with Airday's own toolbar and styles (headless usage is supported).
+with Monoplan's own toolbar and styles (headless usage is supported).
 
 CodeMirror 6 with Markdown is the fallback if Quill's contenteditable
 handling fights the dialog (mobile caret, IME, the existing
@@ -432,7 +432,7 @@ prefix is the workaround Loro itself suggests.
 Researched 2026-09-08: no iOS or Android editor binding for `LoroText`
 exists, official or community, and Lexical iOS has no collaboration
 support at all, so native clients bind to the same delta bridge over
-`airday-ffi` (uniffi) that the web uses over wasm. On iOS that is a
+`monoplan-ffi` (uniffi) that the web uses over wasm. On iOS that is a
 `UITextView` (TextKit 2, wrapped for SwiftUI) with `NSTextStorageDelegate`
 producing UTF-16 deltas and `itemNotesDelta` applied to the text storage;
 marks map to font traits and attributes, line formats to

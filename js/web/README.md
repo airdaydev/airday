@@ -1,4 +1,4 @@
-# @airday/web
+# @monoplan/web
 
 Solid + Vite + TS web client.
 

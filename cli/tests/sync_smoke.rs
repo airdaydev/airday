@@ -1,4 +1,4 @@
-//! End-to-end CLI sync smoke: real airday-server, real Loro, real WS.
+//! End-to-end CLI sync smoke: real monoplan-server, real Loro, real WS.
 //!
 //! Bypasses the interactive auth UI by signing up via direct HTTP and
 //! materializing the on-disk profile that the CLI would have written.
@@ -7,18 +7,18 @@
 //!   open → mutate → flush → re-open → next pull observes nothing new.
 //!
 //! Confirms ops actually landed on the server by hitting the same
-//! sqlite the server uses (via `airday-server`'s public queries
+//! sqlite the server uses (via `monoplan-server`'s public queries
 //! module).
 
 use std::time::Duration;
 
-use airday_cli::commands::export::write_export;
-use airday_cli::config::{Config, Profile, Secrets};
-use airday_cli::keystore::dek_to_hex;
-use airday_cli::storage::Account;
-use airday_cli::sync::Session;
-use airday_core::{Dek, Doc, LIST_INBOX};
-use airday_server::sync::queries;
+use monoplan_cli::commands::export::write_export;
+use monoplan_cli::config::{Config, Profile, Secrets};
+use monoplan_cli::keystore::dek_to_hex;
+use monoplan_cli::storage::Account;
+use monoplan_cli::sync::Session;
+use monoplan_core::{Dek, Doc, LIST_INBOX};
+use monoplan_server::sync::queries;
 use uuid::Uuid;
 
 mod support;
@@ -151,7 +151,7 @@ async fn offline_add_survives_restart_then_syncs() {
 /// unset across offline flushes (every command flushes, even read-only
 /// ones) and land only after a real server exchange. Regression guard
 /// for the bug where `flush()` stamped it unconditionally — which made
-/// `airday status` report "Last sync: 0s ago" while fully offline.
+/// `monoplan status` report "Last sync: 0s ago" while fully offline.
 #[tokio::test]
 async fn last_sync_at_set_only_after_online_sync() {
     let server = TestServer::start().await;
@@ -168,7 +168,7 @@ async fn last_sync_at_set_only_after_online_sync() {
         true,
     )
     .await;
-    let doc_id = airday_core::DocId(Uuid::parse_str(&signup.primary_doc_id).unwrap());
+    let doc_id = monoplan_core::DocId(Uuid::parse_str(&signup.primary_doc_id).unwrap());
 
     // Offline flush, even with a mutation, must not stamp last_sync_at.
     let session = Session::open_with_profile(profile, false).await.unwrap();
@@ -176,7 +176,7 @@ async fn last_sync_at_set_only_after_online_sync() {
     session.doc().add_item(LIST_INBOX, "offline item").unwrap();
     session.flush().await.unwrap();
     {
-        let storage = airday_cli::storage::open_storage(&reopen_profile(tmp.path())).unwrap();
+        let storage = monoplan_cli::storage::open_storage(&reopen_profile(tmp.path())).unwrap();
         assert!(
             storage
                 .read_sync_cursor(doc_id)
@@ -194,7 +194,7 @@ async fn last_sync_at_set_only_after_online_sync() {
     assert!(session2.is_online());
     session2.flush().await.unwrap();
     {
-        let storage = airday_cli::storage::open_storage(&reopen_profile(tmp.path())).unwrap();
+        let storage = monoplan_cli::storage::open_storage(&reopen_profile(tmp.path())).unwrap();
         assert!(
             storage
                 .read_sync_cursor(doc_id)
@@ -212,10 +212,10 @@ async fn default_open_skips_connect() {
     let profile = Profile::new(tmp.path().to_path_buf());
     let fake_account = Uuid::now_v7().to_string();
     let fake_doc_uuid = Uuid::now_v7();
-    let doc_id = airday_core::DocId(fake_doc_uuid);
+    let doc_id = monoplan_core::DocId(fake_doc_uuid);
     let dek = Dek::generate();
-    let storage = airday_cli::storage::open_storage(&profile).unwrap();
-    airday_cli::storage::seed_snapshot(&storage, &dek, doc_id, &Doc::new().unwrap()).unwrap();
+    let storage = monoplan_cli::storage::open_storage(&profile).unwrap();
+    monoplan_cli::storage::seed_snapshot(&storage, &dek, doc_id, &Doc::new().unwrap()).unwrap();
     storage
         .write_account(&Account {
             account_id: fake_account.clone(),
@@ -288,8 +288,8 @@ async fn second_device_observes_first_devices_items_via_pull() {
     let tmp_b = tempfile::tempdir().unwrap();
     let profile_b = Profile::new(tmp_b.path().to_path_buf());
     let primary_doc_uuid = Uuid::parse_str(&signup.primary_doc_id).unwrap();
-    let doc_id_b = airday_core::DocId(primary_doc_uuid);
-    let storage_b = airday_cli::storage::open_storage(&profile_b).unwrap();
+    let doc_id_b = monoplan_core::DocId(primary_doc_uuid);
+    let storage_b = monoplan_cli::storage::open_storage(&profile_b).unwrap();
     storage_b
         .write_account(&Account {
             account_id: signup.account_id.clone(),
@@ -309,7 +309,7 @@ async fn second_device_observes_first_devices_items_via_pull() {
             dek_hex: dek_to_hex(&dek),
         })
         .unwrap();
-    airday_cli::storage::seed_snapshot(&storage_b, &dek, doc_id_b, &Doc::empty()).unwrap();
+    monoplan_cli::storage::seed_snapshot(&storage_b, &dek, doc_id_b, &Doc::empty()).unwrap();
 
     // A pushes a new item.
     let session_a = Session::open_with_profile(profile_a, true).await.unwrap();

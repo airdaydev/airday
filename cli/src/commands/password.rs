@@ -1,6 +1,6 @@
-use airday_core::random_bytes;
-use airday_protocol::{KdfParams, PasswordChangeRequest, PreloginRequest, PreloginResponse};
 use dialoguer::Password;
+use monoplan_core::random_bytes;
+use monoplan_protocol::{KdfParams, PasswordChangeRequest, PreloginRequest, PreloginResponse};
 
 use super::prompt_new_password;
 use crate::config::Profile;

@@ -5,7 +5,7 @@
 //! `import`.
 //!
 //! - `scale`: 10k items (default) with two paragraphs of notes each, in three
-//!   shapes: today's string register through the airday `Doc`, the v4
+//!   shapes: today's string register through the monoplan `Doc`, the v4
 //!   mergeable `LoroText` shape on a raw Loro doc, and the same with a
 //!   simulated typing history. Reports snapshot size, import, boot-shaped
 //!   walk, notes read, and seal / open of the blob.
@@ -13,11 +13,11 @@
 //!   bulk `add_items_at`, to separate commit cost from index cost.
 //! - `import`: `import_json` of a synthetic v3 export of the same size.
 
-use airday_core::doc::Doc;
-use airday_core::{
+use loro::{Container, ExportMode, LoroDoc, LoroMap, LoroValue, UpdateOptions, ValueOrContainer};
+use monoplan_core::doc::Doc;
+use monoplan_core::{
     Dek, ExportItem, ExportLifecycle, ExportList, ExportSettings, JsonExport, LIST_INBOX,
 };
-use loro::{Container, ExportMode, LoroDoc, LoroMap, LoroValue, UpdateOptions, ValueOrContainer};
 use std::time::Instant;
 
 const WORDS: &[&str] = &[
@@ -93,7 +93,7 @@ fn main() {
 // ---------- scale ----------
 
 fn scale(cfg: &Cfg) {
-    // Today: airday Doc, notes as a string register. Built with the
+    // Today: monoplan Doc, notes as a string register. Built with the
     // bulk add so the number reflects the doc, not the per-add index
     // cost (see `commit`).
     {
@@ -106,7 +106,7 @@ fn scale(cfg: &Cfg) {
             doc.edit_item_notes(id, &notes_for(cfg, i)).unwrap();
         }
         println!(
-            "\n[A  v3 string register, airday Doc] build {:?}",
+            "\n[A  v3 string register, monoplan Doc] build {:?}",
             t.elapsed()
         );
         let t = Instant::now();

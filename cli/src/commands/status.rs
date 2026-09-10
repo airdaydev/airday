@@ -1,4 +1,4 @@
-//! `airday status` — local-only summary. Never opens a WS.
+//! `monoplan status` — local-only summary. Never opens a WS.
 
 use clap::Parser;
 use serde::Serialize;

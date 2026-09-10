@@ -23,7 +23,7 @@ import {
   parseRecoveryCode,
   unwrapDek,
   wrapDek,
-} from "../wasm/airday_core_web.js";
+} from "../wasm/monoplan_core_web.js";
 
 const KDF = { m: 8, t: 1, p: 1 } as const;
 

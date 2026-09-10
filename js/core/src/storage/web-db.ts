@@ -1,12 +1,12 @@
 // The web client's IndexedDB schema — one database, every store.
 //
-// All persistent-at-rest browser state for airday lives in the single
-// `airday-web` database. Two layers share it:
+// All persistent-at-rest browser state for monoplan lives in the single
+// `monoplan-web` database. Two layers share it:
 //
 //   Config plane (small, stable):
 //     - `vault`  store  — wrapped DEK            (`dek-vault.ts`)
 //     - `device` store  — device identity + `lastSyncAt` (`device-store.ts`)
-//     - `prefs`  store  — per-account UI preferences (`@airday/web`)
+//     - `prefs`  store  — per-account UI preferences (`@monoplan/web`)
 //
 //   Engine data plane (high-churn op log) — the web implementation of
 //   the Rust `LocalStorage` trait (`spec/local-storage.md`), consumed by
@@ -19,19 +19,19 @@
 // they live in one database here: a single version line, a single
 // `onupgradeneeded`, and the option of an atomic write spanning both
 // planes if we ever need it. This module is the single source of truth
-// for the schema; every caller goes through `openAirdayDb()`.
+// for the schema; every caller goes through `openMonoplanDb()`.
 //
 // IDB's compound-index quirk — records where any key element is
 // `undefined` are skipped — gives the engine `ops` store a partial
 // unique index for free (`serverSeq` is unset on local-origin rows).
 
-const DB_NAME = "airday-web";
+const DB_NAME = "monoplan-web";
 // v1–v6 built up (and re-keyed) the config stores plus a now-defunct
 // op-log-on-OPFS data plane (`ops` / `snapshot_meta`). v7 retired that
 // data plane and briefly homed the engine op log in a *separate*
-// `airday-engine` database. v8 collapsed that split back in: the engine
+// `monoplan-engine` database. v8 collapsed that split back in: the engine
 // stores (`docs` / `ops` / `snapshots`) were created here, and
-// `airday-engine` abandoned. v9 is the WAL/VV separation
+// `monoplan-engine` abandoned. v9 is the WAL/VV separation
 // (spec/vv-wal-separation.md): `ops` becomes the pure crash-recovery
 // WAL (no more `clientOpId` / outbox role — it was recreated fresh at
 // v9, its v8 rows abandoned; authed devices re-pull, and the snapshot
@@ -61,7 +61,7 @@ const LEGACY_STORES = ["snapshot_meta"];
 
 // The retired separate engine database (v7 only). Deleted best-effort
 // after the consolidated DB opens so it doesn't linger as an orphan.
-const RETIRED_ENGINE_DB = "airday-engine";
+const RETIRED_ENGINE_DB = "monoplan-engine";
 
 /** One WAL row in the engine `ops` store. `serverSeq` is set on
  *  server-delivered rows (idempotent re-delivery detection) and unset
@@ -128,13 +128,13 @@ let cached: Promise<IDBDatabase> | null = null;
 let cleanedUpRetiredDb = false;
 
 /**
- * Open (or return the cached) `airday-web` database with every known
+ * Open (or return the cached) `monoplan-web` database with every known
  * store materialised. The handle is shared across modules in the same
  * tab; a `versionchange` event from a peer tab triggering an upgrade
  * closes our handle and clears the cache so the next call opens a fresh
  * one.
  */
-export function openAirdayDb(): Promise<IDBDatabase> {
+export function openMonoplanDb(): Promise<IDBDatabase> {
   if (!cached) {
     cached = openOnce().then((db) => {
       db.onversionchange = () => {
@@ -214,13 +214,13 @@ function openOnce(): Promise<IDBDatabase> {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
     req.onblocked = () =>
-      reject(new Error("airday-web open blocked by another tab"));
+      reject(new Error("monoplan-web open blocked by another tab"));
   });
 }
 
-/** Best-effort, once-per-session cleanup of the retired `airday-engine`
+/** Best-effort, once-per-session cleanup of the retired `monoplan-engine`
  *  database (the v7-only separate op-log DB, now folded into
- *  `airday-web`). Fire-and-forget: a peer tab on old code may block the
+ *  `monoplan-web`). Fire-and-forget: a peer tab on old code may block the
  *  delete, in which case it lands when that tab closes; either way boot
  *  never waits on it. */
 function dropRetiredEngineDb(): void {
@@ -233,8 +233,8 @@ function dropRetiredEngineDb(): void {
   }
 }
 
-/** Test-seam: forget the cached handle so a fresh `openAirdayDb`
+/** Test-seam: forget the cached handle so a fresh `openMonoplanDb`
  *  re-acquires it. Don't use in product code. */
-export function _resetAirdayDbForTests(): void {
+export function _resetMonoplanDbForTests(): void {
   cached = null;
 }

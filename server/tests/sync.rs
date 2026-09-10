@@ -5,16 +5,16 @@
 //! crypto material because the auth route checks shape; we use the
 //! weak Argon2 params from the auth tests so the suite stays fast.
 
-use airday_core::{Dek, derive_password_master, random_bytes};
-use airday_protocol::{
+use futures_util::{SinkExt, StreamExt};
+use http::header::AUTHORIZATION;
+use monoplan_core::{Dek, derive_password_master, random_bytes};
+use monoplan_protocol::{
     ClientFrame, DeviceCredential, DeviceRegistration, EncryptedBlob, Hello, HelloAck,
     HelloRejected, KdfParams, PROTOCOL_VERSION, PushBlob, ServerFrame, SignupRequest,
     SignupResponse, StoredBlob,
 };
-use airday_server::sync::{SnapshotCoordinator, queries};
-use airday_server::{AppState, router};
-use futures_util::{SinkExt, StreamExt};
-use http::header::AUTHORIZATION;
+use monoplan_server::sync::{SnapshotCoordinator, queries};
+use monoplan_server::{AppState, router};
 use reqwest::header::CONTENT_TYPE;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -219,7 +219,7 @@ async fn handshake(ws: &mut WsStream) -> HelloAck {
     send_msgpack(
         ws,
         &Hello {
-            client: "airday-cli-test".into(),
+            client: "monoplan-cli-test".into(),
             client_version: env!("CARGO_PKG_VERSION").into(),
             supported_protocol_versions: vec![PROTOCOL_VERSION],
         },
@@ -352,7 +352,7 @@ async fn handshake_rejected_when_no_shared_protocol_version() {
     send_msgpack(
         &mut ws,
         &Hello {
-            client: "airday-cli-test".into(),
+            client: "monoplan-cli-test".into(),
             client_version: "0.0.0".into(),
             supported_protocol_versions: vec![999],
         },

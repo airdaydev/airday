@@ -13,8 +13,8 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { Dek, Doc, SyncEngine } from "../wasm/airday_core_web.js";
-import type { EngineStorage } from "../wasm/airday_core_web.js";
+import { Dek, Doc, SyncEngine } from "../wasm/monoplan_core_web.js";
+import type { EngineStorage } from "../wasm/monoplan_core_web.js";
 import { MemEngineStorage } from "./mem-engine-storage.ts";
 
 const LIST_MAIN = "inbox";

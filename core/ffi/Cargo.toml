@@ -1,11 +1,11 @@
 [package]
-name = "airday-ffi"
+name = "monoplan-ffi"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [lib]
-name = "airday_ffi"
+name = "monoplan_ffi"
 # staticlib ships in the XCFramework; cdylib exists so uniffi's
 # library-mode bindgen has a host artifact to read metadata from.
 crate-type = ["staticlib", "cdylib"]
@@ -16,8 +16,8 @@ name = "uniffi-bindgen"
 path = "src/bin/uniffi-bindgen.rs"
 
 [dependencies]
-airday-core = { path = "../../core" }
-airday-storage-sqlite = { path = "../../crates/storage-sqlite" }
+monoplan-core = { path = "../../core" }
+monoplan-storage-sqlite = { path = "../../crates/storage-sqlite" }
 uniffi = { version = "0.32", features = ["cli"] }
 uuid = { workspace = true }
 thiserror = { workspace = true }

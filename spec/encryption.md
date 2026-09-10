@@ -4,12 +4,12 @@
 
 - **DEK** (data encryption key) — 32-byte random, generated client-side at signup. Encrypts every op + snapshot blob. AEAD: XChaCha20-Poly1305.
 - **Master** — `Argon2id(password, master_salt)`. One expensive call per session.
-- **KEK** (key encryption key) — `HKDF(master, "airday/kek/v1")`. Wraps/unwraps the DEK. Client-only.
-- **Auth secret** — `HKDF(master, "airday/auth/v1")`. Sent to server as login credential. Server stores `SHA-256(auth_secret)`. HKDF is one-way — possessing `auth_secret` reveals neither `master` nor `kek`. See `auth.md` for the full password-handling invariant.
+- **KEK** (key encryption key) — `HKDF(master, "monoplan/kek/v1")`. Wraps/unwraps the DEK. Client-only.
+- **Auth secret** — `HKDF(master, "monoplan/auth/v1")`. Sent to server as login credential. Server stores `SHA-256(auth_secret)`. HKDF is one-way — possessing `auth_secret` reveals neither `master` nor `kek`. See `auth.md` for the full password-handling invariant.
 - **Recovery code** — 12 words from the English BIP39 wordlist (2048 words). 128 bits of entropy + 4-bit checksum. Generated client-side at signup.
 - **Recovery master** — `Argon2id(recovery_code, recovery_salt)`.
-- **Recovery KEK** — `HKDF(recovery_master, "airday/recovery_kek/v1")`. Wraps/unwraps the DEK on the recovery path. Client-only.
-- **Recovery auth secret** — `HKDF(recovery_master, "airday/recovery_auth/v1")`. Proves possession of the recovery code to the server. Server stores `SHA-256(recovery_auth_secret)`. The recovery wrap is **only** released after this proof — same threat model as the password path: don't hand attackers harvestable wrap material in exchange for an email address.
+- **Recovery KEK** — `HKDF(recovery_master, "monoplan/recovery_kek/v1")`. Wraps/unwraps the DEK on the recovery path. Client-only.
+- **Recovery auth secret** — `HKDF(recovery_master, "monoplan/recovery_auth/v1")`. Proves possession of the recovery code to the server. Server stores `SHA-256(recovery_auth_secret)`. The recovery wrap is **only** released after this proof — same threat model as the password path: don't hand attackers harvestable wrap material in exchange for an email address.
 
 ## Wrap-states stored on server
 

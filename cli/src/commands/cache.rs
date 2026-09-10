@@ -1,4 +1,4 @@
-//! `airday cache` — local cache inspection and reset. Local-only; never opens a WS.
+//! `monoplan cache` — local cache inspection and reset. Local-only; never opens a WS.
 
 use std::io::IsTerminal;
 
@@ -25,7 +25,7 @@ pub enum CacheCmd {
         json: bool,
     },
     /// Delete the local doc cache and reset the sync cursor. The next
-    /// `airday sync` will rehydrate from the server.
+    /// `monoplan sync` will rehydrate from the server.
     Clear {
         /// Skip the confirmation prompt when there are unsynced ops.
         #[arg(long)]
@@ -90,7 +90,7 @@ async fn clear(force: bool) -> anyhow::Result<()> {
     if pending && !force {
         if !std::io::stdin().is_terminal() {
             anyhow::bail!(
-                "local cache has unsynced changes; run `airday sync` first or pass --force"
+                "local cache has unsynced changes; run `monoplan sync` first or pass --force"
             );
         }
         let proceed = Confirm::new()
@@ -105,7 +105,7 @@ async fn clear(force: bool) -> anyhow::Result<()> {
 
     storage.clear_cache(doc_id)?;
 
-    println!("Cache cleared. Run `airday sync` to rehydrate.");
+    println!("Cache cleared. Run `monoplan sync` to rehydrate.");
     Ok(())
 }
 

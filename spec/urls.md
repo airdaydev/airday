@@ -31,7 +31,7 @@ from local prefs, as before URLs existed.
 - **No server route.** `web.rs` serves `/` and a flat set of files. The
   fragment needs nothing new and works cold on a fresh device, before
   the PWA service worker fallback (`spec/pwa-plan.md`) exists.
-- **Trivial to migrate.** A native deep link (`airday://item_<id>`) or
+- **Trivial to migrate.** A native deep link (`monoplan://item_<id>`) or
   a future path scheme carries the identical token.
 
 ## Why not Loro container ids

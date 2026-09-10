@@ -12,10 +12,10 @@ use super::{
 /// HKDF info strings. Versioned so we can rotate the derivation without
 /// breaking older accounts (bump the suffix, keep the old path for
 /// migration).
-pub const KEK_INFO: &[u8] = b"airday/kek/v1";
-pub const AUTH_INFO: &[u8] = b"airday/auth/v1";
-pub const RECOVERY_KEK_INFO: &[u8] = b"airday/recovery_kek/v1";
-pub const RECOVERY_AUTH_INFO: &[u8] = b"airday/recovery_auth/v1";
+pub const KEK_INFO: &[u8] = b"monoplan/kek/v1";
+pub const AUTH_INFO: &[u8] = b"monoplan/auth/v1";
+pub const RECOVERY_KEK_INFO: &[u8] = b"monoplan/recovery_kek/v1";
+pub const RECOVERY_AUTH_INFO: &[u8] = b"monoplan/recovery_auth/v1";
 
 const MASTER_LEN: usize = 32;
 

@@ -1,17 +1,17 @@
 [package]
-name = "airday-core-web"
+name = "monoplan-core-web"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "wasm-bindgen wrappers around airday-core for JS/TS consumers."
+description = "wasm-bindgen wrappers around monoplan-core for JS/TS consumers."
 
 [lib]
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-airday-core = { path = ".." }
-airday-protocol = { path = "../../crates/protocol" }
+monoplan-core = { path = ".." }
+monoplan-protocol = { path = "../../crates/protocol" }
 hex = { workspace = true }
 serde_json = { workspace = true }
 wasm-bindgen = "0.2"
@@ -20,7 +20,7 @@ console_error_panic_hook = "0.1"
 
 # Wasm-only flags for upstream crates that gate JS/web platform support
 # behind a feature. These pull through the dependency graph for the
-# wasm target so airday-core's `rand`/`uuid`/`getrandom` use the
+# wasm target so monoplan-core's `rand`/`uuid`/`getrandom` use the
 # browser/Node crypto + performance APIs instead of looking for libc.
 getrandom = { version = "0.2", features = ["js"] }
 uuid = { workspace = true, features = ["js"] }

@@ -1,6 +1,6 @@
-//! Native sqlite `LocalStorage` for Airday.
+//! Native sqlite `LocalStorage` for Monoplan.
 //!
-//! `SqliteStorage` is the native implementation of `airday_core::LocalStorage`:
+//! `SqliteStorage` is the native implementation of `monoplan_core::LocalStorage`:
 //! plain `rusqlite` behind a `Mutex`, synchronously durable (the trait
 //! method returns only after the `INSERT`/`UPDATE` commits). The generic
 //! schema is `migrations/001_init.sql` — an encrypted `wal` log plus one
@@ -16,21 +16,21 @@
 //! needs its own tables (the CLI's singleton `account` identity row)
 //! supplies them as *extra* migrations via [`SqliteStorage::open_with_extra`],
 //! so identity and the doc cache share one db file and one transactional
-//! store. Boot / seed / load glue lives in `airday_core::storage` — it is
+//! store. Boot / seed / load glue lives in `monoplan_core::storage` — it is
 //! generic over the trait and DEK-holding, so it belongs beside the trait,
 //! not here.
 //!
-//! `core/` must stay wasm-clean, so this crate — not `airday-core` — is
+//! `core/` must stay wasm-clean, so this crate — not `monoplan-core` — is
 //! where `rusqlite` lands.
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use airday_core::{
+use monoplan_core::{
     BootState, DocId, InFlightPush, LocalSeq, LocalStorage, PushId, RemoteWalRow, ServerSeq,
     SnapshotRow, StorageError, WalRow,
 };
-use airday_protocol::EncryptedBlob;
+use monoplan_protocol::EncryptedBlob;
 use rusqlite::{Connection, OptionalExtension, params};
 use uuid::Uuid;
 

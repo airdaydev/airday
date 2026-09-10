@@ -1,6 +1,6 @@
 //! Tiny msgpack-over-http client.
 
-use airday_protocol::ErrorBody;
+use monoplan_protocol::ErrorBody;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::{Method, StatusCode};
 use serde::Serialize;

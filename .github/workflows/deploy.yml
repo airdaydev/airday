@@ -17,6 +17,6 @@ jobs:
         run: |
           echo "$SSH_PRIVATE_KEY" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
-          ssh -o StrictHostKeyChecking=accept-new -i /tmp/deploy_key airday@$DEPLOY_HOST \
-            "cd /opt/airday/source && git fetch origin && git reset --hard origin/main && ./deploy/ci.sh"
+          ssh -o StrictHostKeyChecking=accept-new -i /tmp/deploy_key monoplan@$DEPLOY_HOST \
+            "cd /opt/monoplan/source && git fetch origin && git reset --hard origin/main && ./deploy/ci.sh"
           rm /tmp/deploy_key

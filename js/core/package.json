@@ -1,5 +1,5 @@
 {
-  "name": "@airday/core",
+  "name": "@monoplan/core",
   "private": true,
   "type": "module",
   "main": "src/index.ts",
@@ -7,8 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./wasm": {
-      "browser": "./wasm-web/airday_core_web.js",
-      "default": "./wasm/airday_core_web.js"
+      "browser": "./wasm-web/monoplan_core_web.js",
+      "default": "./wasm/monoplan_core_web.js"
     },
     "./storage/dek-vault": "./src/storage/dek-vault.ts",
     "./storage/web-db": "./src/storage/web-db.ts",

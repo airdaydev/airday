@@ -5,16 +5,16 @@
 //! under a second — the crypto correctness is covered by `core` unit
 //! tests.
 
-use airday_core::{
+use monoplan_core::{
     AEAD_NONCE_LEN, Dek, derive_password_master, derive_recovery_master, generate_recovery_code,
     random_bytes,
 };
-use airday_protocol::{
+use monoplan_protocol::{
     DeviceRenameRequest, DevicesListResponse, KdfParams, LoginRequest, LoginResponse,
     PasswordResetRequest, PreloginRequest, PreloginResponse, RecoverRequest, RecoverResponse,
     RecoveryMaterial, SignupRequest, SignupResponse,
 };
-use airday_server::{AppState, router};
+use monoplan_server::{AppState, router};
 use reqwest::header::CONTENT_TYPE;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -375,7 +375,7 @@ async fn recovery_session_token_cannot_be_reused() {
         .try_into()
         .unwrap();
     let dek = r_kek
-        .unwrap(&airday_core::WrappedDek {
+        .unwrap(&monoplan_core::WrappedDek {
             ciphertext: recovered.recovery_wrapped_dek,
             nonce,
         })
@@ -391,7 +391,7 @@ async fn recovery_session_token_cannot_be_reused() {
     let new_auth = new_master.auth_secret().unwrap();
     let new_wrapped = new_kek.wrap(&dek).unwrap();
 
-    let reset: airday_protocol::PasswordResetResponse = post_msgpack(
+    let reset: monoplan_protocol::PasswordResetResponse = post_msgpack(
         &format!("{}/api/account/password/reset", acc.server.base),
         &PasswordResetRequest {
             recovery_session_token: recovered.recovery_session_token.clone(),
@@ -459,10 +459,10 @@ async fn signup_sets_device_cookie_with_expected_attributes() {
     .await;
     assert!(status.is_success());
     let body = body.unwrap();
-    let sc =
-        find_set_cookie(&set_cookies, "airday_device").expect("expected airday_device Set-Cookie");
+    let sc = find_set_cookie(&set_cookies, "monoplan_device")
+        .expect("expected monoplan_device Set-Cookie");
     assert_eq!(
-        cookie_value(sc, "airday_device"),
+        cookie_value(sc, "monoplan_device"),
         Some(body.device_token.as_str())
     );
     assert!(sc.contains("HttpOnly"), "missing HttpOnly: {sc}");
@@ -485,7 +485,7 @@ async fn signup_sets_device_cookie_with_expected_attributes() {
 async fn cookie_authenticates_logout_without_bearer() {
     let acc = signup(false).await;
     // Logout via cookie only (no Authorization header).
-    let cookie_header = format!("airday_device={}", acc.device_token);
+    let cookie_header = format!("monoplan_device={}", acc.device_token);
     let (status, set_cookies, _): (_, _, Option<()>) = post_msgpack_full(
         &format!("{}/api/account/logout", acc.server.base),
         &serde_bytes::Bytes::new(b""), // empty body; route ignores it
@@ -499,13 +499,13 @@ async fn cookie_authenticates_logout_without_bearer() {
         status.is_success(),
         "logout via cookie should succeed: {status}"
     );
-    let cleared = find_set_cookie(&set_cookies, "airday_device")
+    let cleared = find_set_cookie(&set_cookies, "monoplan_device")
         .expect("logout should emit a clearing Set-Cookie");
     assert!(
         cleared.contains("Max-Age=0"),
         "expected clear cookie: {cleared}"
     );
-    assert_eq!(cookie_value(cleared, "airday_device"), Some(""));
+    assert_eq!(cookie_value(cleared, "monoplan_device"), Some(""));
 
     // Subsequent bearer call should now 401 — the device was revoked.
     let status = post_msgpack_status(
@@ -547,7 +547,7 @@ async fn login_without_register_device_does_not_set_cookie() {
     .await;
     assert!(status.is_success());
     assert!(
-        find_set_cookie(&set_cookies, "airday_device").is_none(),
+        find_set_cookie(&set_cookies, "monoplan_device").is_none(),
         "no cookie should be set when no device is minted: {set_cookies:?}"
     );
 }

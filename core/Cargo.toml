@@ -1,5 +1,5 @@
 [package]
-name = "airday-core"
+name = "monoplan-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,7 +8,7 @@ license.workspace = true
 path = "src/lib.rs"
 
 [dependencies]
-airday-protocol = { path = "../crates/protocol" }
+monoplan-protocol = { path = "../crates/protocol" }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }

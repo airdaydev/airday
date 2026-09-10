@@ -1,17 +1,17 @@
 #!/bin/bash
 # Build a release on the box and flip the `current` symlink to it.
-# Run as the airday user (locally over ssh, or from a CI runner with
+# Run as the monoplan user (locally over ssh, or from a CI runner with
 # sudo'd `systemctl restart` rights — see deploy/bootstrap.sh).
 
 set -euo pipefail
 
-BASE_DIR="/opt/airday"
+BASE_DIR="/opt/monoplan"
 SOURCE_DIR="$BASE_DIR/source"
 RELEASES_DIR="$BASE_DIR/releases"
 CURRENT_LINK="$BASE_DIR/current"
 DEPLOY_ENV_FILE="${DEPLOY_ENV_FILE:-$BASE_DIR/.env}"
 DEPLOY_REF="${DEPLOY_REF:-origin/main}"
-ETC_DIR="/etc/airday"
+ETC_DIR="/etc/monoplan"
 
 export CARGO_TARGET_DIR="$BASE_DIR/cargo-target"
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
@@ -66,25 +66,25 @@ bun run build:wasm:web
 echo "==> Building web bundle"
 ( cd js/web && bun run build )
 
-echo "==> Building airday-server"
-cargo build --release -p airday-server
+echo "==> Building monoplan-server"
+cargo build --release -p monoplan-server
 
 # Cargo writes the binary into the shared CARGO_TARGET_DIR, but the
 # systemd unit (and the Caddyfile, indirectly) reference paths under
-# /opt/airday/current — so stage the binary inside the release tree.
+# /opt/monoplan/current — so stage the binary inside the release tree.
 install -Dm755 \
-  "$CARGO_TARGET_DIR/release/airday-server" \
-  "$RELEASE_DIR/target/release/airday-server"
+  "$CARGO_TARGET_DIR/release/monoplan-server" \
+  "$RELEASE_DIR/target/release/monoplan-server"
 
 echo "==> Installing rendered server config to $ETC_DIR"
-install -m 0640 -o airday -g airday \
+install -m 0640 -o monoplan -g monoplan \
   "$RELEASE_DIR/deploy/rendered/server.toml" "$ETC_DIR/server.toml"
 
 echo "==> Flipping current symlink"
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
 
 echo "==> Restarting services"
-sudo systemctl restart airday.service
+sudo systemctl restart monoplan.service
 sudo systemctl restart caddy.service
 
 # Best-effort prune: keep last 5 releases. Older ones are safe to drop —

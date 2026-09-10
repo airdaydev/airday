@@ -60,8 +60,8 @@ false` and leave this as-is; do not ship both. Contents:
 
 ```json
 {
-  "name": "Airday",
-  "short_name": "Airday",
+  "name": "Monoplan",
+  "short_name": "Monoplan",
   "start_url": "/",
   "display": "standalone",
   "background_color": "<light bg>",
@@ -152,13 +152,13 @@ Purpose-built replacement for the `listDevices` probe. Requirements:
 - Behind the **same** `DeviceAuth` extractor as every authed route, so the
   probe cannot disagree with the WS-upgrade validation it stands in for.
 - `200` → `Msgpack<SessionInfo { account_id, device_id }>` (new
-  `airday_protocol` type). Doubles as a whoami.
+  `monoplan_protocol` type). Doubles as a whoami.
 - `401` → existing `ApiError` shape. Future reason codes (`device_revoked`,
   `password_changed`, `unknown_token`) ride the existing `ApiErrorBody.code`
   field when the locked-state work lands — no wire change needed.
 
 Changes: handler in `auth_routes.rs` (or a new `session_routes.rs`), route in
-`http/mod.rs`, `SessionInfo` in `airday_protocol`, `api.session()` in
+`http/mod.rs`, `SessionInfo` in `monoplan_protocol`, `api.session()` in
 `js/web/src/api.ts`, and `probeAuth` in `js/web/src/sync/sync.ts` swaps
 `api.listDevices()` → `api.session()`. Document the endpoint in
 `spec/auth.md`, plus a note in `spec/sync-protocol.md` recording the
@@ -195,7 +195,7 @@ New `js/web/src/pwa.ts`, imported from `index.tsx`:
 1. `bun run build:wasm && bun run --cwd js/web build` — dist contains
    `sw.js`, `manifest.webmanifest`, icons; precache manifest inside `sw.js`
    lists the wasm file.
-2. `cargo run -p airday-server --features bundled-web` and, via Playwright
+2. `cargo run -p monoplan-server --features bundled-web` and, via Playwright
    against `http://localhost:8000`:
    - first load registers the SW (`navigator.serviceWorker.ready`);
    - `context.setOffline(true)` + reload → app boots to the workspace from

@@ -1,6 +1,6 @@
-use airday_protocol::ErrorBody;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use monoplan_protocol::ErrorBody;
 use rusqlite::ffi::ErrorCode;
 
 use crate::build_info;

@@ -1,4 +1,4 @@
-//! Internals shared between the `airday` binary and integration tests.
+//! Internals shared between the `monoplan` binary and integration tests.
 
 pub mod commands;
 pub mod config;

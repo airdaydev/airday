@@ -1,5 +1,5 @@
 [package]
-name = "airday-protocol"
+name = "monoplan-protocol"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

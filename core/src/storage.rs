@@ -1,4 +1,4 @@
-//! Local-storage trait shared by every Airday client.
+//! Local-storage trait shared by every Monoplan client.
 //!
 //! Local persistence and outbound sync are **separate concerns**
 //! (`spec/vv-wal-separation.md`):
@@ -43,7 +43,7 @@
 //!
 //! See `spec/local-storage.md` for the schema and boot semantics.
 
-use airday_protocol::EncryptedBlob;
+use monoplan_protocol::EncryptedBlob;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
@@ -80,7 +80,7 @@ impl PushId {
 pub struct LocalSeq(pub u64);
 
 /// Server-assigned per-account sequence number. Mirrors
-/// `airday_protocol::StoredBlob::seq`. Dense within an account.
+/// `monoplan_protocol::StoredBlob::seq`. Dense within an account.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize,
 )]

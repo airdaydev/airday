@@ -23,6 +23,6 @@
       },
     },
     optimizeDeps: {
-      exclude: ["@airday/core"],
+      exclude: ["@monoplan/core"],
     },
   });

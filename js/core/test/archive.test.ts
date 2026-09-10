@@ -6,8 +6,8 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { Dek, Doc, SyncEngine } from "../wasm/airday_core_web.js";
-import type { AppEventJs, EngineStorage } from "../wasm/airday_core_web.js";
+import { Dek, Doc, SyncEngine } from "../wasm/monoplan_core_web.js";
+import type { AppEventJs, EngineStorage } from "../wasm/monoplan_core_web.js";
 import { MemEngineStorage } from "./mem-engine-storage.ts";
 
 const DOC_ID = "00000000-0000-0000-0000-000000000000";

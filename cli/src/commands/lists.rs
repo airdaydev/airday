@@ -4,8 +4,8 @@
 //! is the only way to remove a list from the active workspace. The
 //! core's destructive `delete_list` stays internal.
 
-use airday_core::ListView;
 use clap::{Parser, Subcommand};
+use monoplan_core::ListView;
 use serde::Serialize;
 
 use crate::sync::Session;

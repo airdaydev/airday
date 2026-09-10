@@ -74,13 +74,13 @@ fn default_db() -> PathBuf {
     // the Rust toolchain (cargo, rustup) behaviour.
     if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
         if !xdg.is_empty() {
-            return PathBuf::from(xdg).join("airday/airday.sqlite");
+            return PathBuf::from(xdg).join("monoplan/monoplan.sqlite");
         }
     }
     if let Some(home) = dirs::home_dir() {
-        return home.join(".local/share/airday/airday.sqlite");
+        return home.join(".local/share/monoplan/monoplan.sqlite");
     }
-    PathBuf::from("airday.sqlite")
+    PathBuf::from("monoplan.sqlite")
 }
 
 fn default_log_level() -> String {
@@ -102,7 +102,7 @@ impl Config {
     pub fn load(path: Option<&Path>) -> (Self, ConfigSource) {
         let path = path
             .map(PathBuf::from)
-            .or_else(|| std::env::var("AIRDAY_CONFIG").ok().map(PathBuf::from))
+            .or_else(|| std::env::var("MONOPLAN_CONFIG").ok().map(PathBuf::from))
             .unwrap_or_else(|| PathBuf::from(DEFAULT_CONFIG_PATH));
 
         let (mut config, source) = match std::fs::read_to_string(&path) {
@@ -113,24 +113,24 @@ impl Config {
             Err(_) => (Config::default(), ConfigSource::Defaults { tried: path }),
         };
 
-        if let Ok(v) = std::env::var("AIRDAY_BIND") {
+        if let Ok(v) = std::env::var("MONOPLAN_BIND") {
             config.bind = v;
         }
-        if let Ok(v) = std::env::var("AIRDAY_DB_PATH") {
+        if let Ok(v) = std::env::var("MONOPLAN_DB_PATH") {
             config.db = PathBuf::from(v);
         }
-        if let Ok(v) = std::env::var("AIRDAY_LOG_LEVEL") {
+        if let Ok(v) = std::env::var("MONOPLAN_LOG_LEVEL") {
             config.log_level = v;
         }
-        if let Ok(v) = std::env::var("AIRDAY_SECURE_COOKIES") {
+        if let Ok(v) = std::env::var("MONOPLAN_SECURE_COOKIES") {
             config.secure_cookies = matches!(v.as_str(), "1" | "true" | "TRUE");
         }
-        if let Ok(v) = std::env::var("AIRDAY_SNAPSHOT_THRESHOLD_BLOBS") {
+        if let Ok(v) = std::env::var("MONOPLAN_SNAPSHOT_THRESHOLD_BLOBS") {
             config.snapshot_threshold_blobs = v
                 .parse()
-                .unwrap_or_else(|e| panic!("invalid AIRDAY_SNAPSHOT_THRESHOLD_BLOBS={v:?}: {e}"));
+                .unwrap_or_else(|e| panic!("invalid MONOPLAN_SNAPSHOT_THRESHOLD_BLOBS={v:?}: {e}"));
         }
-        if let Ok(v) = std::env::var("AIRDAY_ADMIN_PASSWORD_HASH") {
+        if let Ok(v) = std::env::var("MONOPLAN_ADMIN_PASSWORD_HASH") {
             config.admin_password_hash = (!v.is_empty()).then_some(v);
         }
 

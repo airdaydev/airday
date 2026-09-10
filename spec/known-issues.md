@@ -6,12 +6,12 @@ Grouped movable-list reorder undo is unsafe in the current core/Loro path.
 
 - Repro: perform a larger reorder as many `move_item(...)` calls inside one undo group, then `undo()`, then `redo()`.
 - Observed behavior: redo can corrupt list order and effectively drop/eat trailing items.
-- This reproduces in `airday-core` without the web UI, so it is not a projection/render bug.
+- This reproduces in `monoplan-core` without the web UI, so it is not a projection/render bug.
 - The failed `moveItems` experiment was removed. It did not solve the problem and had the same underlying undo-safety issue.
 
 ### Current workaround
 
-For launch, reorder does **not** use core undo grouping. The grouped-undo API was removed from `airday-core` rather than left around as an attractive footgun.
+For launch, reorder does **not** use core undo grouping. The grouped-undo API was removed from `monoplan-core` rather than left around as an attractive footgun.
 
 - Reorder still executes as plain per-item `move_item(...)` mutations, but
   only for the selected rows. A drag's commit count is bounded by selection
@@ -23,4 +23,4 @@ For launch, reorder does **not** use core undo grouping. The grouped-undo API wa
 
 ### Scope note
 
-This workaround appears acceptable for Airday's task/list UX, but it should not be treated as a durable pattern for higher-stakes domains. Generic grouped undo for important state transitions remains conceptually and technically suspect.
+This workaround appears acceptable for Monoplan's task/list UX, but it should not be treated as a durable pattern for higher-stakes domains. Generic grouped undo for important state transitions remains conceptually and technically suspect.

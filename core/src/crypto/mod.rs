@@ -26,8 +26,8 @@ pub use recovery::{RecoveryCode, generate_recovery_code, parse_recovery_code};
 pub use secrets::{AuthSecret, Dek, Kek, PasswordMaster, RecoveryMaster};
 
 /// Convenience re-export so callers don't need an explicit dep on
-/// `airday-protocol` for the one struct that crosses the boundary.
-pub use airday_protocol::KdfParams;
+/// `monoplan-protocol` for the one struct that crosses the boundary.
+pub use monoplan_protocol::KdfParams;
 
 use rand::RngCore;
 

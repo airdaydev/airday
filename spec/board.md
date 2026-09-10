@@ -157,7 +157,7 @@ local override (if any)  →  saved default (if any)  →  built-in flat list
 ## Client (web) contract
 
 - Per-list view (list ⇄ board, plus the board's visible lanes) resolves as
-  above: a **local override** in `localStorage` (`airday:list-view`, a map of
+  above: a **local override** in `localStorage` (`monoplan:list-view`, a map of
   list id ⇒ encoded view) wins over the synced default. The same account may
   want a board on desktop and a flat list on a phone, or fewer lanes on the
   phone's narrower board.

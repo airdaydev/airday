@@ -5,7 +5,7 @@
 // It isn't worth a sync round-trip, and "what I reached for on this device"
 // is arguably the right scope anyway.
 
-const KEY = "airday.emoji.recents";
+const KEY = "monoplan.emoji.recents";
 
 /** Three rows of eight in the picker grid. */
 const MAX = 24;

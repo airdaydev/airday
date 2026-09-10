@@ -15,7 +15,7 @@ Reference inventory of every cryptographic primitive in use, what it does, and w
 
 **Location:** `core/src/crypto/kdf.rs` (`hkdf_expand`).
 **Purpose:** Split one master key into multiple purpose-specific subkeys without correlation between them.
-**Inputs:** master (32 bytes) + a domain-separation `info` string (`"airday/kek/v1"`, `"airday/auth/v1"`, etc.).
+**Inputs:** master (32 bytes) + a domain-separation `info` string (`"monoplan/kek/v1"`, `"monoplan/auth/v1"`, etc.).
 **Output:** 32-byte subkey.
 
 **Why it matters:** Critical that `KEK` and `auth_secret` are different bytes — the server gets `auth_secret`, must not be able to derive `KEK`. HKDF guarantees subkeys are computationally independent (one-way: holding any subkey reveals nothing about the master or other subkeys). The versioned `info` string lets us rotate derivation later without breaking old accounts (bump the suffix, keep the old path for migration).
@@ -67,7 +67,7 @@ Used for:
 **Location:** `core/src/crypto/recovery.rs`.
 **Purpose:** Encode 128 bits of entropy as 12 English words (with a 4-bit checksum) so users can write it down without transcription errors.
 
-Same scheme Bitcoin/Ethereum wallets use for seed phrases — Airday cribs the format because it's well-tested and the wordlist (BIP39 English) is chosen to minimize ambiguous similar-sounding words. Length and case-tolerance are handled by `parse_recovery_code`.
+Same scheme Bitcoin/Ethereum wallets use for seed phrases — Monoplan cribs the format because it's well-tested and the wordlist (BIP39 English) is chosen to minimize ambiguous similar-sounding words. Length and case-tolerance are handled by `parse_recovery_code`.
 
 **Note:** We use the words as a **string** input to Argon2id, not as a derivation seed (which is BIP39's traditional role in wallets). The 128 bits of entropy is what makes the recovery KEK strong; BIP39 is just the user-facing wrapper.
 

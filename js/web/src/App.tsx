@@ -8,8 +8,8 @@
 // but never ship ops to a server.
 
 import { createEffect, createSignal, onMount, Show } from "solid-js";
-import { Dek, Doc, EncryptedBlob } from "@airday/core/wasm";
-import { IdbStorage, readOrMintPeerSlot } from "@airday/core";
+import { Dek, Doc, EncryptedBlob } from "@monoplan/core/wasm";
+import { IdbStorage, readOrMintPeerSlot } from "@monoplan/core";
 import { loadPrefs } from "./prefs.ts";
 import { api } from "./api.ts";
 import { dekVault } from "./sync/dekVault.ts";
@@ -21,7 +21,7 @@ import { SessionProvider, useSession } from "./SessionContext.tsx";
 import { clearAuthPromptDismissed } from "./nav.tsx";
 
 export function App(props: {
-  /** True when this tab holds the `airday-single-tab` Web Lock — the
+  /** True when this tab holds the `monoplan-single-tab` Web Lock — the
    *  claim on peer slot 0. Without it, boot minted a random peer. */
   singleTabLockHeld: boolean;
 }) {

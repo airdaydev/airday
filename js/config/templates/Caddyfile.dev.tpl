@@ -27,8 +27,8 @@
 		resolvers 1.1.1.1
 	}
 
-	@airday host {{ env "DEV_PROXY_HOSTNAME" }}
-	handle @airday {
+	@monoplan host {{ env "DEV_PROXY_HOSTNAME" }}
+	handle @monoplan {
 		encode zstd gzip
 
 		# Vite dev server. WebSocket upgrades (HMR + /api/sync) pass through

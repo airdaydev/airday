@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use airday_core::JsonExport;
 use clap::Parser;
+use monoplan_core::JsonExport;
 
 use crate::sync::Session;
 

@@ -28,8 +28,8 @@ deploy/rendered/
 js/core/wasm/
 
 # Apple build outputs (produced by `bun run build:apple`)
-apple/AirdayCore/AirdayCoreFFI.xcframework/
-apple/AirdayCore/Sources/AirdayCore/Generated/
+apple/MonoplanCore/MonoplanCoreFFI.xcframework/
+apple/MonoplanCore/Sources/MonoplanCore/Generated/
 # SwiftPM / Xcode local state
 .build/
 **/xcuserdata/

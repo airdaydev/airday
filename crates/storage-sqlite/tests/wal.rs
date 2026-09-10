@@ -7,12 +7,12 @@
 //! "reopening at any operation boundary yields a consistent state"),
 //! and duplicate remote delivery (6, storage half).
 
-use airday_core::{
+use monoplan_core::{
     BootMeta, Dek, Doc, DocId, EngineOptions, InFlightPush, LocalSeq, LocalStorage, PushId,
     RemoteWalRow, ServerSeq, SyncEngine, boot_doc,
 };
-use airday_protocol::EncryptedBlob;
-use airday_storage_sqlite::SqliteStorage;
+use monoplan_protocol::EncryptedBlob;
+use monoplan_storage_sqlite::SqliteStorage;
 use uuid::Uuid;
 
 fn doc_id() -> DocId {

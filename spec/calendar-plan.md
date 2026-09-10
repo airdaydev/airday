@@ -186,22 +186,22 @@ Amend `spec/urls.md` with the reservation only.
 
 `spec/cli.md` Items gains:
 
-- `airday when <item_id> <YYYY-MM-DD[THH:MM] | ->`: set or clear (`-`) the
+- `monoplan when <item_id> <YYYY-MM-DD[THH:MM] | ->`: set or clear (`-`) the
   `when` register.
-- `airday deadline <item_id> <YYYY-MM-DD | ->`: set or clear the deadline.
+- `monoplan deadline <item_id> <YYYY-MM-DD | ->`: set or clear the deadline.
   The CLI has no deadline verb today; add both together.
-- `airday agenda [--days N]`: the agenda as text, one day section per line
+- `monoplan agenda [--days N]`: the agenda as text, one day section per line
   group, default 14 days plus Today's fold.
 - `ls` shows a trailing `@<when>` and `!<deadline>` when set.
 
 ## iCalendar mapping (recorded, not built)
 
-An Airday item is a `VTODO`: `DTSTART` is `when`, `DUE` is `deadline`. That
+An Monoplan item is a `VTODO`: `DTSTART` is `when`, `DUE` is `deadline`. That
 is the correct shape, but calendar displays ignore `VTODO` (Apple Calendar,
 Google Calendar; only Reminders-style apps and CalDAV task clients read them).
 Anything meant to appear on a calendar must be a `VEVENT`:
 
-| Airday | iCalendar |
+| Monoplan | iCalendar |
 |---|---|
 | `when` = `2026-07-13` | `DTSTART;VALUE=DATE:20260713`, `DTEND;VALUE=DATE:20260714` (exclusive end, added at export) |
 | `when` = `2026-07-13T14:00` | `DTSTART:20260713T140000` (floating: no `Z`, no `TZID`). Apple renders in the viewer's zone; Google pins to the calendar's zone at import. |

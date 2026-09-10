@@ -1,4 +1,4 @@
-// Single-tab gate + slot-0 peer anchor. Airday assumes one active tab
+// Single-tab gate + slot-0 peer anchor. Monoplan assumes one active tab
 // per browser (the engine + IDB op log aren't built for concurrent
 // writers), so we grab a Web Lock on mount and only render `App` once
 // the outcome is known. In prod a second tab fails to acquire the lock
@@ -8,7 +8,7 @@
 // its next mount.
 //
 // The same lock acquisition anchors the stable Loro peer id
-// (`spec/peer-id-plan.md`): holding `airday-single-tab` is the claim
+// (`spec/peer-id-plan.md`): holding `monoplan-single-tab` is the claim
 // on peer slot 0, so `lockHeld` flows into boot and decides between
 // `Doc.createWithPeer` (slot peer) and `Doc.create` (random peer).
 // This coupling is deliberate — a tab that renders without the lock
@@ -19,7 +19,7 @@ import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { useAppI18n } from "./i18n.tsx";
 import { App } from "./App.tsx";
 
-const SINGLE_TAB_LOCK_NAME = "airday-single-tab";
+const SINGLE_TAB_LOCK_NAME = "monoplan-single-tab";
 
 export function BrowserTabGate() {
   const { m } = useAppI18n();
@@ -66,7 +66,7 @@ export function BrowserTabGate() {
         when={gate() === "allowed"}
         fallback={
           <div class="empty">
-            Airday is already open in another tab.
+            Monoplan is already open in another tab.
           </div>
         }
       >

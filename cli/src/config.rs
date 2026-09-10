@@ -11,10 +11,10 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-const ROOT_DIR: &str = "airday";
+const ROOT_DIR: &str = "monoplan";
 const CONFIG_FILE: &str = "config.toml";
 const SECRETS_FILE: &str = "secrets.toml";
-const DOC_DB_FILE: &str = "airday.sqlite";
+const DOC_DB_FILE: &str = "monoplan.sqlite";
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -47,11 +47,11 @@ pub struct Secrets {
 }
 
 /// Top-level on-disk handle. Path layout under the root dir (system
-/// default `<data>/airday/`, or `AIRDAY_DATA_DIR` if set):
+/// default `<data>/monoplan/`, or `MONOPLAN_DATA_DIR` if set):
 /// ```text
 ///   <root>/config.toml    — server_url
 ///   <root>/secrets.toml   — device token + DEK ("logged in" marker)
-///   <root>/airday.sqlite  — doc cache + account identity + sync cursor
+///   <root>/monoplan.sqlite  — doc cache + account identity + sync cursor
 /// ```
 pub struct Profile {
     pub dir: PathBuf,
@@ -62,11 +62,11 @@ impl Profile {
         Self { dir }
     }
 
-    /// The single per-install profile, if one is logged in. Airday is
+    /// The single per-install profile, if one is logged in. Monoplan is
     /// single-human-user (see product thesis); one account at a time,
     /// no profile switching, so "active" collapses to "do we hold device
     /// credentials?" — i.e. does `secrets.toml` exist. Run two accounts
-    /// side-by-side in dev by pointing `AIRDAY_DATA_DIR` at distinct
+    /// side-by-side in dev by pointing `MONOPLAN_DATA_DIR` at distinct
     /// roots.
     pub fn active() -> Result<Option<Self>, ConfigError> {
         let dir = root_dir()?;
@@ -111,7 +111,7 @@ impl Profile {
         self.dir.join(DOC_DB_FILE)
     }
 
-    /// Wipe local state. Used by `airday logout`.
+    /// Wipe local state. Used by `monoplan logout`.
     pub fn purge(&self) -> Result<(), ConfigError> {
         if self.dir.exists() {
             std::fs::remove_dir_all(&self.dir)?;
@@ -121,12 +121,12 @@ impl Profile {
 }
 
 fn root_dir() -> Result<PathBuf, ConfigError> {
-    // `AIRDAY_DATA_DIR` lets tests (and adventurous users) override the
+    // `MONOPLAN_DATA_DIR` lets tests (and adventurous users) override the
     // platform-default data dir without rebuilding. Taken verbatim:
-    // the user picked the path, so we don't append `airday/` to it.
+    // the user picked the path, so we don't append `monoplan/` to it.
     // Production paths leave the env var unset, falling through to the
     // namespaced default below — `data_local_dir` is always absolute.
-    let raw = match std::env::var("AIRDAY_DATA_DIR") {
+    let raw = match std::env::var("MONOPLAN_DATA_DIR") {
         Ok(v) if !v.is_empty() => PathBuf::from(v),
         _ => dirs::data_local_dir()
             .ok_or(ConfigError::NoDataDir)?

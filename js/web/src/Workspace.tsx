@@ -107,7 +107,7 @@ const theme = createTheme();
 // a key, so a client that never overrides anything tracks the account.
 // Values are encoded `ViewSpec` strings — the same grammar the doc
 // stores, so comparing local against default is a string compare.
-const VIEW_PREF_KEY = "airday:list-view";
+const VIEW_PREF_KEY = "monoplan:list-view";
 function loadViewPrefs(): Record<string, string> {
   try {
     const raw = localStorage.getItem(VIEW_PREF_KEY);
@@ -154,7 +154,7 @@ function LaneRow(props: {
 // state is otherwise invisible, and whether that matters is a per-list
 // call (a capture list is all Backlog; a project list is not). Off by
 // default — only the lists with it on get a key.
-const STATE_PREF_KEY = "airday:list-show-state";
+const STATE_PREF_KEY = "monoplan:list-show-state";
 function loadShowStatePrefs(): Record<string, true> {
   try {
     const raw = localStorage.getItem(STATE_PREF_KEY);
@@ -172,7 +172,7 @@ function loadShowStatePrefs(): Record<string, true> {
 // preference. The Done view is a single global view, so this is one flag,
 // not a per-list map. Same local-only storage rationale as the board prefs.
 // On by default — only the "off" state is persisted (stored as "0").
-const DONE_SHOW_LIST_PREF_KEY = "airday:done-show-list";
+const DONE_SHOW_LIST_PREF_KEY = "monoplan:done-show-list";
 function loadDoneShowListPref(): boolean {
   try {
     return localStorage.getItem(DONE_SHOW_LIST_PREF_KEY) !== "0";
@@ -184,7 +184,7 @@ function loadDoneShowListPref(): boolean {
 // Same origin-list badge flag for the Focus lens, which is also a single
 // global view. Off by default — only the "on" state is persisted
 // (stored as "1").
-const FOCUS_SHOW_LIST_PREF_KEY = "airday:focus-show-list";
+const FOCUS_SHOW_LIST_PREF_KEY = "monoplan:focus-show-list";
 function loadFocusShowListPref(): boolean {
   try {
     return localStorage.getItem(FOCUS_SHOW_LIST_PREF_KEY) === "1";
@@ -196,8 +196,8 @@ function loadFocusShowListPref(): boolean {
 // Desktop "sidebar hidden" flag. Local-only chrome state like the prefs
 // above; visible is the default, so only the hidden state is persisted
 // (stored as "1"). Mobile ignores it — the drawer has its own state.
-const NAV_HIDDEN_PREF_KEY = "airday:nav-hidden";
-const SIDE_PANEL_OPEN_PREF_KEY = "airday:side-panel-open";
+const NAV_HIDDEN_PREF_KEY = "monoplan:nav-hidden";
+const SIDE_PANEL_OPEN_PREF_KEY = "monoplan:side-panel-open";
 function loadNavHiddenPref(): boolean {
   try {
     return localStorage.getItem(NAV_HIDDEN_PREF_KEY) === "1";
@@ -1359,7 +1359,7 @@ export function Workspace(props: {
 
   // Copy items to the clipboard as a markdown-ish checklist (one line
   // each, in visible order, with `[*]` marking done items) so the block
-  // round-trips back as items if the user pastes into Airday. A single
+  // round-trips back as items if the user pastes into Monoplan. A single
   // source additionally appends its notes on the following line when
   // present, since notes only matter when one item is in focus.
   const copyBlock = (sourceIds: readonly string[]): void => {
@@ -1829,7 +1829,7 @@ export function Workspace(props: {
   // close is the pane handing focus back (Escape, Enter): it carries on
   // showing the selection, so an Enter / Escape cycle there nets zero
   // history. The first run (boot) always replaces.
-  const ITEM_ENTRY = { airdayItem: true };
+  const ITEM_ENTRY = { monoplanItem: true };
   let prevUrlState: { viewKey: string; item: string | null } | undefined;
   createEffect(() => {
     const v = view();
@@ -1846,7 +1846,7 @@ export function Workspace(props: {
     const viewChanged = prev.viewKey !== cur.viewKey;
     const opened = prev.item === null && item !== null;
     const closed = prev.item !== null && item === null;
-    if (closed && !viewChanged && history.state?.airdayItem === true) {
+    if (closed && !viewChanged && history.state?.monoplanItem === true) {
       // The popstate handler sees the view we're already on and leaves
       // it (and the selection) alone.
       history.back();

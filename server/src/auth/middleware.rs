@@ -1,5 +1,5 @@
 //! `DeviceAuth` extractor: validates a device token presented via
-//! `Authorization: Bearer <hex>` (CLI) or the `airday_device` cookie
+//! `Authorization: Bearer <hex>` (CLI) or the `monoplan_device` cookie
 //! (web) against the `devices` table and surfaces `(account_id,
 //! device_id, primary_doc_id)` to handlers. The doc id is picked up
 //! at the same JOIN as the device lookup so the WS path doesn't need

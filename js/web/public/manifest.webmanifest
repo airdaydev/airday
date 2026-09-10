@@ -1,6 +1,6 @@
 {
-  "name": "Airday",
-  "short_name": "Airday",
+  "name": "Monoplan",
+  "short_name": "Monoplan",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

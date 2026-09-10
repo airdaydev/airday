@@ -224,8 +224,8 @@ appear twice. `bun run build:wasm` from the workspace root.
 Multi-device proof spans CLI ↔ web, so CLI needs parity. Add FFI wrappers and CLI
 commands per `spec/cli.md` conventions, e.g.:
 
-- `airday focus` — list the Focus view
-- `airday focus add <item>` / `airday focus rm <item>` / `airday focus mv <item> <pos>`
+- `monoplan focus` — list the Focus view
+- `monoplan focus add <item>` / `monoplan focus rm <item>` / `monoplan focus mv <item> <pos>`
 
 ### B.11 Web UI (`js/web`)
 
@@ -293,7 +293,7 @@ the server. No wire-version bump, no server work.
   regenerated. **Watch-out for Phase 3:** the web store still reads `settings.mainName` /
   `settingsChanged.mainName` and calls `setMainName` — those JS call sites now break until
   Phase 3 flips them to `inboxName` / `setInboxName` (already on the Phase 3 list).
-  Note: `cargo check -p airday-core-web` fails off-target (E0308, pre-existing wasm-only
+  Note: `cargo check -p monoplan-core-web` fails off-target (E0308, pre-existing wasm-only
   crate) — build it only via `bun run build:wasm`.
 - ✅ **Phase 3 — Web. DONE, all JS tests green.** i18n, nav Focus entry, Focus lens
   render, add-to-focus toggles, store/event wiring, and the `main`→`inbox` literal sweep
@@ -304,10 +304,10 @@ the server. No wire-version bump, no server work.
   free. In-browser verification was done by Daniel (single context); the **two-tab
   convergence + CLI↔web fingerprint parity checks move to Phase 5**, since CLI focus
   parity doesn't exist until Phase 4.
-- ✅ **Phase 4 — CLI/FFI. DONE.** `airday focus` / `focus add` / `rm` / `mv` commands
+- ✅ **Phase 4 — CLI/FFI. DONE.** `monoplan focus` / `focus add` / `rm` / `mv` commands
   (`cli/src/commands/focus.rs`, wired in `commands/mod.rs`); FFI wrappers
   (`add_to_focus` / `remove_from_focus` / `move_in_focus` / `focus_view` on
-  `AirdayStore`). CLI↔web convergence + fingerprint-parity integration test
+  `MonoplanStore`). CLI↔web convergence + fingerprint-parity integration test
   (`focus_curation_converges_across_devices` in `sync_smoke.rs`). Details in "Progress
   & handoff" (Phase 4 section).
 - **Phase 5 — Verify (DONE) + cutover (PENDING Daniel).** ✅ Multi-device convergence,
@@ -397,7 +397,7 @@ in `js/web`.
   verification is deferred to Phase 5 (needs CLI focus from Phase 4).
 
 **Phase 4 — CLI/FFI (done).**
-- **CLI (`cli/src/commands/focus.rs`, new):** `airday focus` (list, default action),
+- **CLI (`cli/src/commands/focus.rs`, new):** `monoplan focus` (list, default action),
   `focus add <item> [pos]`, `focus rm <item>`, `focus mv <item> <pos>`. Bare `focus`
   lists the view via `Option<FocusCmd>` (None ⇒ list) — same optional-subcommand shape
   clap gives `lists`. **Positions on the CLI are 1-based** (matches the numbered listing
@@ -408,7 +408,7 @@ in `js/web`.
   `commands/mod.rs` (`Cmd::Focus` between `Edit` and `Lists`).
 - **FFI (`core/ffi/src/lib.rs`):** added `add_to_focus(item, index: Option<u32>)`
   (None ⇒ append), `remove_from_focus(item)`, `move_in_focus(item, index: u32)`,
-  `focus_view() -> Vec<ItemView>` to `AirdayStore`, mirroring the existing
+  `focus_view() -> Vec<ItemView>` to `MonoplanStore`, mirroring the existing
   add_item/set_item_done pattern (lock → mutate → `persist`). Index is 0-based across the
   boundary (the CLI's 1-based sugar is CLI-only).
 - **Integration test (`cli/tests/sync_smoke.rs`):**
@@ -416,14 +416,14 @@ in `js/web`.
   and observes the identical focus order + matching `fingerprint()`; then A marks a
   focused item Done (auto-removes the ref) and un-dones it (does **not** reappear), and B
   reconverges with matching fingerprint. This is the CLI↔web parity check the plan called
-  for (the CLI uses the same `airday-core` that compiles to the web wasm).
+  for (the CLI uses the same `monoplan-core` that compiles to the web wasm).
 - **Pre-existing bug fixed in passing:** the Phase 1 `main`→`inbox` rename left
   `core/ffi/src/lib.rs`'s `persists_across_reopen` test seeding items into a now-unreserved
   `"main"` list (`add_item` → `list not found: main`); it was never run in Phases 1–3
-  (`cargo test -p airday-ffi` wasn't in the loop). Flipped the test's `"main"` → `"inbox"`
+  (`cargo test -p monoplan-ffi` wasn't in the loop). Flipped the test's `"main"` → `"inbox"`
   and corrected the stale `all_lists` doc comment. **Watch-out:** `cargo test --workspace`
-  still fails to *compile* `airday-core-web` off-target (E0308, pre-existing wasm-only
-  crate, Phase 2 note) — run `cargo test --workspace --exclude airday-core-web` (21 test
+  still fails to *compile* `monoplan-core-web` off-target (E0308, pre-existing wasm-only
+  crate, Phase 2 note) — run `cargo test --workspace --exclude monoplan-core-web` (21 test
   binaries green) or build web via `bun run build:wasm`.
 
 **Phase 5 — Verify (done); cutover pending Daniel.**

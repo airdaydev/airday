@@ -133,20 +133,20 @@ async function parseEnvFile(path: string): Promise<Record<string, string>> {
 
 function buildDevEnv(secrets: Record<string, string>) {
   const env: Record<string, string | undefined> = { ...Bun.env, ...secrets };
-  env.AIRDAY_BIND = env.AIRDAY_BIND || "127.0.0.1:8000";
-  env.AIRDAY_LOG_LEVEL = env.AIRDAY_LOG_LEVEL || "info";
-  env.AIRDAY_SECURE_COOKIES = env.AIRDAY_SECURE_COOKIES || "false";
+  env.MONOPLAN_BIND = env.MONOPLAN_BIND || "127.0.0.1:8000";
+  env.MONOPLAN_LOG_LEVEL = env.MONOPLAN_LOG_LEVEL || "info";
+  env.MONOPLAN_SECURE_COOKIES = env.MONOPLAN_SECURE_COOKIES || "false";
   // Split bind into host/port so process-compose readiness probes can
   // target them individually.
-  const colon = env.AIRDAY_BIND.lastIndexOf(":");
-  if (colon < 0) throw new Error(`AIRDAY_BIND must be host:port, got ${env.AIRDAY_BIND}`);
-  env.AIRDAY_HOST = env.AIRDAY_BIND.slice(0, colon);
-  env.AIRDAY_PORT = env.AIRDAY_BIND.slice(colon + 1);
+  const colon = env.MONOPLAN_BIND.lastIndexOf(":");
+  if (colon < 0) throw new Error(`MONOPLAN_BIND must be host:port, got ${env.MONOPLAN_BIND}`);
+  env.MONOPLAN_HOST = env.MONOPLAN_BIND.slice(0, colon);
+  env.MONOPLAN_PORT = env.MONOPLAN_BIND.slice(colon + 1);
   // Pin the dev DB inside the gitignored `local/` dir so all dev
   // artifacts live next to each other and `bun run wipe` has a
   // hardcoded, repo-scoped target. Resolved relative to the server's
   // cwd, which is the repo root under `bun run server`.
-  env.AIRDAY_DB_PATH = env.AIRDAY_DB_PATH || "local/airday.sqlite";
+  env.MONOPLAN_DB_PATH = env.MONOPLAN_DB_PATH || "local/monoplan.sqlite";
   // Dev TLS reverse proxy. WebCrypto needs a secure context, so the dev
   // stack runs behind Caddy by default. Override DEV_PROXY_HOSTNAME in
   // js/config/.env to point at your own mesh A record.
@@ -165,12 +165,12 @@ function buildDeployEnv(secrets: Record<string, string>) {
   const env: Record<string, string | undefined> = { ...Bun.env, ...secrets };
 
   // Loopback only — Caddy reverse-proxies the public hostname.
-  env.AIRDAY_BIND = env.AIRDAY_BIND || "127.0.0.1:8000";
-  env.AIRDAY_DB_PATH = env.AIRDAY_DB_PATH || "/var/lib/airday/airday.sqlite";
-  env.AIRDAY_LOG_LEVEL = env.AIRDAY_LOG_LEVEL || "info";
-  env.AIRDAY_SECURE_COOKIES = env.AIRDAY_SECURE_COOKIES || "true";
+  env.MONOPLAN_BIND = env.MONOPLAN_BIND || "127.0.0.1:8000";
+  env.MONOPLAN_DB_PATH = env.MONOPLAN_DB_PATH || "/var/lib/monoplan/monoplan.sqlite";
+  env.MONOPLAN_LOG_LEVEL = env.MONOPLAN_LOG_LEVEL || "info";
+  env.MONOPLAN_SECURE_COOKIES = env.MONOPLAN_SECURE_COOKIES || "true";
 
-  for (const key of ["AIRDAY_HOST", "CADDY_EMAIL"]) {
+  for (const key of ["MONOPLAN_HOST", "CADDY_EMAIL"]) {
     if (!env[key]) throw new Error(`Missing required variable: ${key}`);
   }
 

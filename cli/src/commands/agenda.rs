@@ -1,13 +1,13 @@
-//! `airday agenda`: Open items by day, Today first with overdue
+//! `monoplan agenda`: Open items by day, Today first with overdue
 //! deadlines and slipped planned dates folded in, then the coming days
 //! (`spec/calendar-plan.md` "Agenda").
 //!
 //! Placement, tone, and ordering are pure functions of the item views
 //! and a `today` stamp, so they are unit-tested here without a doc.
 
-use airday_core::ItemView;
 use chrono::{Datelike, Days, Local, NaiveDate};
 use clap::Parser;
+use monoplan_core::ItemView;
 use serde::Serialize;
 
 use crate::sync::Session;
@@ -265,7 +265,7 @@ fn row_json(row: &AgendaRow) -> RowJson<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use airday_core::{LIST_INBOX, WorkflowState};
+    use monoplan_core::{LIST_INBOX, WorkflowState};
 
     fn item(id: &str, when: Option<&str>, deadline: Option<&str>, created_at: i64) -> ItemView {
         ItemView {

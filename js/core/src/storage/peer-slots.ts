@@ -6,7 +6,7 @@
 // is minted once, then read forever. The mapping alone is NOT the
 // claim: minting under a slot's peer id is only safe while the caller
 // holds the Web Lock that owns that slot (today: the single-tab gate's
-// `airday-single-tab` lock owns slot 0). No lock held → don't call
+// `monoplan-single-tab` lock owns slot 0). No lock held → don't call
 // this; boot with a random peer instead. Two live docs on one peer
 // mint duplicate `(peer, counter)` op ids — unrecoverable corruption.
 //
@@ -14,7 +14,7 @@
 // transaction, so even a racing pair of calls converges on a single
 // minted id (IDB serialises readwrite transactions per store).
 
-import { openAirdayDb, type PeerSlotRow, STORE_PEER_SLOTS } from "./web-db.ts";
+import { openMonoplanDb, type PeerSlotRow, STORE_PEER_SLOTS } from "./web-db.ts";
 
 /** Loro reserves `u64::MAX` (`set_peer_id` rejects it). */
 const RESERVED_PEER = 0xffffffffffffffffn;
@@ -37,7 +37,7 @@ function mintPeerId(): bigint {
  * module header.
  */
 export async function readOrMintPeerSlot(slot: number): Promise<bigint> {
-  const db = await openAirdayDb();
+  const db = await openMonoplanDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_PEER_SLOTS, "readwrite");
     const store = tx.objectStore(STORE_PEER_SLOTS);

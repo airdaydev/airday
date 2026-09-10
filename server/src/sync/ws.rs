@@ -7,14 +7,14 @@
 //!
 use std::time::Instant;
 
-use airday_protocol::{
-    ClientFrame, EncryptedBlob, Hello, HelloAck, HelloRejected, PROTOCOL_VERSION, PushBlob,
-    ServerFrame,
-};
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Extension, Query, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
+use monoplan_protocol::{
+    ClientFrame, EncryptedBlob, Hello, HelloAck, HelloRejected, PROTOCOL_VERSION, PushBlob,
+    ServerFrame,
+};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tracing::Instrument;
@@ -36,7 +36,7 @@ use super::queries;
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// `?token=...` is a non-browser fallback (e.g. test clients that can't
-/// set headers on WS upgrades). Browsers use the `airday_device` cookie,
+/// set headers on WS upgrades). Browsers use the `monoplan_device` cookie,
 /// which the user-agent attaches to the upgrade request automatically;
 /// CLI uses the `Authorization` header.
 #[derive(Deserialize)]

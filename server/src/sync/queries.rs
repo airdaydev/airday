@@ -7,7 +7,7 @@
 //! need to re-key the data plane. Device frontiers stay per-device (which
 //! is also per-doc while 1:1 holds).
 
-use airday_protocol::{EncryptedBlob, PushAck, PushBlob, StoredBlob};
+use monoplan_protocol::{EncryptedBlob, PushAck, PushBlob, StoredBlob};
 use rusqlite::{OptionalExtension, params};
 use uuid::Uuid;
 

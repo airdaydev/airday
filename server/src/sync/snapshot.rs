@@ -10,7 +10,7 @@ use uuid::Uuid;
 // catch-up (op replay after snapshot import) short and lets compaction
 // advance without churning full-doc snapshots. Operators override via
 // `snapshot_threshold_blobs` in the server config (or
-// `AIRDAY_SNAPSHOT_THRESHOLD_BLOBS`); JS e2e tests drop it to a handful
+// `MONOPLAN_SNAPSHOT_THRESHOLD_BLOBS`); JS e2e tests drop it to a handful
 // so the snapshot path runs in seconds.
 // Timeout after 5 minutes
 pub const SNAPSHOT_THRESHOLD_BLOBS: u64 = 500;

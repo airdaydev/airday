@@ -1,6 +1,6 @@
 ## Product Thesis
 
-Airday is a low-friction, FOSS, single-human-user/small-team, E2EE, multi-device capture/clarify/organise tool for ideas, intents, goals, projects. It is flexible but built with particular regard to improving users' productivity & focus.
+Monoplan is a low-friction, FOSS, single-human-user/small-team, E2EE, multi-device capture/clarify/organise tool for ideas, intents, goals, projects. It is flexible but built with particular regard to improving users' productivity & focus.
 
 Workflow: a reserved primary capture list ("Inbox", id `inbox`), any number of user-created lists (each viewable as a fixed Backlog/Live/Done board), and a bin. Items move between lists, transition through the lifecycle (Backlog, Live, Done, Binned), can be restored, and deleted.
 
@@ -8,7 +8,7 @@ Workflow: a reserved primary capture list ("Inbox", id `inbox`), any number of u
 
 - **Rust core** (`core/`) — Loro CRDT, E2EE, sync engine. Compiles to native (CLI, server) and WASM (web) via `core/web/`.
 - **Rust server** (`server/`) — sqlite-backed, sequenced encrypted-blob store + auth + WS relay. The server is *dumb*: it cannot read op contents, cannot run a Loro doc, cannot validate semantics. Its job is auth, ordering, durability, frontier tracking, snapshot orchestration. TODO: Compaction may put an asterisk on "DUMB".
-- **CLI** (`cli/`) — Airday CLI
+- **CLI** (`cli/`) — Monoplan CLI
 - **Web** (`js/web/`, consuming `core/web/` wasm via `js/core/`) — browser client; multi-device proof spans CLI ↔ web.
 - **iOS / Android / native macOS** — future clients
 
@@ -55,7 +55,7 @@ Migrations: while pre-release, keep exactly one migration file per database (`00
 Root `package.json` is a Bun workspace (`js/*`) with thin script wrappers — there is no JS to build, the scripts just front cargo and the config generator:
 
 - `bun run config` — render `local/server.toml` from `js/config/templates/` (see `js/config/README.md`); `local/` holds gitignored dev artifacts
-- `bun run server` / `bun run cli` — `cargo run -p airday-server --` / `cargo run -p airday --` (debug build; faster compile, slower sync on real-sized docs). Pass flags after the script name (e.g. `bun run server -- --bind 0.0.0.0:8000`). `bun run cli:prod` for the release build when you need real sync perf.
+- `bun run server` / `bun run cli` — `cargo run -p monoplan-server --` / `cargo run -p monoplan --` (debug build; faster compile, slower sync on real-sized docs). Pass flags after the script name (e.g. `bun run server -- --bind 0.0.0.0:8000`). `bun run cli:prod` for the release build when you need real sync perf.
 - `bun run build` / `bun run test` / `bun run fmt` / `bun run lint` — cargo equivalents
 - `bun run build:wasm` — `wasm-pack build core/`. Always use this from the workspace root; bare `cargo build --target wasm32-...` will try to build `server`/`cli` for wasm and fail.
 - `bun run typecheck` — `tsc --noEmit -p js/config`

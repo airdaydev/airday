@@ -369,7 +369,7 @@ Whether the nav shows an open-item count (all Open states) beside each list is g
 
 ## Built-in lists
 
-Airday has one reserved primary capture list:
+Monoplan has one reserved primary capture list:
 
 - `inbox` — rendered as "Inbox". This id is reserved and addressable by items,
   but it is not stored as a `ListMeta` row in the `lists` MovableList. Its

@@ -14,8 +14,8 @@
 // derive lazily from `itemsById` (timestamp sorts), not CRDT order.
 // See spec/list-perf-plan.md.
 
-import type { AppEventJs, SyncEngine } from "@airday/core/wasm";
-import { ItemLifecycle } from "@airday/core/wasm";
+import type { AppEventJs, SyncEngine } from "@monoplan/core/wasm";
+import { ItemLifecycle } from "@monoplan/core/wasm";
 import type { NotesDeltaOp } from "../notesDelta.ts";
 import { batch, createSignal, type Accessor } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";

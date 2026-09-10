@@ -1,5 +1,5 @@
 {
-  "name": "@airday/config",
+  "name": "@monoplan/config",
   "private": true,
   "type": "module",
   "scripts": {

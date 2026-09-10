@@ -1,14 +1,14 @@
 import XCTest
-@testable import AirdayCore
+@testable import MonoplanCore
 
-final class AirdayCoreTests: XCTestCase {
+final class MonoplanCoreTests: XCTestCase {
     /// End-to-end smoke test of the FFI boundary: open a store with a
     /// generated DEK, mutate it, read views back — then close and reopen
     /// and assert the state replayed from disk (the acceptance gate for
     /// spec/swift-ffi-plan.md).
     func testCaptureReadAndReopen() throws {
         let dir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("airday-smoke-\(UUID().uuidString)")
+            .appendingPathComponent("monoplan-smoke-\(UUID().uuidString)")
         try FileManager.default.createDirectory(
             atPath: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(atPath: dir) }
@@ -21,7 +21,7 @@ final class AirdayCoreTests: XCTestCase {
 
         // First handle: capture some work.
         do {
-            let store = try AirdayStore.open(dir: dir, dek: dek)
+            let store = try MonoplanStore.open(dir: dir, dek: dek)
             _ = try store.addItem(listId: "main", text: "first")
             doneId = try store.addItem(listId: "main", text: "second")
             try store.setItemDone(itemId: doneId, done: true)
@@ -36,7 +36,7 @@ final class AirdayCoreTests: XCTestCase {
         }
 
         // Second handle over the same dir + DEK: state must replay.
-        let store = try AirdayStore.open(dir: dir, dek: dek)
+        let store = try MonoplanStore.open(dir: dir, dek: dek)
         let main = store.itemsInList(listId: "main")
         XCTAssertEqual(main.map(\.text), ["first", "second"],
                        "items replay from disk on reopen")
@@ -54,18 +54,18 @@ final class AirdayCoreTests: XCTestCase {
     /// so booting surfaces an error rather than silently losing data.
     func testWrongKeyFailsToBoot() throws {
         let dir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("airday-wrongkey-\(UUID().uuidString)")
+            .appendingPathComponent("monoplan-wrongkey-\(UUID().uuidString)")
         try FileManager.default.createDirectory(
             atPath: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(atPath: dir) }
 
         let dek = generateDek()
         do {
-            let store = try AirdayStore.open(dir: dir, dek: dek)
+            let store = try MonoplanStore.open(dir: dir, dek: dek)
             _ = try store.addItem(listId: "main", text: "secret")
         }
 
         let wrongDek = generateDek()
-        XCTAssertThrowsError(try AirdayStore.open(dir: dir, dek: wrongDek))
+        XCTAssertThrowsError(try MonoplanStore.open(dir: dir, dek: wrongDek))
     }
 }

@@ -1,12 +1,12 @@
-//! wasm-bindgen facade over `airday-core`.
+//! wasm-bindgen facade over `monoplan-core`.
 //!
-//! Surfaces enough of `airday-core` for a JS host to (a) round-trip a
+//! Surfaces enough of `monoplan-core` for a JS host to (a) round-trip a
 //! `Doc` through a storage adapter and (b) drive the sans-IO
 //! `SyncEngine` from a browser-owned `WebSocket`, (c) password/recovery derivation.
 
 use wasm_bindgen::prelude::*;
 
-use airday_core::{
+use monoplan_core::{
     AEAD_NONCE_LEN, AppEvent as CoreAppEvent, BootState as CoreBootState, Dek as CoreDek,
     Doc as CoreDoc, DocId as CoreDocId, EngineOptions as CoreEngineOptions, Event as CoreEvent,
     ImportSummary as CoreImportSummary, InFlightPush as CoreInFlightPush,
@@ -16,7 +16,7 @@ use airday_core::{
     SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek, derive_password_master,
     derive_recovery_master, generate_recovery_code, kek_from_master, parse_recovery_code,
 };
-use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
+use monoplan_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
 
 /// Install the panic hook so Rust panics surface as readable JS errors
 /// in the console rather than `RuntimeError: unreachable`.
@@ -37,7 +37,7 @@ fn js_err<E: std::fmt::Display>(e: E) -> JsError {
 // ---------- lifecycle ----------
 
 /// Resolved item lifecycle (`spec/data-model.md` "Lifecycle"), mirrored
-/// from `airday_core::ItemLifecycle` for the wasm boundary: the five
+/// from `monoplan_core::ItemLifecycle` for the wasm boundary: the five
 /// workflow states plus the orthogonal `Binned` mask. Passed to
 /// `setItemLifecycle` / `setItemsLifecycle`; the board's lane-drop
 /// primitive.
@@ -68,7 +68,7 @@ impl From<ItemLifecycle> for CoreItemLifecycle {
 /// Resolve a JS-side lifecycle argument to the open workflow state a
 /// direct capture requires (`spec/board.md` "Capture"): Done and Binned
 /// are not capture lanes.
-fn open_state_arg(l: ItemLifecycle) -> Result<airday_core::WorkflowState, JsError> {
+fn open_state_arg(l: ItemLifecycle) -> Result<monoplan_core::WorkflowState, JsError> {
     CoreItemLifecycle::from(l)
         .workflow_state()
         .filter(|s| s.is_open())
@@ -308,7 +308,7 @@ impl Doc {
     }
 
     /// Set (`icon` = emoji grapheme) or clear (`icon` = "") a list's
-    /// display icon. See `airday_core::Doc::set_list_icon`.
+    /// display icon. See `monoplan_core::Doc::set_list_icon`.
     #[wasm_bindgen(js_name = setListIcon)]
     pub fn set_list_icon(&self, list_id: &str, icon: &str) -> Result<(), JsError> {
         self.inner.set_list_icon(list_id, icon).map_err(js_err)
@@ -316,7 +316,7 @@ impl Doc {
 
     /// Save (`view` = `"list"` / `"board"` / `"board:<lanes>"`) or clear
     /// (`view` = "") a list's default view. Accepts the reserved `inbox`
-    /// too. See `airday_core::Doc::set_default_view`.
+    /// too. See `monoplan_core::Doc::set_default_view`.
     #[wasm_bindgen(js_name = setDefaultView)]
     pub fn set_default_view(&self, list_id: &str, view: &str) -> Result<(), JsError> {
         self.inner
@@ -331,7 +331,7 @@ impl Doc {
 
     /// Archive (`true`) or unarchive (`false`) a user-created list.
     /// Metadata-only; refuses for `inbox`. See
-    /// `airday_core::Doc::set_list_archived`.
+    /// `monoplan_core::Doc::set_list_archived`.
     #[wasm_bindgen(js_name = setListArchived)]
     pub fn set_list_archived(&self, list_id: &str, archived: bool) -> Result<(), JsError> {
         self.inner
@@ -589,7 +589,7 @@ impl Doc {
     }
 
     /// Plaintext full-state Loro snapshot — for user-driven backup
-    /// (`airday.bin`). Loro's `Doc::load`-equivalent reconstructs
+    /// (`monoplan.bin`). Loro's `Doc::load`-equivalent reconstructs
     /// identical state from this blob.
     #[wasm_bindgen(js_name = exportSnapshot)]
     pub fn export_snapshot(&self) -> Result<Vec<u8>, JsError> {
@@ -1640,7 +1640,7 @@ impl SyncEngine {
     }
 
     /// Set (`icon` = emoji grapheme) or clear (`icon` = "") a list's
-    /// display icon. See `airday_core::Doc::set_list_icon`.
+    /// display icon. See `monoplan_core::Doc::set_list_icon`.
     #[wasm_bindgen(js_name = setListIcon)]
     pub fn set_list_icon(&self, list_id: &str, icon: &str) -> Result<(), JsError> {
         self.inner
@@ -1651,7 +1651,7 @@ impl SyncEngine {
 
     /// Save (`view` = `"list"` / `"board"` / `"board:<lanes>"`) or clear
     /// (`view` = "") a list's default view. Accepts the reserved `inbox`
-    /// too. See `airday_core::Doc::set_default_view`.
+    /// too. See `monoplan_core::Doc::set_default_view`.
     #[wasm_bindgen(js_name = setDefaultView)]
     pub fn set_default_view(&self, list_id: &str, view: &str) -> Result<(), JsError> {
         self.inner
@@ -1670,7 +1670,7 @@ impl SyncEngine {
 
     /// Archive (`true`) or unarchive (`false`) a user-created list.
     /// Metadata-only; refuses for `inbox`. See
-    /// `airday_core::Doc::set_list_archived`.
+    /// `monoplan_core::Doc::set_list_archived`.
     #[wasm_bindgen(js_name = setListArchived)]
     pub fn set_list_archived(&self, list_id: &str, archived: bool) -> Result<(), JsError> {
         self.inner
@@ -1892,7 +1892,7 @@ impl SyncEngine {
 
 // ---------- EngineEvent ----------
 
-/// Flat JS-friendly view of `airday_core::Event`. The host switches on
+/// Flat JS-friendly view of `monoplan_core::Event`. The host switches on
 /// `kind` and reads the payload-specific getter — exactly one of
 /// `online`, `seq`, `message` will be set per event (or none, for
 /// payload-less variants).
@@ -1966,7 +1966,7 @@ impl From<CoreEvent> for EngineEvent {
 
 // ---------- AppEventJs ----------
 
-/// Flat JS-friendly view of `airday_core::AppEvent`. The host switches
+/// Flat JS-friendly view of `monoplan_core::AppEvent`. The host switches
 /// on `kind` and reads only the fields documented for that variant —
 /// every other getter returns `undefined`.
 ///
@@ -2042,7 +2042,7 @@ pub struct AppEventJs {
     /// Position within the owning list's *Open* projection (the four
     /// open workflow states; Done/binned excluded). Present on item
     /// events whenever the item is open after the change; `undefined`
-    /// otherwise. See `airday_core::AppEvent` for per-variant semantics.
+    /// otherwise. See `monoplan_core::AppEvent` for per-variant semantics.
     open_index: Option<usize>,
 }
 
@@ -2344,16 +2344,16 @@ impl From<CoreAppEvent> for AppEventJs {
 /// the saved default, anything else must be a known encoded
 /// [`DefaultView`]. An unknown string is an error rather than a silent
 /// clear, so a caller typo surfaces instead of wiping the default.
-fn parse_default_view_arg(view: &str) -> Result<Option<airday_core::DefaultView>, JsError> {
+fn parse_default_view_arg(view: &str) -> Result<Option<monoplan_core::DefaultView>, JsError> {
     if view.is_empty() {
         return Ok(None);
     }
-    airday_core::DefaultView::parse(view)
+    monoplan_core::DefaultView::parse(view)
         .map(Some)
         .ok_or_else(|| JsError::new(&format!("unknown default view: {view}")))
 }
 
-fn list_to_json(l: &airday_core::ListView) -> String {
+fn list_to_json(l: &monoplan_core::ListView) -> String {
     let mut s = format!(
         "{{\"id\":{},\"name\":{}",
         json_string(&l.id),
@@ -2374,7 +2374,7 @@ fn list_to_json(l: &airday_core::ListView) -> String {
     s
 }
 
-fn settings_to_json(s: &airday_core::SettingsView) -> String {
+fn settings_to_json(s: &monoplan_core::SettingsView) -> String {
     let mut out = format!("{{\"showListCounts\":{}", s.show_list_counts);
     if let Some(v) = &s.inbox_view {
         out.push_str(",\"inboxView\":");
@@ -2384,7 +2384,7 @@ fn settings_to_json(s: &airday_core::SettingsView) -> String {
     out
 }
 
-fn lists_to_json(lists: &[airday_core::ListView]) -> String {
+fn lists_to_json(lists: &[monoplan_core::ListView]) -> String {
     let mut s = String::from("[");
     for (i, l) in lists.iter().enumerate() {
         if i > 0 {
@@ -2396,7 +2396,7 @@ fn lists_to_json(lists: &[airday_core::ListView]) -> String {
     s
 }
 
-fn item_to_json(it: &airday_core::ItemView) -> String {
+fn item_to_json(it: &monoplan_core::ItemView) -> String {
     let mut s = format!(
         "{{\"id\":{},\"text\":{},\"notes\":{},\"listId\":{},\"createdAt\":{},\"state\":{},\"lifecycleAt\":{}",
         json_string(&it.id),
@@ -2428,7 +2428,7 @@ fn item_to_json(it: &airday_core::ItemView) -> String {
     s
 }
 
-fn items_to_json(items: &[airday_core::ItemView]) -> String {
+fn items_to_json(items: &[monoplan_core::ItemView]) -> String {
     let mut s = String::from("[");
     for (i, it) in items.iter().enumerate() {
         if i > 0 {

@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use airday_protocol::{ServerFrame, StoredBlob};
+use monoplan_protocol::{ServerFrame, StoredBlob};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 

@@ -1,13 +1,13 @@
 //
-//  AirdayUITests.swift
-//  AirdayUITests
+//  MonoplanUITests.swift
+//  MonoplanUITests
 //
 //  Created by Daniel Gormly on 5/5/2026.
 //
 
 import XCTest
 
-final class AirdayUITests: XCTestCase {
+final class MonoplanUITests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.

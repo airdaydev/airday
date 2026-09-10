@@ -35,151 +35,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "airday"
-version = "0.0.1-alpha.12"
-dependencies = [
- "airday-core",
- "airday-protocol",
- "airday-server",
- "airday-storage-sqlite",
- "anyhow",
- "axum",
- "chrono",
- "clap",
- "dialoguer",
- "dirs",
- "futures-util",
- "gethostname",
- "hex",
- "http",
- "rand 0.8.8",
- "reqwest",
- "rmp-serde",
- "rusqlite",
- "serde",
- "serde_bytes",
- "serde_json",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tokio-tungstenite 0.24.0",
- "toml 0.8.23",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "airday-core"
-version = "0.0.1-alpha.12"
-dependencies = [
- "airday-protocol",
- "argon2",
- "bip39",
- "chacha20poly1305",
- "hex",
- "hkdf",
- "js-sys",
- "loro",
- "rand 0.8.8",
- "rand_core 0.6.4",
- "rmp-serde",
- "serde",
- "serde_bytes",
- "serde_json",
- "sha2 0.10.9",
- "thiserror 1.0.69",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "airday-core-web"
-version = "0.0.1-alpha.12"
-dependencies = [
- "airday-core",
- "airday-protocol",
- "console_error_panic_hook",
- "getrandom 0.2.17",
- "hex",
- "js-sys",
- "serde_json",
- "uuid",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "airday-ffi"
-version = "0.0.1-alpha.12"
-dependencies = [
- "airday-core",
- "airday-storage-sqlite",
- "tempfile",
- "thiserror 1.0.69",
- "uniffi",
- "uuid",
-]
-
-[[package]]
-name = "airday-protocol"
-version = "0.0.1-alpha.12"
-dependencies = [
- "serde",
- "serde_bytes",
- "uuid",
-]
-
-[[package]]
-name = "airday-server"
-version = "0.0.1-alpha.12"
-dependencies = [
- "airday-core",
- "airday-protocol",
- "anyhow",
- "argon2",
- "axum",
- "bytes",
- "clap",
- "dirs",
- "futures-util",
- "hex",
- "http",
- "rand 0.8.8",
- "reqwest",
- "rmp-serde",
- "rusqlite",
- "rust-embed",
- "serde",
- "serde_bytes",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tokio-rusqlite",
- "tokio-tungstenite 0.24.0",
- "toml 0.8.23",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "airday-storage-sqlite"
-version = "0.0.1-alpha.12"
-dependencies = [
- "airday-core",
- "airday-protocol",
- "rusqlite",
- "tempfile",
- "thiserror 1.0.69",
- "uuid",
-]
-
-[[package]]
 name = "android_system_properties"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1941,6 +1796,151 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "monoplan"
+version = "0.0.1-alpha.12"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "clap",
+ "dialoguer",
+ "dirs",
+ "futures-util",
+ "gethostname",
+ "hex",
+ "http",
+ "monoplan-core",
+ "monoplan-protocol",
+ "monoplan-server",
+ "monoplan-storage-sqlite",
+ "rand 0.8.8",
+ "reqwest",
+ "rmp-serde",
+ "rusqlite",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-tungstenite 0.24.0",
+ "toml 0.8.23",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "monoplan-core"
+version = "0.0.1-alpha.12"
+dependencies = [
+ "argon2",
+ "bip39",
+ "chacha20poly1305",
+ "hex",
+ "hkdf",
+ "js-sys",
+ "loro",
+ "monoplan-protocol",
+ "rand 0.8.8",
+ "rand_core 0.6.4",
+ "rmp-serde",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "monoplan-core-web"
+version = "0.0.1-alpha.12"
+dependencies = [
+ "console_error_panic_hook",
+ "getrandom 0.2.17",
+ "hex",
+ "js-sys",
+ "monoplan-core",
+ "monoplan-protocol",
+ "serde_json",
+ "uuid",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "monoplan-ffi"
+version = "0.0.1-alpha.12"
+dependencies = [
+ "monoplan-core",
+ "monoplan-storage-sqlite",
+ "tempfile",
+ "thiserror 1.0.69",
+ "uniffi",
+ "uuid",
+]
+
+[[package]]
+name = "monoplan-protocol"
+version = "0.0.1-alpha.12"
+dependencies = [
+ "serde",
+ "serde_bytes",
+ "uuid",
+]
+
+[[package]]
+name = "monoplan-server"
+version = "0.0.1-alpha.12"
+dependencies = [
+ "anyhow",
+ "argon2",
+ "axum",
+ "bytes",
+ "clap",
+ "dirs",
+ "futures-util",
+ "hex",
+ "http",
+ "monoplan-core",
+ "monoplan-protocol",
+ "rand 0.8.8",
+ "reqwest",
+ "rmp-serde",
+ "rusqlite",
+ "rust-embed",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-rusqlite",
+ "tokio-tungstenite 0.24.0",
+ "toml 0.8.23",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "monoplan-storage-sqlite"
+version = "0.0.1-alpha.12"
+dependencies = [
+ "monoplan-core",
+ "monoplan-protocol",
+ "rusqlite",
+ "tempfile",
+ "thiserror 1.0.69",
+ "uuid",
 ]
 
 [[package]]

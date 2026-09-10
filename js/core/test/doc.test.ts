@@ -4,7 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { Dek, Doc, EncryptedBlob } from "../wasm/airday_core_web.js";
+import { Dek, Doc, EncryptedBlob } from "../wasm/monoplan_core_web.js";
 
 const LIST_MAIN = "inbox";
 

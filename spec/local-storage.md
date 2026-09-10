@@ -161,7 +161,7 @@ Initial attachment is not a live mutation stream. The web store materializes onc
 Pre-release rule (see `AGENTS.md`): exactly one migration file per database, edited in place — never incremental migrations, never legacy bridges. Old-layout data is abandoned, not drained.
 
 - **CLI**: `crates/storage-sqlite/migrations/001_init.sql` (+ the CLI's `001_cli` account table). The old outbox-era `ops` schema was replaced in place.
-- **Web**: the engine stores live in the single `airday-web` IDB database (`docs` / `ops` / `snapshots` / `inflight`) alongside the config stores. The v9 upgrade recreates `ops` as the WAL (v8's outbox-era rows are abandoned; authed devices re-pull and the snapshot baseline carries anonymous docs) and adds the `inflight` store.
+- **Web**: the engine stores live in the single `monoplan-web` IDB database (`docs` / `ops` / `snapshots` / `inflight`) alongside the config stores. The v9 upgrade recreates `ops` as the WAL (v8's outbox-era rows are abandoned; authed devices re-pull and the snapshot baseline carries anonymous docs) and adds the `inflight` store.
 
 ## Testing
 

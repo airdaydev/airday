@@ -40,7 +40,7 @@ import type { DocApp } from "./sync/store.ts";
 // rationale as the board prefs in Workspace.tsx. Cleared on logout (see
 // App.tsx) so signing out re-prompts. The user can still reopen the
 // dialog any time via the cloud-off indicator.
-const AUTH_DISMISSED_KEY = "airday:auth-prompt-dismissed";
+const AUTH_DISMISSED_KEY = "monoplan:auth-prompt-dismissed";
 export function loadAuthPromptDismissed(): boolean {
   try {
     return localStorage.getItem(AUTH_DISMISSED_KEY) === "1";
@@ -67,7 +67,7 @@ function markAuthPromptDismissed(): void {
 // the nav. Groundwork for shared workspaces: each workspace will get its
 // own collapsible heading, and the personal one is the first. Purely
 // local UI state, same localStorage rationale as the flag above.
-const PERSONAL_COLLAPSED_KEY = "airday:nav-personal-collapsed";
+const PERSONAL_COLLAPSED_KEY = "monoplan:nav-personal-collapsed";
 function loadPersonalCollapsed(): boolean {
   try {
     return localStorage.getItem(PERSONAL_COLLAPSED_KEY) === "1";
@@ -811,7 +811,7 @@ export function NavMenu(props: {
       const json = props.app.engine.exportJson();
       const blob = new Blob([json], { type: "application/json" });
       const stamp = new Date().toISOString().slice(0, 10);
-      triggerDownload(blob, `airday-${stamp}.json`);
+      triggerDownload(blob, `monoplan-${stamp}.json`);
     } catch (err) {
       console.error("export json failed:", err);
       alert(m().nav.exportFailed);

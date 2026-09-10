@@ -16,7 +16,7 @@ PATCH  /api/devices/:device_id         (rename a device)
 DELETE /api/devices/:device_id
 ```
 
-WebSocket upgrade: `GET /api/sync` with `Authorization: Bearer <device_token>` (CLI) or the `airday_device` cookie (web). Server validates on upgrade; the connection is bound to `(account_id, device_id)` for its lifetime. No per-message auth. (Frame encoding + version handshake: see `sync-protocol.md`.)
+WebSocket upgrade: `GET /api/sync` with `Authorization: Bearer <device_token>` (CLI) or the `monoplan_device` cookie (web). Server validates on upgrade; the connection is bound to `(account_id, device_id)` for its lifetime. No per-message auth. (Frame encoding + version handshake: see `sync-protocol.md`.)
 
 All HTTP request and response bodies are MessagePack-encoded (`Content-Type: application/msgpack`). Same encoding as the WS path; one wire format across the system.
 
@@ -30,10 +30,10 @@ Forever tokens in both threat models. A compromised CLI host hands the attacker 
 
 ### Web (cookie transport)
 
-- Token-issuing endpoints (`signup`, `login`, `password/reset`, `POST /devices`) attach `Set-Cookie: airday_device=<token>; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=34560000` alongside the response body. Body keeps the token because the CLI consumes it; web ignores the body's token field and trusts the cookie. `Max-Age` is 400 days — the browser-honoured maximum (Chrome/Firefox/Safari clamp longer values). The token is forever-lived, so the cookie should persist as long as browsers allow; a *session* cookie (no `Max-Age`) is discarded by mobile Safari/WebKit on backgrounded-tab memory reclaim, silently de-authing the client while the server session is still valid.
-- `DeviceAuth` extractor and the WS upgrade try `Authorization: Bearer` first, fall back to the `airday_device` cookie. CLI is unaffected.
-- `POST /api/account/logout` (authed): revokes the calling device's token server-side and emits `Set-Cookie: airday_device=; Max-Age=0`. `DELETE /api/devices/:id` retains its existing semantics (revoke any device by id) and does not touch cookies.
-- Web bundle and API must share registrable domain (`SameSite=Strict` permits same-site cross-origin, e.g. `app.airday.io` → `api.airday.io`). Self-hosted instances serve their own bundle from their own domain; we do not support one web bundle pointed at arbitrary remote APIs.
+- Token-issuing endpoints (`signup`, `login`, `password/reset`, `POST /devices`) attach `Set-Cookie: monoplan_device=<token>; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=34560000` alongside the response body. Body keeps the token because the CLI consumes it; web ignores the body's token field and trusts the cookie. `Max-Age` is 400 days — the browser-honoured maximum (Chrome/Firefox/Safari clamp longer values). The token is forever-lived, so the cookie should persist as long as browsers allow; a *session* cookie (no `Max-Age`) is discarded by mobile Safari/WebKit on backgrounded-tab memory reclaim, silently de-authing the client while the server session is still valid.
+- `DeviceAuth` extractor and the WS upgrade try `Authorization: Bearer` first, fall back to the `monoplan_device` cookie. CLI is unaffected.
+- `POST /api/account/logout` (authed): revokes the calling device's token server-side and emits `Set-Cookie: monoplan_device=; Max-Age=0`. `DELETE /api/devices/:id` retains its existing semantics (revoke any device by id) and does not touch cookies.
+- Web bundle and API must share registrable domain (`SameSite=Strict` permits same-site cross-origin, e.g. `app.monoplan.io` → `api.monoplan.io`). Self-hosted instances serve their own bundle from their own domain; we do not support one web bundle pointed at arbitrary remote APIs.
 - CSRF mitigation: `SameSite=Strict`. No double-submit token currently.
 
 ## Account model
@@ -50,8 +50,8 @@ Client-side derivation (one Argon2id pass, two HKDF splits):
 
 ```
 master       = Argon2id(password, master_salt)
-kek          = HKDF(master, info = "airday/kek/v1")
-auth_secret  = HKDF(master, info = "airday/auth/v1")
+kek          = HKDF(master, info = "monoplan/kek/v1")
+auth_secret  = HKDF(master, info = "monoplan/auth/v1")
 ```
 
 - `kek` is used to wrap/unwrap the DEK. **Never leaves the client.**
@@ -71,7 +71,7 @@ Minimum length **10 characters**, no composition rules. Client-enforced at every
 
 Client cannot derive `auth_secret` without the salt. Standard pattern:
 
-1. `POST /api/account/prelogin { email }` → server returns `{ password_salt, kdf_params }`, or **404 if email unknown**. We accept that this leaks account existence: signup (duplicate-email rejection) and recovery already leak the same bit, so faking a deterministic dummy salt here would be theatre while costing every typo'd-email attempt a full client-side Argon2id pass. Defence is rate-limiting (per-IP + per-email backoff), not response shaping. Revisit only if Airday ever holds data where "is X a user" is itself sensitive.
+1. `POST /api/account/prelogin { email }` → server returns `{ password_salt, kdf_params }`, or **404 if email unknown**. We accept that this leaks account existence: signup (duplicate-email rejection) and recovery already leak the same bit, so faking a deterministic dummy salt here would be theatre while costing every typo'd-email attempt a full client-side Argon2id pass. Defence is rate-limiting (per-IP + per-email backoff), not response shaping. Revisit only if Monoplan ever holds data where "is X a user" is itself sensitive.
 2. Client computes `master`, `kek`, `auth_secret` from the password and salt.
 3. `POST /api/account/login { email, auth_secret }` → server verifies, returns `{ wrapped_dek, wrapped_dek_nonce, recovery_present, device_token? }` (device_token only if registering this client as a device in the same call; otherwise client follows up with `POST /api/devices`).
 4. Client unwraps DEK with `kek`.

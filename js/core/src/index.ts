@@ -1,5 +1,5 @@
-// @airday/core — storage adapters + types. The wasm-bindgen surface
-// (`Doc`, `Dek`, `SyncEngine`, ...) lives at `@airday/core/wasm` so
+// @monoplan/core — storage adapters + types. The wasm-bindgen surface
+// (`Doc`, `Dek`, `SyncEngine`, ...) lives at `@monoplan/core/wasm` so
 // the conditional export resolves to the bundler-target build under
 // Vite and the nodejs-target build under Bun without callers
 // thinking about it.
@@ -10,7 +10,7 @@ export {
   type EngineBootRows,
   type InFlightPushJs,
 } from "./storage/idb-storage.ts";
-export { openAirdayDb, _resetAirdayDbForTests } from "./storage/web-db.ts";
+export { openMonoplanDb, _resetMonoplanDbForTests } from "./storage/web-db.ts";
 export { readOrMintPeerSlot } from "./storage/peer-slots.ts";
 export { getDevice, putDevice } from "./storage/device-store.ts";
 export {

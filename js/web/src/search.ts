@@ -4,7 +4,7 @@
 // doc materializes and maintained incrementally from the same AppEvent
 // stream the store dispatches.
 
-import type { AppEventJs } from "@airday/core/wasm";
+import type { AppEventJs } from "@monoplan/core/wasm";
 import {
   lifecycleOf as itemLifecycleOf,
   parseWorkflowState,

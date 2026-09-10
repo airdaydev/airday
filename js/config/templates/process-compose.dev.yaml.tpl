@@ -11,14 +11,14 @@ processes:
       exit_on_end: false
 
   server:
-    command: cargo run -p airday-server
+    command: cargo run -p monoplan-server
     environment:
-      - RUST_LOG={{ env "AIRDAY_LOG_LEVEL" }}
+      - RUST_LOG={{ env "MONOPLAN_LOG_LEVEL" }}
       - RUST_BACKTRACE=1
     readiness_probe:
       http_get:
-        host: {{ env "AIRDAY_HOST" }}
-        port: {{ env "AIRDAY_PORT" }}
+        host: {{ env "MONOPLAN_HOST" }}
+        port: {{ env "MONOPLAN_PORT" }}
         path: /healthz
       initial_delay_seconds: 3
       period_seconds: 2

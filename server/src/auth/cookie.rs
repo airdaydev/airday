@@ -1,12 +1,12 @@
 //! Web cookie transport for the device token. CLI uses
 //! `Authorization: Bearer <token>`; the browser receives a
-//! `Set-Cookie: airday_device=...` on every endpoint that mints a token
+//! `Set-Cookie: monoplan_device=...` on every endpoint that mints a token
 //! and the same name on `Cookie:` for subsequent requests. See
 //! `spec/auth.md`.
 
 use axum::http::{HeaderMap, HeaderValue, header};
 
-pub const COOKIE_NAME: &str = "airday_device";
+pub const COOKIE_NAME: &str = "monoplan_device";
 
 /// `Max-Age` for the device cookie: 400 days, the maximum any modern
 /// browser will honour (Chrome 104+, Firefox, Safari all clamp longer
@@ -41,7 +41,7 @@ pub fn clear_cookie(secure: bool) -> HeaderValue {
 }
 
 /// Extract the device token from any `Cookie:` header on the request.
-/// Returns `None` when no `airday_device` cookie is present.
+/// Returns `None` when no `monoplan_device` cookie is present.
 pub fn token_from_cookies(headers: &HeaderMap) -> Option<&str> {
     for hv in headers.get_all(header::COOKIE).iter() {
         let Ok(s) = hv.to_str() else { continue };

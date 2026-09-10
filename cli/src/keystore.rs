@@ -4,13 +4,13 @@
 //! integration drops into one place rather than threading through every
 //! command.
 
-use airday_core::{Dek, Kek, PasswordMaster};
-use airday_protocol::KdfParams;
+use monoplan_core::{Dek, Kek, PasswordMaster};
+use monoplan_protocol::KdfParams;
 
 #[derive(Debug, thiserror::Error)]
 pub enum KeystoreError {
     #[error(transparent)]
-    Crypto(#[from] airday_core::CryptoError),
+    Crypto(#[from] monoplan_core::CryptoError),
     #[error("invalid hex: {0}")]
     Hex(#[from] hex::FromHexError),
 }
@@ -20,7 +20,7 @@ pub fn derive_master(
     salt: &[u8],
     params: KdfParams,
 ) -> Result<PasswordMaster, KeystoreError> {
-    Ok(airday_core::derive_password_master(
+    Ok(monoplan_core::derive_password_master(
         password.as_bytes(),
         salt,
         params,

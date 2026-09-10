@@ -1,7 +1,7 @@
 //! Strongly-typed key material.
 //!
 //! Each type is a thin newtype around a 32-byte secret. They are *not*
-//! `Serialize` — wire types live in `airday-protocol` and convert via
+//! `Serialize` — wire types live in `monoplan-protocol` and convert via
 //! `as_bytes()`. Drop zeroes the bytes.
 
 use zeroize::{Zeroize, ZeroizeOnDrop};

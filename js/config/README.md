@@ -1,6 +1,6 @@
 # Config generation
 
-Renders Airday's runtime config files from templates in `templates/`. Two profiles: `dev` (local artifacts under
+Renders Monoplan's runtime config files from templates in `templates/`. Two profiles: `dev` (local artifacts under
 `local/`) and `deploy` (renders to `deploy/rendered/` on the production box —
 see `deploy/README.md`).
 
@@ -11,13 +11,13 @@ see `deploy/README.md`).
 cp js/config/.env.dev.example js/config/.env
 bun run config
 
-# deploy — runs on the box during ci.sh, reads /opt/airday/.env
+# deploy — runs on the box during ci.sh, reads /opt/monoplan/.env
 bun run config:deploy
 ```
 
 Dev outputs:
 
-- `local/server.toml` — server config, picked up by `airday-server`'s default
+- `local/server.toml` — server config, picked up by `monoplan-server`'s default
   `--config` path.
 - `local/process-compose.yaml` — `process-compose` recipe for running the
   server + web dev stack together. Run from the repo root:
@@ -25,10 +25,10 @@ Dev outputs:
 
 Deploy outputs:
 
-- `deploy/rendered/server.toml` — installed at `/etc/airday/server.toml`
+- `deploy/rendered/server.toml` — installed at `/etc/monoplan/server.toml`
   by `deploy/ci.sh`.
 - `deploy/rendered/Caddyfile` — referenced directly by `caddy.service`
-  via the `/opt/airday/current` symlink.
+  via the `/opt/monoplan/current` symlink.
 
 The whole `local/` and `deploy/rendered/` dirs are gitignored.
 

@@ -20,8 +20,8 @@
 import { describe, expect, test } from "bun:test";
 import { decode, encode } from "@msgpack/msgpack";
 
-import { Dek, Doc, EncryptedBlob, SyncEngine } from "../wasm/airday_core_web.js";
-import type { EngineStorage } from "../wasm/airday_core_web.js";
+import { Dek, Doc, EncryptedBlob, SyncEngine } from "../wasm/monoplan_core_web.js";
+import type { EngineStorage } from "../wasm/monoplan_core_web.js";
 import { MemEngineStorage, unhex } from "./mem-engine-storage.ts";
 
 const PROTOCOL_VERSION = 1;

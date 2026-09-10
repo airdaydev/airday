@@ -1,9 +1,9 @@
-//! Airday FFI — the Rust↔Swift boundary for the Apple clients.
+//! Monoplan FFI — the Rust↔Swift boundary for the Apple clients.
 //!
 //! Layers 1 & 2 of `spec/swift-ffi-plan.md`: an *offline* capture/read
 //! surface only. No sync, no auth, no HTTP — the `SyncEngine` is not
-//! exposed. One uniffi object, [`AirdayStore`], owns the sqlite storage,
-//! the live `Doc`, and the DEK, mirroring what `airday_core::boot_doc`
+//! exposed. One uniffi object, [`MonoplanStore`], owns the sqlite storage,
+//! the live `Doc`, and the DEK, mirroring what `monoplan_core::boot_doc`
 //! does for the CLI: boot the doc from persisted ops on open, and after
 //! every mutation capture the fresh Loro delta into an encrypted oplog
 //! row so a later reopen replays it. Key management (Keychain) is the
@@ -15,10 +15,10 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use airday_core::{
+use monoplan_core::{
     Dek, Doc, DocId, ItemView as CoreItemView, ListView as CoreListView, LocalStorage, boot_doc,
 };
-use airday_storage_sqlite::{DbError, SqliteStorage};
+use monoplan_storage_sqlite::{DbError, SqliteStorage};
 use uuid::Uuid;
 
 uniffi::setup_scaffolding!();
@@ -27,9 +27,9 @@ uniffi::setup_scaffolding!();
 /// `doc_id`; since the offline prototype has no server-assigned account
 /// doc, a fixed well-known id keeps open/reopen pointing at the same
 /// rows. (Layer 3 sync will replace this with the account's primary doc.)
-const FFI_DOC_ID: DocId = DocId(Uuid::from_bytes(*b"airday-ffi-doc!!"));
+const FFI_DOC_ID: DocId = DocId(Uuid::from_bytes(*b"monoplan-ffi-doc"));
 
-const DB_FILE: &str = "airday.sqlite";
+const DB_FILE: &str = "monoplan.sqlite";
 
 // ---------- errors ----------
 
@@ -37,7 +37,7 @@ const DB_FILE: &str = "airday.sqlite";
 /// message per variant so Swift gets a readable `error.localizedDescription`
 /// without needing to model core's error trees.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
-pub enum AirdayError {
+pub enum MonoplanError {
     #[error("storage: {message}")]
     Storage { message: String },
     #[error("doc: {message}")]
@@ -48,37 +48,37 @@ pub enum AirdayError {
     InvalidKey { message: String },
 }
 
-impl From<airday_core::StorageError> for AirdayError {
-    fn from(e: airday_core::StorageError) -> Self {
-        AirdayError::Storage {
+impl From<monoplan_core::StorageError> for MonoplanError {
+    fn from(e: monoplan_core::StorageError) -> Self {
+        MonoplanError::Storage {
             message: e.to_string(),
         }
     }
 }
-impl From<airday_core::DocError> for AirdayError {
-    fn from(e: airday_core::DocError) -> Self {
-        AirdayError::Doc {
+impl From<monoplan_core::DocError> for MonoplanError {
+    fn from(e: monoplan_core::DocError) -> Self {
+        MonoplanError::Doc {
             message: e.to_string(),
         }
     }
 }
-impl From<airday_core::BootError> for AirdayError {
-    fn from(e: airday_core::BootError) -> Self {
-        AirdayError::Boot {
+impl From<monoplan_core::BootError> for MonoplanError {
+    fn from(e: monoplan_core::BootError) -> Self {
+        MonoplanError::Boot {
             message: e.to_string(),
         }
     }
 }
-impl From<DbError> for AirdayError {
+impl From<DbError> for MonoplanError {
     fn from(e: DbError) -> Self {
-        AirdayError::Storage {
+        MonoplanError::Storage {
             message: e.to_string(),
         }
     }
 }
-impl From<airday_core::CryptoError> for AirdayError {
-    fn from(e: airday_core::CryptoError) -> Self {
-        AirdayError::InvalidKey {
+impl From<monoplan_core::CryptoError> for MonoplanError {
+    fn from(e: monoplan_core::CryptoError) -> Self {
+        MonoplanError::InvalidKey {
             message: e.to_string(),
         }
     }
@@ -86,7 +86,7 @@ impl From<airday_core::CryptoError> for AirdayError {
 
 // ---------- flat view records ----------
 
-/// Flat mirror of `airday_core::ItemView` for the FFI boundary. `state`
+/// Flat mirror of `monoplan_core::ItemView` for the FFI boundary. `state`
 /// is the workflow register's name (`"backlog"` … `"done"`,
 /// `spec/data-model.md` "Lifecycle") and `lifecycle_at` its transition
 /// time; `binned_at` is the orthogonal bin mask, `done_at` the
@@ -122,7 +122,7 @@ impl From<CoreItemView> for ItemView {
     }
 }
 
-/// Flat mirror of `airday_core::ListView`.
+/// Flat mirror of `monoplan_core::ListView`.
 #[derive(uniffi::Record)]
 pub struct ListView {
     pub id: String,
@@ -149,7 +149,7 @@ impl From<CoreListView> for ListView {
 /// step needs `&mut Doc` (`mark_persisted_at`). The `Mutex` gives both — and
 /// serialises the otherwise-single-threaded calls a UI makes.
 #[derive(uniffi::Object)]
-pub struct AirdayStore {
+pub struct MonoplanStore {
     doc_id: DocId,
     dek: Dek,
     storage: SqliteStorage,
@@ -157,17 +157,17 @@ pub struct AirdayStore {
 }
 
 #[uniffi::export]
-impl AirdayStore {
-    /// Open (creating if needed) `<dir>/airday.sqlite` and boot the doc
+impl MonoplanStore {
+    /// Open (creating if needed) `<dir>/monoplan.sqlite` and boot the doc
     /// from its persisted ops. First open on an empty dir yields a fresh
     /// empty doc. `dek` is the raw 32-byte data-encryption key.
     #[uniffi::constructor]
-    pub fn open(dir: String, dek: Vec<u8>) -> Result<Arc<AirdayStore>, AirdayError> {
+    pub fn open(dir: String, dek: Vec<u8>) -> Result<Arc<MonoplanStore>, MonoplanError> {
         let dek = Dek::from_bytes(&dek)?;
         let path = PathBuf::from(dir).join(DB_FILE);
         let storage = SqliteStorage::open(&path)?;
         let (doc, _boot_meta) = boot_doc(&storage, &dek, FFI_DOC_ID, None)?;
-        Ok(Arc::new(AirdayStore {
+        Ok(Arc::new(MonoplanStore {
             doc_id: FFI_DOC_ID,
             dek,
             storage,
@@ -175,32 +175,32 @@ impl AirdayStore {
         }))
     }
 
-    pub fn add_item(&self, list_id: String, text: String) -> Result<String, AirdayError> {
+    pub fn add_item(&self, list_id: String, text: String) -> Result<String, MonoplanError> {
         let mut doc = self.doc.lock().expect("doc mutex poisoned");
         let id = doc.add_item(&list_id, &text)?;
         self.persist(&mut doc)?;
         Ok(id)
     }
 
-    pub fn edit_item_text(&self, item_id: String, text: String) -> Result<(), AirdayError> {
+    pub fn edit_item_text(&self, item_id: String, text: String) -> Result<(), MonoplanError> {
         let mut doc = self.doc.lock().expect("doc mutex poisoned");
         doc.edit_item_text(&item_id, &text)?;
         self.persist(&mut doc)
     }
 
-    pub fn set_item_done(&self, item_id: String, done: bool) -> Result<(), AirdayError> {
+    pub fn set_item_done(&self, item_id: String, done: bool) -> Result<(), MonoplanError> {
         let mut doc = self.doc.lock().expect("doc mutex poisoned");
         doc.set_item_done(&item_id, done)?;
         self.persist(&mut doc)
     }
 
-    pub fn set_item_binned(&self, item_id: String, binned: bool) -> Result<(), AirdayError> {
+    pub fn set_item_binned(&self, item_id: String, binned: bool) -> Result<(), MonoplanError> {
         let mut doc = self.doc.lock().expect("doc mutex poisoned");
         doc.set_item_binned(&item_id, binned)?;
         self.persist(&mut doc)
     }
 
-    pub fn add_list(&self, name: String) -> Result<String, AirdayError> {
+    pub fn add_list(&self, name: String) -> Result<String, MonoplanError> {
         let mut doc = self.doc.lock().expect("doc mutex poisoned");
         let id = doc.add_list(&name)?;
         self.persist(&mut doc)?;
@@ -210,7 +210,7 @@ impl AirdayStore {
     /// Add a reference to `item_id` in the Focus lens (`spec/focus.md`).
     /// `index` is the 0-based visible position; `None` appends. No-op if
     /// the item is already focused or is not Open.
-    pub fn add_to_focus(&self, item_id: String, index: Option<u32>) -> Result<(), AirdayError> {
+    pub fn add_to_focus(&self, item_id: String, index: Option<u32>) -> Result<(), MonoplanError> {
         let mut doc = self.doc.lock().expect("doc mutex poisoned");
         let at = index.map(|i| i as usize).unwrap_or(usize::MAX);
         doc.add_to_focus(&item_id, at)?;
@@ -219,14 +219,14 @@ impl AirdayStore {
 
     /// Remove `item_id`'s reference(s) from the Focus lens. The item is
     /// untouched (it stays in its home list).
-    pub fn remove_from_focus(&self, item_id: String) -> Result<(), AirdayError> {
+    pub fn remove_from_focus(&self, item_id: String) -> Result<(), MonoplanError> {
         let mut doc = self.doc.lock().expect("doc mutex poisoned");
         doc.remove_from_focus(&item_id)?;
         self.persist(&mut doc)
     }
 
     /// Reorder `item_id`'s reference to 0-based visible position `index`.
-    pub fn move_in_focus(&self, item_id: String, index: u32) -> Result<(), AirdayError> {
+    pub fn move_in_focus(&self, item_id: String, index: u32) -> Result<(), MonoplanError> {
         let mut doc = self.doc.lock().expect("doc mutex poisoned");
         doc.move_in_focus(&item_id, index as usize)?;
         self.persist(&mut doc)
@@ -262,14 +262,14 @@ impl AirdayStore {
     }
 }
 
-impl AirdayStore {
+impl MonoplanStore {
     /// Capture the doc's uncaptured Loro delta into an encrypted WAL
     /// row, so a later reopen replays it. Mirrors
     /// `SyncEngine::capture_local_ops` minus the wire concerns: seal
     /// the delta, append it to the WAL, and advance the capture
     /// cursor. Events the mutation queued are drained and dropped —
     /// nothing consumes them offline.
-    fn persist(&self, doc: &mut Doc) -> Result<(), AirdayError> {
+    fn persist(&self, doc: &mut Doc) -> Result<(), MonoplanError> {
         if doc.has_uncaptured_ops() {
             // Snapshot the oplog VV before export so a concurrent commit
             // stays uncaptured for the next capture (matches the engine).
@@ -310,7 +310,7 @@ mod tests {
         let done_id;
         let binned_id;
         {
-            let store = AirdayStore::open(dir_str.clone(), dek.clone()).unwrap();
+            let store = MonoplanStore::open(dir_str.clone(), dek.clone()).unwrap();
             store.add_item("inbox".into(), "first".into()).unwrap();
             done_id = store.add_item("inbox".into(), "second".into()).unwrap();
             store.set_item_done(done_id.clone(), true).unwrap();
@@ -327,7 +327,7 @@ mod tests {
             );
         } // drop: no explicit close; storage was synchronously durable.
 
-        let store = AirdayStore::open(dir_str, dek).unwrap();
+        let store = MonoplanStore::open(dir_str, dek).unwrap();
         let main = store.items_in_list("inbox".into());
         assert_eq!(
             main.iter().map(|i| i.text.as_str()).collect::<Vec<_>>(),

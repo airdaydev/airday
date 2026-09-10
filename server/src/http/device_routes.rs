@@ -1,9 +1,9 @@
 //! Device list / register / rename / revoke handlers. All require bearer auth.
 
-use airday_protocol::{
+use axum::extract::{Path, State};
+use monoplan_protocol::{
     Device, DeviceCredential, DeviceRegistration, DeviceRenameRequest, DevicesListResponse,
 };
-use axum::extract::{Path, State};
 use uuid::Uuid;
 
 use crate::auth::DeviceAuth;
@@ -18,7 +18,8 @@ pub async fn list(
     auth: DeviceAuth,
 ) -> ApiResult<Msgpack<DevicesListResponse>> {
     let rows = list_devices(&state.db, auth.account_id).await?;
-    let server_last_seq = crate::sync::queries::latest_doc_seq(&state.db, auth.primary_doc_id).await?;
+    let server_last_seq =
+        crate::sync::queries::latest_doc_seq(&state.db, auth.primary_doc_id).await?;
     Ok(Msgpack(DevicesListResponse {
         devices: rows
             .into_iter()

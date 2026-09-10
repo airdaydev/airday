@@ -4,7 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { Dek, deriveLogin, wrapDek, unwrapDek } from "../wasm/airday_core_web.js";
+import { Dek, deriveLogin, wrapDek, unwrapDek } from "../wasm/monoplan_core_web.js";
 
 describe("Dek.seal / Dek.open round-trip", () => {
   test("seal then open recovers the plaintext", () => {

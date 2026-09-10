@@ -56,6 +56,13 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 ## CI
 - sqlite migrations
 
+## Other names?
+picoplan.app
+monofolio.app
+contraplane.app
+aeroplan.app
+dayplane.app
+
 ## Maybe/later
 - Encoding habits?
 - vi keys (as an option)

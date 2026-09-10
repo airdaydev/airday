@@ -1,4 +1,4 @@
-# Airday web-UI list-perf survey — handoff
+# Monoplan web-UI list-perf survey — handoff
 
 > Working design/handoff doc (not a finalized contract). Companion to the
 > "Performance note" in [`data-model.md`](data-model.md). Move/rename freely.
@@ -89,14 +89,14 @@ sync engine reaches steady-state `Idle`.
 - Loro's own movable-list `UndoManager::undo` work still scales with document
   size; at 13k lifetime items a reloaded-doc move undo measured ~30ms native
   while redo measured <1ms. Twenty moves undo in ~267ms native. The former
-  Airday full rebuild/diff and distance amplification are gone.
+  Monoplan full rebuild/diff and distance amplification are gone.
 - `delete_list` / `empty_bin` — O(N) once, rare and explicitly bulk.
 
 Measured terms (native M1 release, 13k lifetime items; wasm ≈2–4×):
 `add_item` 0.11ms · `set_item_done` 0.08ms · `set_items_binned(1)`
 0.14ms · `apply_remote(1 op)` 0.7ms · `snapshot_blob` 40ms ·
 `iter_items().collect()` 14ms · `rebuild_item_index` 7.6ms. Re-run via
-`cargo test -p airday-core --release bench_mutation_terms_at_13k --
+`cargo test -p monoplan-core --release bench_mutation_terms_at_13k --
 --ignored --nocapture`.
 
 ### v2 per-list order schema (2026-07-04)

@@ -1,13 +1,13 @@
 //
-//  AirdayUITestsLaunchTests.swift
-//  AirdayUITests
+//  MonoplanUITestsLaunchTests.swift
+//  MonoplanUITests
 //
 //  Created by Daniel Gormly on 5/5/2026.
 //
 
 import XCTest
 
-final class AirdayUITestsLaunchTests: XCTestCase {
+final class MonoplanUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

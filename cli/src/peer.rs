@@ -27,7 +27,7 @@ pub enum PeerError {
     #[error("peer lease: {0}")]
     Io(#[from] std::io::Error),
     #[error(transparent)]
-    Storage(#[from] airday_core::StorageError),
+    Storage(#[from] monoplan_core::StorageError),
 }
 
 /// An exclusive claim on one peer slot. Commits made by a `Doc` booted

@@ -1,12 +1,12 @@
 //! CLI local persistence.
 //!
 //! The generic doc storage — the `ops` / `snapshots` log and the
-//! `LocalStorage` trait impl — now lives in `airday-storage-sqlite` so
+//! `LocalStorage` trait impl — now lives in `monoplan-storage-sqlite` so
 //! the FFI / native app builds can share it. This module is the thin
 //! CLI-specific layer on top: it adds the singleton `account` identity
 //! row and the per-doc sync-cursor columns to the *same* db file, and
 //! re-exports the DEK-holding boot/seed/load glue (which lives beside the
-//! `LocalStorage` trait in `airday-core`).
+//! `LocalStorage` trait in `monoplan-core`).
 //!
 //! `SqliteStorage` here is a newtype over the shared backend. It carries
 //! the CLI's inherent account/cursor queries (which reach the shared
@@ -17,19 +17,19 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use airday_core::{
+use monoplan_core::{
     BootState, DocId, InFlightPush, LocalSeq, LocalStorage, PushId, RemoteWalRow, ServerSeq,
     StorageError,
 };
-use airday_protocol::EncryptedBlob;
-use airday_storage_sqlite::SqliteStorage as SqliteBackend;
+use monoplan_protocol::EncryptedBlob;
+use monoplan_storage_sqlite::SqliteStorage as SqliteBackend;
 use rusqlite::{Connection, OptionalExtension, params};
 use uuid::Uuid;
 
 use crate::config::Profile;
 
-pub use airday_core::{BootError, boot_doc, has_unsynced_ops, load_doc, seed_snapshot};
-pub use airday_storage_sqlite::DbError;
+pub use monoplan_core::{BootError, boot_doc, has_unsynced_ops, load_doc, seed_snapshot};
+pub use monoplan_storage_sqlite::DbError;
 
 /// Ledger name for the CLI's extra migration (`cli/migrations/001_init.sql`).
 /// Distinct from the storage crate's own `"001_init"` so both can live in
@@ -183,7 +183,7 @@ impl SqliteStorage {
     }
 
     /// Persist the observability timestamp only — the "Last sync" shown
-    /// by `airday status`. Deliberately separate from the resume cursor:
+    /// by `monoplan status`. Deliberately separate from the resume cursor:
     /// the engine owns `last_acked_server_seq` (via the `LocalStorage`
     /// trait's `write_acked_seq`), while `last_sync_at` is a CLI-only
     /// stamp nothing in the sync path reads. (Creates the `docs` row if
@@ -201,7 +201,7 @@ impl SqliteStorage {
     }
 
     /// Drop the doc cache (WAL + snapshot + in-flight push) and reset
-    /// every sync cursor, keeping account identity. Backs `airday cache
+    /// every sync cursor, keeping account identity. Backs `monoplan cache
     /// clear`: the next sync rehydrates from server_seq 0.
     pub fn clear_cache(&self, doc_id: DocId) -> Result<(), StorageError> {
         let mut conn = self.conn().lock().expect("SqliteStorage mutex poisoned");

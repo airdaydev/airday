@@ -1,5 +1,5 @@
 {
-  "name": "@airday/web",
+  "name": "@monoplan/web",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@airday/core": "workspace:*",
+    "@monoplan/core": "workspace:*",
     "@corvu/calendar": "^0.1.2",
     "@kobalte/core": "^0.13.12",
     "@msgpack/msgpack": "^3.1.3",

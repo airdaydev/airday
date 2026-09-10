@@ -12,7 +12,7 @@
 	}
 }
 
-{{ mustEnv "AIRDAY_HOST" }} {
+{{ mustEnv "MONOPLAN_HOST" }} {
 	import common_proxy
 
 	# Health + API + admin + sync WebSocket → Rust server.
@@ -27,12 +27,12 @@
 	# stick — do not move the API onto a separate subdomain without
 	# revisiting `cookie_same_site` and CORS in the server config.
 	handle {
-		root * /opt/airday/current/js/web/dist
+		root * /opt/monoplan/current/js/web/dist
 		try_files {path} /index.html
 		file_server
 	}
 }
 
-www.{{ mustEnv "AIRDAY_HOST" }} {
-	redir https://{{ mustEnv "AIRDAY_HOST" }}{uri} 308
+www.{{ mustEnv "MONOPLAN_HOST" }} {
+	redir https://{{ mustEnv "MONOPLAN_HOST" }}{uri} 308
 }

@@ -1,5 +1,5 @@
 //! CLI-side sync runtime — a thin tokio-tungstenite adapter that
-//! drives the sans-IO `airday_core::SyncEngine`.
+//! drives the sans-IO `monoplan_core::SyncEngine`.
 //!
 //! `Session` is the per-invocation handle: open at command start, mutate
 //! the local Loro doc via `session.doc()`, `flush()` at end. With sync
@@ -10,15 +10,15 @@
 //! Offline-by-default per `spec/cli.md`:
 //! - Default: no network. Mutations are persisted locally and ship on
 //!   the next sync invocation.
-//! - `--sync` / `-s` / `AIRDAY_SYNC=1`: attempt WS connect with a 2s
+//! - `--sync` / `-s` / `MONOPLAN_SYNC=1`: attempt WS connect with a 2s
 //!   timeout. Failure → local-only with a stderr warning. The dedicated
-//!   `airday sync` command treats connect failure as a hard error.
+//!   `monoplan sync` command treats connect failure as a hard error.
 
 use std::time::Duration;
 
-use airday_core::{Doc, DocId, EngineOptions, Event, SyncEngine};
 use futures_util::{SinkExt, StreamExt};
 use http::header::AUTHORIZATION;
+use monoplan_core::{Doc, DocId, EngineOptions, Event, SyncEngine};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
@@ -45,13 +45,13 @@ pub enum SyncError {
     #[error(transparent)]
     Keystore(#[from] KeystoreError),
     #[error(transparent)]
-    Doc(#[from] airday_core::DocError),
+    Doc(#[from] monoplan_core::DocError),
     #[error(transparent)]
     Db(#[from] crate::storage::DbError),
     #[error(transparent)]
-    Boot(#[from] airday_core::BootError),
+    Boot(#[from] monoplan_core::BootError),
     #[error("storage: {0}")]
-    Storage(#[from] airday_core::StorageError),
+    Storage(#[from] monoplan_core::StorageError),
     #[error(transparent)]
     Peer(#[from] crate::peer::PeerError),
     #[error("ws: {0}")]
@@ -99,7 +99,7 @@ impl Session {
 
     /// As `open`, but takes an explicit profile. Used by tests that
     /// need to point the runtime at a tempdir without mutating
-    /// process-global state (the `AIRDAY_DATA_DIR` env var).
+    /// process-global state (the `MONOPLAN_DATA_DIR` env var).
     pub async fn open_with_profile(profile: Profile, sync: bool) -> Result<Self, SyncError> {
         let config = profile.read_config()?;
         let secrets = profile.read_secrets()?;
@@ -127,7 +127,7 @@ impl Session {
             dek,
             boot_meta.last_acked_server_seq.0,
             EngineOptions {
-                client_name: "airday-cli".into(),
+                client_name: "monoplan-cli".into(),
                 client_version: env!("CARGO_PKG_VERSION").into(),
             },
             Box::new(storage),
@@ -252,7 +252,7 @@ impl Session {
 
     /// Stamp "last successful online sync" = now. Called only after a
     /// confirmed online exchange — never on an offline or purely local
-    /// flush — so `airday status` reports when this device actually last
+    /// flush — so `monoplan status` reports when this device actually last
     /// reached the server, not when it last ran a command. Pure
     /// observability; nothing in the sync path reads it.
     fn mark_synced(&mut self) -> Result<(), SyncError> {
@@ -310,7 +310,7 @@ fn drain_events(engine: &mut SyncEngine) -> Vec<Event> {
 }
 
 fn sync_requested(flag: bool) -> bool {
-    flag || std::env::var("AIRDAY_SYNC")
+    flag || std::env::var("MONOPLAN_SYNC")
         .map(|v| v != "0" && !v.is_empty())
         .unwrap_or(false)
 }
@@ -375,8 +375,8 @@ mod tests {
             "ws://localhost:8080/api/sync"
         );
         assert_eq!(
-            ws_url("https://airday.example/"),
-            "wss://airday.example/api/sync"
+            ws_url("https://monoplan.example/"),
+            "wss://monoplan.example/api/sync"
         );
         assert_eq!(
             ws_url("ws://localhost:9000"),
@@ -387,15 +387,15 @@ mod tests {
     #[test]
     fn sync_env_var_honoured() {
         // SAFETY: tests run single-threaded under #[test] within this
-        // module; no other test reads/writes AIRDAY_SYNC.
+        // module; no other test reads/writes MONOPLAN_SYNC.
         // FIXME: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::set_var("AIRDAY_SYNC", "1") };
+        unsafe { std::env::set_var("MONOPLAN_SYNC", "1") };
         assert!(sync_requested(false));
         // FIXME: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::set_var("AIRDAY_SYNC", "0") };
+        unsafe { std::env::set_var("MONOPLAN_SYNC", "0") };
         assert!(!sync_requested(false));
         // FIXME: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::remove_var("AIRDAY_SYNC") };
+        unsafe { std::env::remove_var("MONOPLAN_SYNC") };
         assert!(!sync_requested(false));
         assert!(sync_requested(true));
     }

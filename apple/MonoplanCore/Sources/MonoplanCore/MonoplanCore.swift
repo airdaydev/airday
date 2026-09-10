@@ -1,9 +1,9 @@
 // Thin, hand-written convenience layer over the uniffi-generated API
-// (`Generated/airday_ffi.swift`). Deliberately minimal — no abstraction
+// (`Generated/monoplan_ffi.swift`). Deliberately minimal — no abstraction
 // layer yet; just the ergonomics the generated records don't provide.
 //
-// The generated symbols (`AirdayStore`, `ItemView`, `ListView`,
-// `generateDek()`, `AirdayError`) are already `public` and re-exported
+// The generated symbols (`MonoplanStore`, `ItemView`, `ListView`,
+// `generateDek()`, `MonoplanError`) are already `public` and re-exported
 // as part of this module.
 
 import Foundation

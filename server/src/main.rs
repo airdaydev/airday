@@ -2,14 +2,14 @@ use std::io::{self, IsTerminal};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use airday_server::{AppState, Config, build_info, router};
 use argon2::Argon2;
 use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::{PasswordHasher, SaltString};
 use clap::{Parser, Subcommand};
+use monoplan_server::{AppState, Config, build_info, router};
 
 #[derive(Parser, Debug)]
-#[command(name = "airday-server", version, about = "Airday relay server")]
+#[command(name = "monoplan-server", version, about = "Monoplan relay server")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
@@ -77,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(
         addr = %listener.local_addr()?,
         build.git_sha = build_info::GIT_SHA,
-        "airday-server listening"
+        "monoplan-server listening"
     );
     axum::serve(listener, app).await?;
     Ok(())

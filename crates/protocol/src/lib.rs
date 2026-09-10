@@ -1,4 +1,4 @@
-//! Wire types shared across `airday-server`, `airday-core`, and `airday`.
+//! Wire types shared across `monoplan-server`, `monoplan-core`, and `monoplan`.
 //!
 //! All types are MessagePack-encoded via `rmp-serde` on both the HTTP
 //! and WebSocket paths. Byte fields use `serde_bytes` so MessagePack

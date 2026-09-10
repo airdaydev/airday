@@ -1,6 +1,6 @@
 // Per-account device row — sync identity + the "last synced" stamp.
 //
-// Lives in the `device` store of the `airday-web` database (alongside
+// Lives in the `device` store of the `monoplan-web` database (alongside
 // vault + prefs and the engine op log), keyed per account. The resume
 // cursor used to live here too, but it's now the engine's: persisted in
 // the `docs` store via `IdbStorage.writeAckedSeq` (clamped to the
@@ -9,7 +9,7 @@
 // "Synced …" status and never consulted by the sync path.
 
 import { type DeviceConfig, normalizeDeviceConfig } from "./adapter.ts";
-import { openAirdayDb, STORE_DEVICE } from "./web-db.ts";
+import { openMonoplanDb, STORE_DEVICE } from "./web-db.ts";
 
 interface DeviceRow {
   account_id: string;
@@ -19,7 +19,7 @@ interface DeviceRow {
 export async function getDevice(
   accountId: string,
 ): Promise<DeviceConfig | null> {
-  const db = await openAirdayDb();
+  const db = await openMonoplanDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_DEVICE, "readonly");
     const req = tx.objectStore(STORE_DEVICE).get(accountId);
@@ -35,7 +35,7 @@ export async function putDevice(
   accountId: string,
   device: DeviceConfig,
 ): Promise<void> {
-  const db = await openAirdayDb();
+  const db = await openMonoplanDb();
   const row: DeviceRow = { account_id: accountId, device };
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_DEVICE, "readwrite");

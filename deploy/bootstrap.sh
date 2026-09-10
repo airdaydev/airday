@@ -1,5 +1,5 @@
 #!/bin/bash
-# Bootstrap a fresh Debian 13 server for Airday.
+# Bootstrap a fresh Debian 13 server for Monoplan.
 # Run as root on the box:
 #   ssh root@<ip> 'bash -s' < deploy/bootstrap.sh
 #
@@ -11,13 +11,13 @@ set -euo pipefail
 
 REPO_URL="${REPO_URL:-git@github.com:danielgormly/airday.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
-BASE_DIR="/opt/airday"
+BASE_DIR="/opt/monoplan"
 SOURCE_DIR="$BASE_DIR/source"
 RELEASES_DIR="$BASE_DIR/releases"
 CURRENT_LINK="$BASE_DIR/current"
 CARGO_TARGET_DIR="$BASE_DIR/cargo-target"
-DATA_DIR="/var/lib/airday"
-ETC_DIR="/etc/airday"
+DATA_DIR="/var/lib/monoplan"
+ETC_DIR="/etc/monoplan"
 
 echo "==> Updating apt + base packages"
 apt-get update && apt-get upgrade -y
@@ -71,42 +71,42 @@ if ! command -v bun >/dev/null 2>&1; then
 fi
 bun --version
 
-echo "==> Creating airday user"
-if ! id -u airday >/dev/null 2>&1; then
-  useradd -m -s /bin/bash airday
+echo "==> Creating monoplan user"
+if ! id -u monoplan >/dev/null 2>&1; then
+  useradd -m -s /bin/bash monoplan
 fi
-cat >/etc/sudoers.d/airday <<'EOF'
-airday ALL=(root) NOPASSWD: /bin/systemctl daemon-reload
-airday ALL=(root) NOPASSWD: /bin/systemctl restart caddy.service
-airday ALL=(root) NOPASSWD: /bin/systemctl restart airday.service
+cat >/etc/sudoers.d/monoplan <<'EOF'
+monoplan ALL=(root) NOPASSWD: /bin/systemctl daemon-reload
+monoplan ALL=(root) NOPASSWD: /bin/systemctl restart caddy.service
+monoplan ALL=(root) NOPASSWD: /bin/systemctl restart monoplan.service
 EOF
-chmod 440 /etc/sudoers.d/airday
+chmod 440 /etc/sudoers.d/monoplan
 
 echo "==> Cloning repo"
 mkdir -p "$SOURCE_DIR" "$RELEASES_DIR" "$(dirname "$CARGO_TARGET_DIR")"
 if [ ! -d "$SOURCE_DIR/.git" ]; then
   # First clone runs as root because the deploy key is typically in
-  # /root/.ssh; chown afterwards so the airday user owns subsequent
+  # /root/.ssh; chown afterwards so the monoplan user owns subsequent
   # fetches.
   git clone -b "$REPO_BRANCH" "$REPO_URL" "$SOURCE_DIR"
 fi
-chown -R airday:airday "$BASE_DIR"
+chown -R monoplan:monoplan "$BASE_DIR"
 touch "$BASE_DIR/.env"
-chown airday:airday "$BASE_DIR/.env"
+chown monoplan:monoplan "$BASE_DIR/.env"
 chmod 600 "$BASE_DIR/.env"
 
 echo "==> Creating data + config dirs"
 mkdir -p "$DATA_DIR" "$ETC_DIR"
-chown -R airday:airday "$DATA_DIR"
-chown root:airday "$ETC_DIR"
+chown -R monoplan:monoplan "$DATA_DIR"
+chown root:monoplan "$ETC_DIR"
 chmod 0750 "$ETC_DIR"
 
 echo "==> Installing systemd units"
 ln -sfn "$SOURCE_DIR" "$CURRENT_LINK"
-install -m 0644 "$SOURCE_DIR/deploy/systemd/airday.service" /etc/systemd/system/airday.service
+install -m 0644 "$SOURCE_DIR/deploy/systemd/monoplan.service" /etc/systemd/system/monoplan.service
 install -m 0644 "$SOURCE_DIR/deploy/systemd/caddy.service" /etc/systemd/system/caddy.service
 systemctl daemon-reload
-systemctl enable airday.service
+systemctl enable monoplan.service
 systemctl enable caddy.service
 
 cat <<'EOF'
@@ -114,11 +114,11 @@ cat <<'EOF'
 ==> Bootstrap complete.
 
 Next steps:
-  1. cp /opt/airday/source/js/config/.env.deploy.example /opt/airday/.env
-     and fill in AIRDAY_HOST + CADDY_EMAIL (mode 0600, owned by airday).
-  2. Make sure DNS for AIRDAY_HOST points at this box (Caddy uses HTTP-01).
-  3. Run the first deploy as the airday user:
-       sudo -u airday bash /opt/airday/source/deploy/ci.sh
-  4. Watch:  journalctl -u airday -u caddy -f
+  1. cp /opt/monoplan/source/js/config/.env.deploy.example /opt/monoplan/.env
+     and fill in MONOPLAN_HOST + CADDY_EMAIL (mode 0600, owned by monoplan).
+  2. Make sure DNS for MONOPLAN_HOST points at this box (Caddy uses HTTP-01).
+  3. Run the first deploy as the monoplan user:
+       sudo -u monoplan bash /opt/monoplan/source/deploy/ci.sh
+  4. Watch:  journalctl -u monoplan -u caddy -f
 
 EOF

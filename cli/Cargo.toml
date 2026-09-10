@@ -1,21 +1,21 @@
 [package]
-name = "airday"
+name = "monoplan"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "airday"
+name = "monoplan"
 path = "src/main.rs"
 
 [lib]
-name = "airday_cli"
+name = "monoplan_cli"
 path = "src/lib.rs"
 
 [dependencies]
-airday-protocol = { path = "../crates/protocol" }
-airday-core = { path = "../core" }
-airday-storage-sqlite = { path = "../crates/storage-sqlite" }
+monoplan-protocol = { path = "../crates/protocol" }
+monoplan-core = { path = "../core" }
+monoplan-storage-sqlite = { path = "../crates/storage-sqlite" }
 tokio = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
@@ -42,6 +42,6 @@ http = "1"
 futures-util = "0.3"
 
 [dev-dependencies]
-airday-server = { path = "../server" }
+monoplan-server = { path = "../server" }
 tempfile = "3"
 axum = { workspace = true }

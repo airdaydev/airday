@@ -17,7 +17,7 @@ content.
 Generate a hash by piping one password line to:
 
 ```sh
-airday-server hash-admin-password
+monoplan-server hash-admin-password
 ```
 
 ## `GET /admin/stats`

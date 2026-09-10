@@ -1,5 +1,5 @@
-use airday_cli::sync::Session;
-use airday_core::LIST_INBOX;
+use monoplan_cli::sync::Session;
+use monoplan_core::LIST_INBOX;
 
 mod support;
 
@@ -181,7 +181,7 @@ async fn recovery_reset_bootstraps_fresh_device_with_existing_items() {
     session_b.flush().await.unwrap();
 
     let profile_b = reopen_profile(tmp_b.path());
-    let storage = airday_cli::storage::open_storage(&profile_b).unwrap();
+    let storage = monoplan_cli::storage::open_storage(&profile_b).unwrap();
     let account = storage.read_account().unwrap();
     let cursor = storage.read_sync_cursor(account.primary_doc_id).unwrap();
     assert!(
