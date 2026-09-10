@@ -296,9 +296,18 @@ export function Workspace(props: {
   // navigates elsewhere (`spec/urls.md`). Declared here so opens can drop
   // it.
   const [pendingItemId, setPendingItemId] = createSignal<string | null>(null);
+  // Identity for a view, for equality checks (`ViewKey` objects are
+  // recreated freely).
+  const viewKey = (v: ViewKey) => (v.kind === "list" ? `list:${v.id}` : v.kind);
+  // The view the entered item was entered under. Navigating to another
+  // view closes the item (the view-change effect below); a route that
+  // reveals + enters in one batch has already switched the view by the
+  // time it enters, so the record matches and the item survives.
+  let openedViewKey: string | null = null;
   const setOpenItemId = (id: string | null) =>
     batch(() => {
       setPendingItemId(null);
+      openedViewKey = id === null ? null : viewKey(untrack(view));
       setOpenItemIdRaw(id);
     });
   // Rows the move palette will re-file (visible order), or null when the
@@ -559,7 +568,7 @@ export function Workspace(props: {
   createEffect(
     on(
       view,
-      () => {
+      (v) => {
         selection.clear();
         // A draft is scoped to the list it was started in; switching
         // away discards it (no save) and collapses.
@@ -567,6 +576,17 @@ export function Workspace(props: {
         setExpandedKey(null);
         // Moving on abandons an unresolved item link.
         setPendingItemId(null);
+        // Navigating away closes the entered item, so the address bar
+        // drops to the new view's token and the side pane re-follows
+        // that view's selection instead of holding a row from the
+        // previous one (`spec/urls.md`). The selection clear above
+        // doesn't do this (an emptied selection leaves the item alone,
+        // see the selection-follow effect). Exempt: an item entered
+        // under this very view, i.e. a reveal that switched view and
+        // entered in one batch.
+        if (untrack(openItemId) !== null && openedViewKey !== viewKey(v)) {
+          setOpenItemId(null);
+        }
       },
       { defer: true },
     ),
@@ -1501,7 +1521,6 @@ export function Workspace(props: {
   // items, matching its nav visibility). Wraps at both ends. From a view that
   // isn't in the sequence (e.g. an emptied Bin), ] enters at the top and
   // [ at the bottom, so the bracket pair always re-enters the set.
-  const viewKey = (v: ViewKey) => (v.kind === "list" ? `list:${v.id}` : v.kind);
   const onBracketNavigate = (e: KeyboardEvent) => {
     if (e.key !== "[" && e.key !== "]") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;

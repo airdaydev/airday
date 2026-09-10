@@ -88,7 +88,12 @@ and the side-panel state are prefs, not URL state: the URL names
 
 History entries:
 
-- A view change pushes an entry.
+- A view change pushes an entry. Navigating to another view (nav,
+  `[` / `]`, digits, a Find pick of a view) also closes the entered
+  item: the URL becomes the new view's token and the side panel goes
+  back to following that view's selection. The item's own entry stays
+  below, so Back returns to it. A route that reveals an item switches
+  view and opens it in one step, so that switch does not close it.
 - An explicit item open (row open, Enter, a Find pick, a link) pushes
   one entry, so Back closes the item. Switching from one open item to
   another replaces it. Selection-driven passive opens (the side panel
