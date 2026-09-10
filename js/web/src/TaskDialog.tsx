@@ -97,9 +97,10 @@ export function TaskDialog(props: {
    *  list). Fires from Kobalte's close-auto-focus hook, which we take over
    *  to steer focus back to the listbox instead of the trigger. */
   onClosed?: () => void;
-  /** Side-panel shell only: plain Enter in the title hands keyboard focus
-   *  back to the list/board without closing the item (the pane keeps
-   *  showing it). The owner focuses its items listbox here. */
+  /** Side-panel shell only: plain Enter in the title (or Escape) hands
+   *  keyboard focus back to the list/board without closing the item (the
+   *  pane keeps showing it). The owner focuses its items listbox here and
+   *  demotes the open back to passive, the inverse of `onFocused`. */
   onReleaseFocus?: () => void;
   /** Side-panel shell only: focus entered the pane (a click into it)
    *  while the open was passive. The owner promotes it to an explicit

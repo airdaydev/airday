@@ -1770,8 +1770,14 @@ export function Workspace(props: {
         !state.listsById[route.view.id]
       )
         return;
+      const sameView = viewKey(route.view) === viewKey(untrack(view));
       batch(() => {
-        setOpenItemId(null);
+        // A pop back onto the view already on screen leaves a passive
+        // open alone: the URL never named it, so the side panel keeps
+        // following the selection (this is the pop the mirror effect
+        // issues when the panel hands focus back to the list). Anything
+        // else closes the item.
+        if (!(sameView && untrack(openPassive))) setOpenItemId(null);
         // Only switch when the route names a different view. Closing an
         // explicitly opened item pops the history entry it pushed, and
         // that popstate routes back to the view already on screen: a
@@ -1779,7 +1785,7 @@ export function Workspace(props: {
         // view-change effect (selection cleared, draft dropped), which is
         // how Enter-to-close in the list view used to lose the row's
         // selection. Board selections live inside Board and never saw it.
-        if (viewKey(route.view) !== viewKey(untrack(view))) setView(route.view);
+        if (!sameView) setView(route.view);
       });
       return;
     }
@@ -1804,7 +1810,11 @@ export function Workspace(props: {
   });
 
   // The item the URL names: the open item unless the open is passive
-  // (selection-driven), which the address bar doesn't follow.
+  // (selection-driven, or handed back to the list), which the address
+  // bar doesn't follow. In the side panel "open" is thus "has focus":
+  // Enter on a row / a click into the pane promotes, Escape / Enter in
+  // the pane demotes, and the URL tracks that the way it tracks the
+  // modal opening and closing.
   const urlItemId = (): string | null => (openPassive() ? null : openItemId());
 
   // State → address bar. History rules: a view change pushes; an
@@ -1812,8 +1822,8 @@ export function Workspace(props: {
   // in `history.state`; item → item replaces; a passive (selection-
   // driven) open reads as no item, so arrowing away from an explicitly
   // opened item drops the URL back to the view token in place; closing
-  // an item we pushed for goes Back instead of leaving a duplicate
-  // entry. The first run (boot) always replaces.
+  // an item we pushed for, or demoting it to passive, goes Back instead
+  // of leaving a duplicate entry. The first run (boot) always replaces.
   const ITEM_ENTRY = { airdayItem: true };
   let prevUrlState: { viewKey: string; item: string | null } | undefined;
   createEffect(() => {
@@ -1833,17 +1843,11 @@ export function Workspace(props: {
     const opened = prev.item === null && item !== null;
     const closed = prev.item !== null && item === null;
     if (closed && !viewChanged && history.state?.airdayItem === true) {
-      if (passive) {
-        // A selection-driven close (the side panel moving on to the next
-        // selected row, or swapping to its multi-select surface) stays
-        // on this entry rather than popping it mid-interaction. Drop the
-        // marker so a later close doesn't pop for it either; the spare
-        // entry is inert (Back re-lands on the same view).
-        history.replaceState(null, "", hash);
-        return;
-      }
       // The popstate handler sees the view we're already on and leaves
-      // it (and the selection) alone.
+      // it (and the selection) alone; when the close is a demotion
+      // (`passive`: the pane handing focus back, or swapping to its
+      // multi-select surface) it leaves the panel's item alone too, so
+      // an Enter / Escape cycle in the pane nets zero history.
       history.back();
       return;
     }
@@ -2264,7 +2268,14 @@ export function Workspace(props: {
         lists={activeLists}
         passive={openPassive}
         onClosed={restoreItemsFocus}
-        onReleaseFocus={restoreItemsFocus}
+        onReleaseFocus={() => {
+          // Handing focus back demotes the open to passive: the pane
+          // keeps showing the item, but the address bar (which follows
+          // focus in the side panel, `spec/urls.md`) drops back to the
+          // view, as closing the modal would.
+          setOpenPassive(true);
+          restoreItemsFocus();
+        }}
         onFocused={() => setOpenPassive(false)}
         onLiveText={(text) => {
           const id = openItemId();

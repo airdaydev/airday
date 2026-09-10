@@ -73,7 +73,12 @@ otherwise. "Open" here means explicitly entered (row open, Enter, a
 Find pick, a link). The side panel passively following the list
 selection does not count: the URL stays on the view token until the
 user actually focuses the item, either by opening it explicitly or by
-clicking into the panel, which promotes the passive open. Board vs list mode, lane visibility
+clicking into the panel, which promotes the passive open. Handing
+focus back to the list from the panel (Escape, or Enter in the title)
+demotes it again: the panel keeps showing the item, but the URL
+returns to the view token. In the side panel, "open" is therefore
+"has focus", so the address bar behaves the same whether the item is
+in the modal or the panel. Board vs list mode, lane visibility
 and the side-panel state are prefs, not URL state: the URL names
 *what*, prefs name *how*.
 
@@ -86,7 +91,11 @@ History entries:
   following the list selection) never touch the URL; arrowing away from
   an explicitly opened item replaces its entry with the view's token in
   place, so arrowing through a list never grows history.
-- Closing the item replaces the entry with the view's token.
+- Closing the item pops the entry its open pushed (so Back and close
+  land on the same place); demoting a side-panel open to passive
+  (focus handed back, or the panel swapping to its multi-select
+  surface) pops the same way, so a focus-in / focus-out cycle in the
+  panel leaves history unchanged.
 - Boot writes the initial hash with a replace, never a push.
 
 Back / Forward and hand-edited hashes apply the route the same way a
