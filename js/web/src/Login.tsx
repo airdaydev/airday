@@ -46,7 +46,7 @@ export interface Session {
 
 /** Illustration shown as the left half of the auth dialog on wide
  *  screens; hidden on narrow viewports (see `.auth-dialog-art`). */
-const AUTH_ART_URL = "https://rustfs.yokoso.golf/media/monoplan.png";
+const AUTH_ART_URL = "/monoplan-badge.png";
 
 function defaultDeviceName(): string {
   return `web-${typeof navigator !== "undefined" ? navigator.platform : "unknown"}`;
