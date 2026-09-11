@@ -93,7 +93,8 @@ export function TaskDialog(props: {
    *  the non-modal shells land the caret. False while the side pane is
    *  merely following the list selection, which leaves focus on the list.
    *  Notifies (without changing) on a re-entry of the same item, which
-   *  re-lands the caret. Treated as true when omitted. */
+   *  re-lands the caret. Treated as true when omitted, and ignored for a
+   *  new-item capture, which always lands the caret. */
   entered?: () => boolean;
   /** Called as the dialog closes so the owner can restore focus (to the
    *  list). Fires from Kobalte's close-auto-focus hook, which we take over
@@ -1105,7 +1106,10 @@ export function TaskDialog(props: {
     // when the same item is re-entered (`entered` notifies).
     props.itemId();
     newItemTarget();
-    if (props.entered?.() === false) return;
+    // A capture has no row to follow: it is always entered, whatever the
+    // owner's entered flag (keyed on an open item id, which a new item
+    // doesn't have yet) says.
+    if (!isNew() && props.entered?.() === false) return;
     // A click into the pane entered it with focus already where the
     // user put it; don't yank the caret to the title.
     if (shellRef?.contains(document.activeElement)) return;
