@@ -1,6 +1,6 @@
 # Monoplan
 
-[Monoplan](https://air.day/) is an e2ee, local-first, tasks/reminders app i.e. todo list, with conflict resolution backed by Loro. It is optimised for ergonomics and frictionless capture and will work offline.
+[Monoplan](https://monoplan.app/) is an e2ee, local-first, tasks/reminders app i.e. todo list, with conflict resolution backed by Loro. It is optimised for ergonomics and frictionless capture and will work offline.
 
 ⚠️ ATTN: Monoplan is undergoing extensive and frequent changes, you can use it locally, but you may have to manually export and import data between updates.
 

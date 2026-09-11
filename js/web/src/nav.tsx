@@ -933,7 +933,7 @@ export function NavMenu(props: {
             <DropdownMenu.Item
               class="dropdown-menu-item"
               as="a"
-              href="https://air.day/"
+              href="https://monoplan.app/"
               target="_blank"
               rel="noopener noreferrer"
             >
